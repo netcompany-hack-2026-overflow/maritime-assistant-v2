@@ -2,90 +2,99 @@
 
 [![CI](https://github.com/netcompany-hack-2026-overflow/maritime-assistant-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/netcompany-hack-2026-overflow/maritime-assistant-v2/actions/workflows/ci.yml)
 
-**Tidewise: Smart Maritime Operations Assistant.** Built for Netcompany Hackathon
-Athens 2026, Challenge #2. *Arrive on time, not early.*
+> 🇬🇧 English version: [README.en.md](README.en.md)
 
-A fleet operator gets a one-line email from a port agent: *"berth delayed 24 hours."*
-Today someone has to read that, remember which ship it affects, do mental arithmetic
-about fuel, and decide whether to slow the ship down. This tool does the reading, the
-matching, and the arithmetic — and then stops and asks a human to approve or reject
-the recommendation. **Nothing is executed automatically.**
+**Tidewise: Έξυπνος Βοηθός Ναυτιλιακών Επιχειρήσεων.** Αναπτύχθηκε για το Netcompany
+Hackathon Athens 2026, Challenge #2. *Φτάσε στην ώρα σου, όχι νωρίτερα.*
 
-## The idea in one scenario
+Ένας διαχειριστής στόλου λαμβάνει ένα email μίας γραμμής από τον πράκτορα του λιμανιού:
+*«η θέση πρόσδεσης καθυστερεί 24 ώρες».* Σήμερα κάποιος πρέπει να το διαβάσει, να θυμηθεί
+ποιο πλοίο αφορά, να κάνει πρόχειρους υπολογισμούς για το καύσιμο και να αποφασίσει αν θα
+μειώσει την ταχύτητα του πλοίου. Το Tidewise κάνει την ανάγνωση, την αντιστοίχιση και τους
+υπολογισμούς — και μετά σταματά και ζητά από έναν άνθρωπο να εγκρίνει ή να απορρίψει τη
+σύσταση. **Τίποτα δεν εκτελείται αυτόματα.**
 
-MV Aegean Star is sailing Piraeus → Rotterdam at 14.0 kn. A port-agent email arrives:
-Rotterdam's berth is delayed by 24 hours. Instead of steaming at full speed and
-anchoring outside port for a day, the ship can slow down just enough to arrive exactly
-when the new berth is ready — burning less fuel for the same outcome. This is called
-**just-in-time (JIT) arrival**, and the saving comes from a cube-law relationship
-between speed and fuel burn: `fuel(v) = fuel_design * (v / v_design)³`. A small drop in
-speed buys a disproportionately large drop in fuel burn.
+## Η ιδέα σε ένα σενάριο
 
-Worked example (the reference case checked by
-[packages/shared/src/__tests__/jit.test.ts](packages/shared/src/__tests__/jit.test.ts)):
+Το MV Aegean Star ταξιδεύει Πειραιάς → Ρότερνταμ με 14,0 κόμβους. Φτάνει email από τον
+πράκτορα: η θέση πρόσδεσης στο Ρότερνταμ καθυστερεί 24 ώρες. Αντί να πλέει με πλήρη ταχύτητα
+και να περιμένει μια μέρα στην αγκυροβολία, το πλοίο μπορεί να επιβραδύνει όσο ακριβώς
+χρειάζεται για να φτάσει τη στιγμή που η νέα θέση είναι έτοιμη — καίγοντας λιγότερο καύσιμο
+για το ίδιο αποτέλεσμα. Αυτό λέγεται **άφιξη just-in-time (JIT)**. Η εξοικονόμηση προκύπτει
+από τον κυβικό νόμο ταχύτητας–κατανάλωσης: `fuel(v) = fuel_design * (v / v_design)³`.
+Μια μικρή μείωση ταχύτητας φέρνει δυσανάλογα μεγάλη μείωση στην κατανάλωση.
 
-| | Plan A — rush & wait at anchor | Plan B — slow-steam (JIT) |
+Παράδειγμα (η περίπτωση αναφοράς που ελέγχεται στο
+[packages/shared/src/\_\_tests\_\_/jit.test.ts](packages/shared/src/__tests__/jit.test.ts)):
+
+| | Σχέδιο A — βιασύνη & αναμονή στην άγκυρα | Σχέδιο B — αργή πλεύση (JIT) |
 |---|---|---|
-| Speed | 14.0 kn | 10.9 kn |
-| Distance remaining | 1200 nm | 1200 nm |
-| Time at sea | 85.7 h | 109.7 h |
-| Time waiting at anchor | 24.0 h | 0 h |
-| Fuel burned | ~145.9 t | ~87.2 t |
+| Ταχύτητα | 14,0 kn | 10,9 kn |
+| Απόσταση που απομένει | 1200 nm | 1200 nm |
+| Χρόνος στη θάλασσα | 85,7 h | 109,7 h |
+| Αναμονή στην άγκυρα | 24,0 h | 0 h |
+| Καύσιμο | ~145,9 t | ~87,2 t |
 
-**Saved: ~58.7 t of fuel, ~€35,200 (at €600/t), ~182.7 t of CO₂.** The app shows every
-one of these numbers — not just the total — under "Show the math" on the Actions page,
-so a human reviewer can check the reasoning before approving.
+**Εξοικονόμηση: ~58,7 t καυσίμου, ~€35.200 (με €600/t), ~182,7 t CO₂.** Η εφαρμογή δείχνει
+κάθε έναν από αυτούς τους αριθμούς — όχι μόνο το σύνολο — στο «Show the math» της σελίδας
+Actions, ώστε ο άνθρωπος να ελέγξει το σκεπτικό πριν εγκρίνει.
 
-## The 90-second demo path
+## Το demo σε 90 δευτερόλεπτα
 
-0. **Landing** (`/`): what Tidewise does in one screen; "Open the console" goes to the app.
-1. **Fleet** — a live 3D globe shows 8 fictional vessels in motion (simulated at
-   `SIM_SPEED`× real time). MV Aegean Star is underway, Piraeus → Rotterdam, at 14.0 kn.
-2. **Inbox** — click "Simulate incoming email" to release the queued Rotterdam
-   berth-delay notice. It gets extracted into a structured port event (highlighted
-   directly in the email body) and matched to MV Aegean Star's voyage.
-3. **Actions** — a recommendation is waiting: slow from 14.0 kn to roughly 10.7–12 kn
-   and save roughly 45–60 t of fuel (~€27–36k), depending on that day's mock weather
-   (calm water gives 10.7 kn / 57 t / €34k). Expand "Show the math" to see every step,
-   including the weather inputs, then **Approve**.
-4. **Fleet** — MV Aegean Star is now visibly slower on the globe, and its ETA has
-   moved to match the new berth time exactly.
-5. **Ask** — ask "How much fuel have we saved from approved recommendations?" and get
-   an answer with a citation back to the recommendation record.
-6. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
-   `apps/web/public/samples/algeciras-berth-notice.pdf` (also downloadable from the
-   Inbox page). The PDF's text runs through the same pipeline and produces a
-   recommendation for MV Ionian Trader.
+0. **Landing** (`/`): τι κάνει το Tidewise σε μία οθόνη· το «Open the console» ανοίγει την εφαρμογή.
+1. **Fleet** — μια ζωντανή 3D υδρόγειος δείχνει 8 φανταστικά πλοία σε κίνηση (προσομοίωση
+   με ταχύτητα `SIM_SPEED`× του πραγματικού χρόνου). Τα πλοία ακολουθούν πραγματικές
+   θαλάσσιες διαδρομές (Γιβραλτάρ, Σουέζ, Μάλακα…). Το MV Aegean Star πλέει Πειραιάς →
+   Ρότερνταμ με 14,0 kn.
+2. **Inbox** — πατήστε «Simulate incoming email» για να έρθει η ειδοποίηση καθυστέρησης
+   στο Ρότερνταμ. Εξάγεται σε δομημένο port event (με επισήμανση μέσα στο κείμενο του
+   email) και αντιστοιχίζεται στο ταξίδι του MV Aegean Star.
+3. **Actions** — περιμένει μια σύσταση: μείωση από 14,0 kn σε περίπου 10,7–12 kn και
+   εξοικονόμηση περίπου 45–60 t καυσίμου (~€27–36 χιλ.), ανάλογα με τον (mock) καιρό της
+   ημέρας. Ανοίξτε το «Show the math» για να δείτε κάθε βήμα, μαζί με τα δεδομένα καιρού,
+   και πατήστε **Approve**.
+4. **Fleet** — το MV Aegean Star κινείται πλέον εμφανώς πιο αργά και η ETA του ταιριάζει
+   ακριβώς με τη νέα ώρα πρόσδεσης.
+5. **Ask** — ρωτήστε «How much fuel have we saved from approved recommendations?» και
+   πάρτε απάντηση με παραπομπή στην εγγραφή της σύστασης.
+6. **Settings** (προαιρετικά) — αλλάξτε την τιμή καυσίμου (€/t). Οι εκκρεμείς συστάσεις
+   επανυπολογίζονται αμέσως με τη νέα τιμή.
+7. **Έγγραφα** (προαιρετικά) — στο Inbox, «Upload PDF» με το δείγμα
+   `apps/web/public/samples/algeciras-berth-notice.pdf` (διαθέσιμο και από τη σελίδα
+   Inbox). Το κείμενο του PDF περνά από την ίδια ροή και παράγει σύσταση για το MV Ionian
+   Trader.
 
-## Pages
+## Σελίδες
 
-- **Landing** (`/`) — hero page explaining the product, with a live "fuel saved so far"
-  figure and a link into the console. The console pages live under `/fleet`, `/voyages`,
-  `/inbox`, `/actions`, `/ask`.
-- **Fleet** — 3D globe (dotted-land style) with every vessel's live position, heading,
-  and route arc; a side list of ships; click a ship for a detail drawer. Ships with a
-  pending recommendation are highlighted. A "Saved to date" tile totals fuel, € and
-  CO₂ saved by every approved recommendation.
-- **Voyages** — a table of every voyage with a "New voyage" form: pick a vessel and two
-  ports (via dropdowns or by clicking a small rotating globe), see a live distance/ETA
-  preview, and create or cancel voyages.
-- **Inbox** — queued and processed port-agent emails. "Simulate incoming email"
-  releases the next queued one; "Paste email" lets you type a custom one; "Upload PDF"
-  turns a text-based PDF (berth notice, port circular) into an inbox item. Processing an
-  email shows the extracted fields with their exact source text highlighted in the
-  original body, which voyage it matched (or why it didn't), and the recommendation it
-  produced.
-- **Actions** — pending and historical recommendations. Each card shows the KPI
-  tiles (fuel/cost/CO₂ saved), a plain-English rationale, a full "Show the math"
-  breakdown of every intermediate JIT calculation value, a "Facts used" section that
-  expands the underlying email/port-event/voyage records, and Approve/Reject controls
-  (reject requires a reason). Approving updates the voyage's speed and ETA atomically
-  and logs the decision.
-- **Ask** — free-text questions over the fleet data, answered by the LLM provider from
-  a fixed set of rows (never free-form knowledge), with citations back to real
-  table+id records. Citations the model invents are dropped server-side.
+- **Landing** (`/`) — αρχική σελίδα που εξηγεί το προϊόν, με ζωντανό σύνολο «fuel saved so
+  far» και σύνδεσμο προς την κονσόλα. Οι σελίδες της κονσόλας είναι οι `/fleet`,
+  `/voyages`, `/inbox`, `/actions`, `/ask`, `/settings`.
+- **Fleet** — 3D υδρόγειος με τη ζωντανή θέση, την πορεία και την υπόλοιπη θαλάσσια
+  διαδρομή κάθε πλοίου, καθώς και τα λιμάνια (πράσινα, με ονόματα) στην πραγματική τους
+  θέση. Πλαϊνή λίστα πλοίων· κλικ σε πλοίο ανοίγει τις λεπτομέρειές του. Τα πλοία με
+  εκκρεμή σύσταση επισημαίνονται. Το πλακίδιο «Saved to date» αθροίζει καύσιμο, € και CO₂
+  από όλες τις εγκεκριμένες συστάσεις.
+- **Voyages** — πίνακας όλων των ταξιδιών με φόρμα «New voyage»: επιλέξτε πλοίο και δύο
+  λιμάνια (από λίστα ή με κλικ σε μια μικρή υδρόγειο), δείτε τη θαλάσσια διαδρομή και
+  ζωντανή εκτίμηση απόστασης/ETA, και δημιουργήστε ή ακυρώστε ταξίδια.
+- **Inbox** — emails πρακτόρων σε αναμονή και επεξεργασμένα. Το «Simulate incoming email»
+  φέρνει το επόμενο· το «Paste email» δέχεται δικό σας κείμενο· το «Upload PDF» μετατρέπει
+  ένα PDF με κείμενο (ειδοποίηση πρόσδεσης, εγκύκλιο λιμανιού) σε email. Η επεξεργασία
+  δείχνει τα πεδία που εξήχθησαν με το ακριβές κείμενο-πηγή επισημασμένο, με ποιο ταξίδι
+  ταίριαξε (ή γιατί δεν ταίριαξε) και τη σύσταση που προέκυψε.
+- **Actions** — εκκρεμείς και παλαιότερες συστάσεις. Κάθε κάρτα έχει KPIs
+  (καύσιμο/κόστος/CO₂), αιτιολόγηση σε απλή γλώσσα, πλήρη ανάλυση «Show the math» για κάθε
+  ενδιάμεση τιμή του υπολογισμού JIT, ενότητα «Facts used» με τις εγγραφές email/port
+  event/ταξιδιού, και κουμπιά Approve/Reject (η απόρριψη απαιτεί αιτιολογία). Η έγκριση
+  ενημερώνει ταχύτητα και ETA του ταξιδιού ατομικά και καταγράφει την απόφαση.
+- **Ask** — ελεύθερες ερωτήσεις για τα δεδομένα του στόλου, που απαντώνται από το LLM
+  μόνο με βάση συγκεκριμένες εγγραφές (ποτέ από «γενική γνώση»), με παραπομπές σε
+  πραγματικές εγγραφές πίνακας+id. Παραπομπές που επινοεί το μοντέλο απορρίπτονται στον server.
+- **Settings** — η τιμή καυσίμου (€/t, VLSFO) που χρησιμοποιείται σε κάθε υπολογισμό
+  εξοικονόμησης. Με την αποθήκευση επανυπολογίζονται μόνο οι εκκρεμείς συστάσεις· οι
+  εγκεκριμένες και οι απορριφθείσες κρατούν την τιμή με την οποία αποφασίστηκαν.
 
-## Architecture
+## Αρχιτεκτονική
 
 ```mermaid
 flowchart LR
@@ -96,6 +105,7 @@ flowchart LR
         Api["apps/api<br/>Express + TypeScript"]
         Llm["LLM abstraction<br/>mock / anthropic / openai"]
         Sim["Simulation engine<br/>(visual speed vs. operational time)"]
+        Route["Sea routing<br/>searoute-js"]
     end
     Db[("PostgreSQL<br/>via Prisma")]
     Shared["packages/shared<br/>geo + JIT math + zod schemas"]
@@ -103,25 +113,29 @@ flowchart LR
     Web -- REST /api/* --> Api
     Api --> Llm
     Api --> Sim
+    Api --> Route
     Api --> Db
     Web -. types/functions .-> Shared
     Api -. types/functions .-> Shared
 ```
 
-The LLM is never called directly from routes: every extraction, rationale, and
-Q&A answer goes through `getLlmProvider()`
-([apps/api/src/llm/index.ts](apps/api/src/llm/index.ts)), which picks `anthropic` or
-`openai` only if that provider is selected **and** its API key is present, and falls
-back to a deterministic regex-based `mock` provider otherwise — so the whole app works
-with zero API keys configured.
+Το LLM δεν καλείται ποτέ απευθείας από τα routes: κάθε εξαγωγή, αιτιολόγηση και απάντηση
+περνά από το `getLlmProvider()`
+([apps/api/src/llm/index.ts](apps/api/src/llm/index.ts)), που επιλέγει `anthropic` ή
+`openai` μόνο αν έχει οριστεί αυτός ο provider **και** υπάρχει το αντίστοιχο API key·
+αλλιώς χρησιμοποιεί έναν ντετερμινιστικό `mock` provider βασισμένο σε regex — έτσι όλη η
+εφαρμογή δουλεύει χωρίς κανένα API key.
 
-Vessel movement runs on two deliberately decoupled clocks: a **visual** clock
-(`SIM_SPEED`-accelerated, used only to animate positions on the globe) and an
-**operational** clock (`plannedEta`, `berthTime` — real-world-equivalent time, used for
-every JIT calculation). This keeps the business math sound regardless of how fast the
-globe is spinning or how long the demo machine has been running.
+Η κίνηση των πλοίων τρέχει σε δύο σκόπιμα ανεξάρτητα «ρολόγια»: ένα **οπτικό**
+(επιταχυμένο κατά `SIM_SPEED`, μόνο για την κίνηση στην υδρόγειο) και ένα **λειτουργικό**
+(`plannedEta`, `berthTime` — πραγματικός χρόνος, για κάθε υπολογισμό JIT). Έτσι τα
+επιχειρηματικά νούμερα μένουν σωστά ανεξάρτητα από το πόσο γρήγορα γυρίζει η υδρόγειος.
 
-## Data model
+Κάθε ταξίδι αποθηκεύει τη θαλάσσια διαδρομή του (`routeCoords`) και το μήκος της
+(`routeNm`). Από αυτά προκύπτουν η θέση, η πορεία και η ETA του πλοίου
+([apps/api/src/sim/positions.ts](apps/api/src/sim/positions.ts)).
+
+## Μοντέλο δεδομένων
 
 ```mermaid
 erDiagram
@@ -152,6 +166,8 @@ erDiagram
         datetime rebasedAt
         datetime plannedEta
         datetime berthTime
+        json routeCoords
+        float routeNm
         enum status
     }
     EMAIL {
@@ -178,19 +194,23 @@ erDiagram
         string action
         json payload
     }
+    SETTINGS {
+        float fuelPriceEurPerT
+        float co2Factor
+    }
 ```
 
-## Monorepo layout
+## Δομή του monorepo
 
 ```
 apps/
-  web/      React + Vite + TypeScript frontend (plain CSS, react-globe.gl)
-  api/      Node + Express + TypeScript + Prisma backend
+  web/      Frontend σε React + Vite + TypeScript (απλό CSS, react-globe.gl)
+  api/      Backend σε Node + Express + TypeScript + Prisma
 packages/
-  shared/   Shared TS types, zod schemas, geo + JIT domain functions
+  shared/   Κοινοί τύποι TS, zod schemas, συναρτήσεις geo + JIT
 ```
 
-## Setup (Docker — recommended)
+## Εγκατάσταση (Docker — προτείνεται)
 
 ```bash
 git clone <repo-url>
@@ -198,82 +218,116 @@ cd maritime-assistant-v2
 docker compose up --build
 ```
 
-No `.env` file is required — every variable has a working default (mock LLM provider,
-no API key needed). Then open **http://localhost:8080**.
+Δεν χρειάζεται αρχείο `.env` — κάθε μεταβλητή έχει λειτουργική προεπιλογή (mock LLM, χωρίς
+API key). Μετά ανοίξτε το **http://localhost:8080**.
 
-Only the web container publishes a host port. Postgres and the API stay on the internal
-Docker network (nginx proxies `/api` to the API), so a Postgres already running on your
-machine can't clash with the stack. If port 8080 is taken, set `WEB_PORT`, e.g.
+Μόνο το web container ανοίγει θύρα στον υπολογιστή σας. Η Postgres και το API μένουν στο
+εσωτερικό δίκτυο του Docker (το nginx προωθεί το `/api` στο API), οπότε μια Postgres που
+ήδη τρέχει τοπικά δεν συγκρούεται. Αν η θύρα 8080 είναι πιασμένη, ορίστε `WEB_PORT`, π.χ.
 `WEB_PORT=8090 docker compose up --build`.
 
-To use a real LLM instead of the offline mock, copy `.env.example` to `.env` and set
-`LLM_PROVIDER=openai` (or `anthropic`) plus the matching API key before running
-`docker compose up --build`. `LLM_MODEL` is optional: when empty it defaults to
-`gpt-5-mini` for OpenAI and `claude-sonnet-5-5` for Anthropic. With the hackathon-issued OpenAI key you can
-also set `LLM_MODEL=gpt-6-luna` for the larger model. The top bar shows which
-provider is actually active. Without a key, the Ask page answers only its example
-questions and says so on screen.
+## Τοπική ανάπτυξη χωρίς Docker
 
-Real-LLM calls are bounded: each request times out after `LLM_TIMEOUT_MS` (default
-30 s) and is retried at most once by the SDK, the JSON-repair loop makes at most two
-attempts, and OpenAI output is capped (4,000 tokens for JSON, 2,000 for rationales,
-leaving room for GPT-5 reasoning tokens). The model is only called on user actions
-(processing an email, generating a rationale, asking a question), never from the
-pages' polling. A timeout shows "The language model took too long to answer".
-
-## Design, devices & accessibility
-
-- Responsive down to phone width: the nav moves to its own scrollable row, the Fleet
-  globe stacks above the ship list, the vessel drawer becomes a bottom sheet, Inbox
-  stacks list over detail, the voyages table scrolls sideways, recommendation KPIs stack.
-- Accessibility: skip-to-content link, a page `<h1>` on every route, visible keyboard
-  focus, ARIA tabs on Actions, `aria-expanded` on every disclosure, a labelled dialog
-  for "Reject", `role="alert"`/`role="status"` on errors and loading, labels on all form
-  fields, 44 px touch targets, AA-contrast warning colour, `prefers-reduced-motion`.
-- Type: Inter for UI, Instrument Serif italic for accents (both self-hosted via
-  `@fontsource`, no external font requests). Hero photo by Austin Neill on Unsplash.
-
-## Local dev without Docker
-
-Requires Node 20+ and a local PostgreSQL instance.
+Απαιτεί Node 20+ και τοπική PostgreSQL.
 
 ```bash
 npm install
-cp .env.example .env            # set DATABASE_URL to your local Postgres, e.g.
+cp .env.example .env            # ορίστε DATABASE_URL στη δική σας Postgres, π.χ.
                                 # postgresql://<you>@localhost:5432/maritime
-                                # (the example uses host "db", which only exists inside Docker)
+                                # (το παράδειγμα έχει host "db", που υπάρχει μόνο μέσα στο Docker)
 createdb maritime
 npm run build --workspace packages/shared
 npm run prisma:migrate --workspace apps/api
 npm run prisma:seed --workspace apps/api
-npm run dev                     # runs the api and web dev servers together
+npm run dev                     # τρέχει μαζί τους dev servers του api και του web
 ```
 
-## Testing & accuracy evidence
+Το `npm run dev` ανοίγει το API στη θύρα 4000 και το web στη 5173. Αν δείτε
+`EADDRINUSE :::4000`, τρέχει ήδη ένα παλιότερο `npm run dev` — σταματήστε το (Ctrl+C στο
+τερματικό του, ή `lsof -ti tcp:4000 | xargs kill`) και ξανατρέξτε το.
 
-GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push:
-typecheck, unit tests, the extraction eval (fails below 12/12), and a full
-`docker compose up --build` with smoke tests of the Fleet API, PDF upload and Ask.
+## Δοκιμή με πραγματικό LLM — βήμα προς βήμα
+
+Χωρίς key η εφαρμογή χρησιμοποιεί τον offline mock. Για πραγματικό μοντέλο:
+
+1. **Βάλτε το key στο `.env`** (στη ρίζα του project). Το API το διαβάζει μόνο του κατά
+   την εκκίνηση:
+   ```
+   LLM_PROVIDER=openai
+   OPENAI_API_KEY=sk-...
+   LLM_MODEL=
+   ```
+   Με κενό `LLM_MODEL` χρησιμοποιείται το `gpt-5-mini` (OpenAI) ή το `claude-sonnet-5-5`
+   (Anthropic). Με το OpenAI key του hackathon μπορείτε να βάλετε `LLM_MODEL=gpt-6-luna`
+   για το μεγαλύτερο μοντέλο. Για Anthropic: `LLM_PROVIDER=anthropic` και
+   `ANTHROPIC_API_KEY=...`. Με Docker, τρέξτε μετά `docker compose up --build`.
+2. **Επανεκκινήστε** το `npm run dev` (Ctrl+C και ξανά), ώστε να φορτωθεί το νέο key.
+3. **Ελέγξτε τον provider**: πάνω δεξιά πρέπει να γράφει **LLM: OPENAI** (ή ANTHROPIC)
+   αντί για **LLM: MOCK**. Ή από τερματικό: `curl -s localhost:4000/api/meta`.
+4. **Inbox** — «Simulate incoming email» ή «Paste email» με δικό σας κείμενο, π.χ.
+   *«Rotterdam berth for MV Aegean Star delayed 30 hours due to congestion»* (δουλεύει και
+   στα ελληνικά). Πατήστε **Process**: λιμάνι, καθυστέρηση και πλοίο εξάγονται από το LLM
+   και επισημαίνονται μέσα στο email.
+5. **Actions** — εμφανίζεται νέα εκκρεμής σύσταση με αιτιολόγηση γραμμένη από το LLM. Η
+   απόσταση και η ETA βασίζονται στη θαλάσσια διαδρομή.
+6. **Settings** — αλλάξτε την τιμή π.χ. 600 → 700 και πατήστε **Save**. Θα δείτε «1 pending
+   recommendation recalculated» και στο Actions η εξοικονόμηση σε € θα έχει αυξηθεί ~16,7%.
+   Κάντε **Approve** και δείτε το «Saved to date» στο Fleet να ανεβαίνει.
+7. **Ask** — ρωτήστε κάτι που ο mock δεν καταλαβαίνει, π.χ. *«Which ships are going
+   through Suez and when do they arrive?»*.
+8. **(Προαιρετικά) Αξιολόγηση** — τα 12 δοκιμαστικά emails μέσα από το πραγματικό μοντέλο
+   (γράφει το `apps/api/eval/results-openai.md`):
+   ```bash
+   npm run eval
+   ```
+
+Για επιστροφή στον offline mock: `LLM_PROVIDER=mock` και επανεκκίνηση.
+
+Οι κλήσεις στο LLM έχουν όρια: κάθε αίτημα λήγει μετά από `LLM_TIMEOUT_MS` (προεπιλογή
+30 s) και επαναλαμβάνεται το πολύ μία φορά, ο βρόχος επιδιόρθωσης JSON κάνει έως δύο
+προσπάθειες, και η έξοδος του OpenAI έχει όριο (4.000 tokens για JSON, 2.000 για
+αιτιολογήσεις, ώστε να μένει χώρος για τα reasoning tokens του GPT-5). Το μοντέλο καλείται
+μόνο από ενέργειες του χρήστη (επεξεργασία email, αιτιολόγηση, ερώτηση), ποτέ από το
+polling των σελίδων. Σε timeout εμφανίζεται «The language model took too long to answer».
+Αν κάτι αποτύχει, δείτε το τερματικό του API — συνήθως φταίει λάθος key ή όνομα μοντέλου.
+
+## Σχεδίαση, συσκευές & προσβασιμότητα
+
+- Responsive μέχρι πλάτος κινητού: το μενού γίνεται δική του γραμμή με κύλιση, η υδρόγειος
+  του Fleet μπαίνει πάνω από τη λίστα πλοίων, οι λεπτομέρειες πλοίου γίνονται bottom sheet,
+  το Inbox βάζει τη λίστα πάνω από τις λεπτομέρειες, ο πίνακας ταξιδιών κυλά οριζόντια.
+- Προσβασιμότητα: σύνδεσμος skip-to-content, `<h1>` σε κάθε σελίδα, ορατό focus
+  πληκτρολογίου, ARIA tabs στο Actions, `aria-expanded` σε κάθε αναδιπλούμενο στοιχείο,
+  διάλογος με ετικέτα για το «Reject», `role="alert"`/`role="status"` σε σφάλματα και
+  φόρτωση, ετικέτες σε όλα τα πεδία, στόχοι αφής 44 px, χρώματα με αντίθεση AA,
+  `prefers-reduced-motion`.
+- Γραμματοσειρές: Inter για το UI, Instrument Serif italic για έμφαση (self-hosted μέσω
+  `@fontsource`, χωρίς εξωτερικά αιτήματα). Φωτογραφία hero: Austin Neill, Unsplash.
+
+## Έλεγχοι & ακρίβεια
+
+Το GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) τρέχει σε κάθε
+push: έλεγχο τύπων, unit tests, την αξιολόγηση εξαγωγής (αποτυγχάνει κάτω από 12/12) και
+πλήρες `docker compose up --build` με smoke tests για Fleet API, ανέβασμα PDF και Ask.
 
 ```bash
-npm run test     # packages/shared (geo + JIT + weather) and apps/api (LLM mock, sim, weather, PDF, ask, env)
-npm run eval      # runs apps/api/eval/emails/*.json through the mock extractor
+npm run test     # packages/shared (geo, διαδρομές, JIT) και apps/api (LLM mock, sim, καιρός, PDF, ask, env, settings)
+npm run eval     # περνά τα apps/api/eval/emails/*.json από τον mock extractor
 
-# same 12 emails through a real LLM (writes apps/api/eval/results-openai.md)
+# τα ίδια 12 emails μέσα από πραγματικό LLM (γράφει το apps/api/eval/results-openai.md)
 LLM_PROVIDER=openai OPENAI_API_KEY=sk-... npm run eval
 ```
 
-The eval set is 12 synthetic port-agent emails covering plain English, Greek-only,
-mixed Greek/English wording, multi-port disambiguation (resolved by UN/LOCODE), a
-missing-vessel-name case, an alternate date separator, two pure no-event emails, one
-email that mentions a real port/vessel but describes no event, and an explicit check
-that the earliest-mentioned event type wins when an email touches on more than one.
-Full per-field, per-email results are written to
-[apps/api/eval/results.md](apps/api/eval/results.md) on every run. Latest run:
+Το σύνολο αξιολόγησης είναι 12 συνθετικά emails πρακτόρων: απλά αγγλικά, μόνο ελληνικά,
+μικτά ελληνικά/αγγλικά, αποσαφήνιση πολλών λιμανιών (μέσω UN/LOCODE), email χωρίς όνομα
+πλοίου, εναλλακτικό διαχωριστικό ημερομηνίας, δύο emails χωρίς συμβάν, ένα που αναφέρει
+πραγματικό λιμάνι/πλοίο αλλά κανένα συμβάν, και έλεγχος ότι κερδίζει ο τύπος συμβάντος
+που αναφέρεται πρώτος. Τα πλήρη αποτελέσματα ανά πεδίο και email γράφονται στο
+[apps/api/eval/results.md](apps/api/eval/results.md) σε κάθε εκτέλεση. Τελευταία εκτέλεση:
 
-| Field | Accuracy |
+| Πεδίο | Ακρίβεια |
 |---|---|
-| Exact-match emails | 12 / 12 (100%) |
+| Emails με πλήρη ταύτιση | 12 / 12 (100%) |
 | eventType | 100% |
 | portName | 100% |
 | portUnlocode | 100% |
@@ -283,74 +337,78 @@ Full per-field, per-email results are written to
 
 ## REST API
 
-| Method | Path | Purpose |
+| Μέθοδος | Path | Σκοπός |
 |---|---|---|
-| GET | `/api/health` | liveness check |
-| GET | `/api/meta` | active LLM provider (after key fallback), sim speed, and economics assumptions |
-| GET | `/api/ports` | all seeded ports |
-| GET | `/api/vessels` | all vessels with their current voyage status |
-| GET | `/api/vessels/positions` | live simulated positions for the globe |
-| GET | `/api/voyages` | all voyages |
-| POST | `/api/voyages` | create a voyage (vesselId, originPortId, destPortId, optional speedKn) |
-| PATCH | `/api/voyages/:id/cancel` | cancel an underway/planned voyage |
-| GET | `/api/emails` | all emails (queued + processed) |
-| POST | `/api/emails` | add a custom email |
-| POST | `/api/emails/simulate` | release the next queued demo email |
-| POST | `/api/emails/document?filename=` | upload a PDF (raw body, `Content-Type: application/pdf`, max 5 MB) as an inbox item |
-| POST | `/api/emails/:id/process` | extract + match + (maybe) generate a recommendation |
-| GET | `/api/port-events` | all extracted port events |
-| GET | `/api/recommendations` | recommendations, optional `?status=` filter |
-| GET | `/api/recommendations/:id` | one recommendation |
-| POST | `/api/recommendations/:id/approve` | approve: updates voyage speed/ETA, logs the decision |
-| POST | `/api/recommendations/:id/reject` | reject (requires a reason) |
-| GET | `/api/records/:table/:id` | generic record lookup, used by "Facts used" and Ask citations |
-| POST | `/api/ask` | natural-language Q&A with validated citations |
+| GET | `/api/health` | έλεγχος λειτουργίας |
+| GET | `/api/meta` | ενεργός LLM provider (μετά τον έλεγχο key), ταχύτητα προσομοίωσης, τιμή καυσίμου και συντελεστής CO₂ |
+| GET | `/api/ports` | όλα τα λιμάνια |
+| GET | `/api/ports/route?from=&to=` | θαλάσσια διαδρομή και απόσταση μεταξύ δύο λιμανιών (UN/LOCODE) |
+| GET | `/api/vessels` | όλα τα πλοία με την κατάσταση του τρέχοντος ταξιδιού |
+| GET | `/api/vessels/positions` | ζωντανές θέσεις και υπόλοιπη διαδρομή για την υδρόγειο |
+| GET | `/api/voyages` | όλα τα ταξίδια |
+| POST | `/api/voyages` | δημιουργία ταξιδιού (vesselId, originPortId, destPortId, προαιρετικά speedKn) |
+| PATCH | `/api/voyages/:id/cancel` | ακύρωση ταξιδιού σε εξέλιξη/προγραμματισμένου |
+| GET | `/api/emails` | όλα τα emails (σε αναμονή + επεξεργασμένα) |
+| POST | `/api/emails` | προσθήκη δικού σας email |
+| POST | `/api/emails/simulate` | φέρνει το επόμενο email του demo |
+| POST | `/api/emails/document?filename=` | ανέβασμα PDF (raw body, `Content-Type: application/pdf`, έως 5 MB) ως email |
+| POST | `/api/emails/:id/process` | εξαγωγή + αντιστοίχιση + (ενδεχομένως) σύσταση |
+| GET | `/api/port-events` | όλα τα port events |
+| GET | `/api/recommendations` | συστάσεις, προαιρετικό φίλτρο `?status=` |
+| GET | `/api/recommendations/:id` | μία σύσταση |
+| POST | `/api/recommendations/:id/approve` | έγκριση: ενημερώνει ταχύτητα/ETA, καταγράφει την απόφαση |
+| POST | `/api/recommendations/:id/reject` | απόρριψη (απαιτεί αιτιολογία) |
+| GET | `/api/records/:table/:id` | γενική ανάκτηση εγγραφής, για «Facts used» και παραπομπές του Ask |
+| POST | `/api/ask` | ερωτήσεις σε φυσική γλώσσα με ελεγμένες παραπομπές |
+| GET | `/api/settings` | τρέχουσα τιμή καυσίμου και συντελεστής CO₂ |
+| PUT | `/api/settings` | ορισμός `fuelPriceEurPerT` (0–5000)· επανυπολογίζει τις εκκρεμείς συστάσεις |
 
-## Assumptions
+## Παραδοχές
 
-- All data (ports, vessels, voyages, emails) is synthetic; vessel IMOs are fictional.
-- Ships follow real sea lanes (via Gibraltar, Suez, Malacca, Panama…) computed with
-  [searoute-js](https://github.com/johnx25bd/searoute) on the Eurostat maritime
-  network ([apps/api/src/services/seaRoute.ts](apps/api/src/services/seaRoute.ts)).
-  Each voyage stores its route and length, which drive the ship's position and ETA
-  (e.g. Piraeus–Rotterdam ~2,890 nm, Hamburg–Singapore ~8,650 nm). The network is
-  coarse near some coasts, so short coastal hops can come out a little long.
-- Fuel price (default €600/t, from `FUEL_PRICE_EUR_PER_T`) is editable on the
-  **Settings** page. Saving a new price re-prices pending recommendations; approved
-  and rejected ones keep the price they were decided at. The CO₂ factor (3.114 t
-  CO₂/t fuel, the standard VLSFO factor) comes from `CO2_FACTOR`. Neither is live
-  market data, and both are shown next to every figure that depends on them.
-- Weather is **mocked**: each destination port gets a deterministic head current
-  (−0.5 to +1.5 kn) and sea state (fuel factor 1.00–1.10) per day
-  ([apps/api/src/sim/weather.ts](apps/api/src/sim/weather.ts)). An adverse current
-  raises the speed through the water needed to arrive on time; rougher seas raise fuel
-  burn for both plans. Both values appear in "Show the math". A real deployment would
-  call a marine-weather API instead.
-- When a notice gives only "delayed by N hours" without a new berth time, the new berth
-  time is the voyage's current planned arrival plus N hours.
-- A recommended speed never exceeds the vessel's current speed (the app only slows
-  ships down) and never drops below its `minSpeedKn`; if the available time is too
-  short even at minimum speed, the plan still clamps and reports a residual wait.
+- Όλα τα δεδομένα (λιμάνια, πλοία, ταξίδια, emails) είναι συνθετικά· τα IMO είναι φανταστικά.
+- Τα πλοία ακολουθούν πραγματικές θαλάσσιες οδούς (Γιβραλτάρ, Σουέζ, Μάλακα, Παναμάς…),
+  που υπολογίζονται με το [searoute-js](https://github.com/johnx25bd/searoute) πάνω στο
+  ναυτιλιακό δίκτυο της Eurostat
+  ([apps/api/src/services/seaRoute.ts](apps/api/src/services/seaRoute.ts)). Κάθε ταξίδι
+  αποθηκεύει τη διαδρομή και το μήκος της, από τα οποία προκύπτουν θέση και ETA (π.χ.
+  Πειραιάς–Ρότερνταμ ~2.890 nm, Αμβούργο–Σιγκαπούρη ~8.650 nm). Το δίκτυο είναι αραιό σε
+  κάποιες ακτές, οπότε σύντομα παράκτια ταξίδια μπορεί να βγαίνουν λίγο μεγαλύτερα.
+- Οι συντεταγμένες των λιμανιών αντιστοιχούν στους λιμενικούς σταθμούς (π.χ. Σαγκάη =
+  λιμάνι Yangshan, όχι το κέντρο της πόλης).
+- Η τιμή καυσίμου (προεπιλογή €600/t από το `FUEL_PRICE_EUR_PER_T`) αλλάζει από τη σελίδα
+  **Settings**. Η νέα τιμή επανυπολογίζει τις εκκρεμείς συστάσεις· οι εγκεκριμένες και οι
+  απορριφθείσες κρατούν την τιμή με την οποία αποφασίστηκαν. Ο συντελεστής CO₂ (3,114 t
+  CO₂/t καυσίμου, ο τυπικός για VLSFO) έρχεται από το `CO2_FACTOR`. Κανένα από τα δύο δεν
+  είναι ζωντανή τιμή αγοράς, και εμφανίζονται δίπλα σε κάθε νούμερο που εξαρτάται από αυτά.
+- Ο καιρός είναι **mock**: κάθε λιμάνι προορισμού παίρνει ντετερμινιστικό αντίθετο ρεύμα
+  (−0,5 έως +1,5 kn) και κατάσταση θάλασσας (συντελεστής καυσίμου 1,00–1,10) ανά ημέρα
+  ([apps/api/src/sim/weather.ts](apps/api/src/sim/weather.ts)). Το αντίθετο ρεύμα αυξάνει
+  την ταχύτητα που χρειάζεται για έγκαιρη άφιξη· η τρικυμία αυξάνει την κατανάλωση και στα
+  δύο σχέδια. Και οι δύο τιμές φαίνονται στο «Show the math». Μια πραγματική εγκατάσταση
+  θα χρησιμοποιούσε API θαλάσσιου καιρού.
+- Όταν μια ειδοποίηση λέει μόνο «καθυστέρηση N ωρών» χωρίς νέα ώρα πρόσδεσης, η νέα ώρα
+  είναι η τρέχουσα προγραμματισμένη άφιξη συν N ώρες.
+- Η προτεινόμενη ταχύτητα δεν ξεπερνά ποτέ την τρέχουσα (η εφαρμογή μόνο επιβραδύνει) και
+  δεν πέφτει κάτω από το `minSpeedKn` του πλοίου· αν ο χρόνος δεν φτάνει ούτε στην ελάχιστη
+  ταχύτητα, το σχέδιο περιορίζεται εκεί και δείχνει την εναπομένουσα αναμονή.
 
-## Known limitations
+## Γνωστοί περιορισμοί
 
-- The mock LLM provider is a deterministic regex extractor, not a real language model.
-  It handles the patterns in the eval set well (100% on all six fields as of the last
-  run) but is not robust to arbitrary free-form phrasing the way a real LLM call
-  (`LLM_PROVIDER=anthropic`/`openai`) would be.
-- Event-type disambiguation uses an "earliest keyword in the email wins" heuristic.
-  This matches the common case (the subject line usually states the real event) but
-  can misclassify an email that leads with a secondary detail before announcing the
-  primary event.
-- Voyage creation does not check for a duplicate route/vessel combination beyond
-  "vessel already has an active voyage" — nothing stops two voyages on the same route
-  for different vessels.
-- There is no authentication; this is a single-tenant demo app.
-- PDF upload reads the text layer only; scanned (image-only) PDFs are rejected with a
-  clear message rather than OCR'd.
+- Ο mock LLM provider είναι ντετερμινιστικός εξαγωγέας με regex, όχι πραγματικό γλωσσικό
+  μοντέλο. Καλύπτει καλά τα μοτίβα του συνόλου αξιολόγησης (100% και στα έξι πεδία) αλλά
+  δεν αντέχει ελεύθερη διατύπωση όπως ένα πραγματικό LLM (`LLM_PROVIDER=anthropic`/`openai`).
+- Η αποσαφήνιση τύπου συμβάντος ακολουθεί τον κανόνα «κερδίζει η πρώτη λέξη-κλειδί». Αυτό
+  ταιριάζει στη συνήθη περίπτωση (το θέμα συνήθως λέει το πραγματικό συμβάν) αλλά μπορεί να
+  ταξινομήσει λάθος ένα email που ξεκινά με δευτερεύουσα λεπτομέρεια.
+- Η δημιουργία ταξιδιού ελέγχει μόνο ότι «το πλοίο δεν έχει ήδη ενεργό ταξίδι» — τίποτα δεν
+  εμποδίζει δύο ταξίδια στην ίδια διαδρομή με διαφορετικά πλοία.
+- Δεν υπάρχει αυθεντικοποίηση· είναι demo για έναν χρήστη.
+- Το ανέβασμα PDF διαβάζει μόνο το επίπεδο κειμένου· σαρωμένα PDF (μόνο εικόνα)
+  απορρίπτονται με σαφές μήνυμα αντί για OCR.
 
-## Hard rules followed throughout
+## Κανόνες που τηρήθηκαν σε όλη την ανάπτυξη
 
-Synthetic data only. No secrets committed (`.env` is gitignored; `.env.example` ships
-with empty API key placeholders). No hardcoded API keys. Every phase of the build
-ended with a working `docker compose up --build` from a clean state before moving on.
+Μόνο συνθετικά δεδομένα. Κανένα μυστικό στο repo (το `.env` είναι στο `.gitignore`· το
+`.env.example` έχει κενά πεδία για API keys). Κανένα hardcoded API key. Κάθε φάση της
+ανάπτυξης ολοκληρώθηκε με λειτουργικό `docker compose up --build` από καθαρή κατάσταση πριν
+προχωρήσουμε.
