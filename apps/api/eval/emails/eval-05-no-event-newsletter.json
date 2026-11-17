@@ -1,0 +1,15 @@
+{
+  "id": "eval-05-no-event-newsletter",
+  "description": "Generic industry newsletter, no port event or vessel reference.",
+  "fromAddr": "news@shipping-weekly.example",
+  "subject": "Shipping Weekly - Market Update",
+  "body": "Hello reader,\n\nThis week: container freight rates on the Asia-Europe trade lane continued their gradual decline, while bunker fuel prices held steady. Analysts expect demand to pick up ahead of the holiday season.\n\nThanks for reading,\nShipping Weekly Editorial Team",
+  "expected": {
+    "eventType": "NONE",
+    "portName": null,
+    "portUnlocode": null,
+    "vesselNameMentioned": null,
+    "delayHours": null,
+    "newBerthTime": null
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "eval-10-date-format-variant",
+  "description": "Berth time given with a T separator instead of a space.",
+  "fromAddr": "ops@genoa-agency.example",
+  "subject": "Berth Delay - Port of Genoa",
+  "body": "Dear Owners,\n\nThe Port of Genoa (ITGOA) reports a berth delay of 15 hours for MV Olympic Horizon due to a pilot shortage. Updated berth time: 2026-11-29T12:00 UTC.\n\nRegards,\nGenoa Agency",
+  "expected": {
+    "eventType": "BERTH_DELAY",
+    "portName": "Genoa",
+    "portUnlocode": "ITGOA",
+    "vesselNameMentioned": "MV Olympic Horizon",
+    "delayHours": 15,
+    "newBerthTime": "2026-11-29T12:00:00.000Z"
+  }
+}

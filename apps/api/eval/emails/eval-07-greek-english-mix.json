@@ -1,0 +1,15 @@
+{
+  "id": "eval-07-greek-english-mix",
+  "description": "Mixed Greek/English wording for a congestion event.",
+  "fromAddr": "agent@shanghai-portcall.example",
+  "subject": "Congestion Update - Port of Shanghai",
+  "body": "Dear Owners,\n\nΛόγω συμφόρησης (congestion) στο λιμάνι Shanghai (CNSHA), υπάρχει καθυστέρηση 8 ωρών για το MV Hellenic Pioneer. Νέα ώρα προσόρμισης: 2026-11-28 10:00 UTC.\n\nRegards,\nShanghai Port Agency",
+  "expected": {
+    "eventType": "CONGESTION",
+    "portName": "Shanghai",
+    "portUnlocode": "CNSHA",
+    "vesselNameMentioned": "MV Hellenic Pioneer",
+    "delayHours": 8,
+    "newBerthTime": "2026-11-28T10:00:00.000Z"
+  }
+}

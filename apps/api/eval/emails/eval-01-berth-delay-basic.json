@@ -1,0 +1,15 @@
+{
+  "id": "eval-01-berth-delay-basic",
+  "description": "Plain English berth delay, single port, single vessel.",
+  "fromAddr": "ops@rtm-agency.example",
+  "subject": "Berth Delay Notice - MV Aegean Star - Port of Rotterdam",
+  "body": "Dear Captain,\n\nThis is to inform you that due to congestion at the container terminal, the berth allocated to MV Aegean Star at the Port of Rotterdam (NLRTM) has been delayed by 24 hours. The new berth time is now 2026-11-25 14:00 UTC.\n\nPlease adjust your ETA accordingly.\n\nBest regards,\nRotterdam Terminal Agency",
+  "expected": {
+    "eventType": "BERTH_DELAY",
+    "portName": "Rotterdam",
+    "portUnlocode": "NLRTM",
+    "vesselNameMentioned": "MV Aegean Star",
+    "delayHours": 24,
+    "newBerthTime": "2026-11-25T14:00:00.000Z"
+  }
+}

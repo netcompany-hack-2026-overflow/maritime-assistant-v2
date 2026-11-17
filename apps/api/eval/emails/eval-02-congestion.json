@@ -1,0 +1,15 @@
+{
+  "id": "eval-02-congestion",
+  "description": "Congestion event with its own delay figure and berth time.",
+  "fromAddr": "agent@sg-portservices.example",
+  "subject": "Congestion Alert - Port of Singapore",
+  "body": "Dear Owners,\n\nPlease be advised that the Port of Singapore (SGSIN) is currently experiencing severe congestion. Vessels including MV Cycladic Wind should expect a delay of 18 hours before berthing. Updated berth time: 2026-11-26 09:30 UTC.\n\nRegards,\nSingapore Port Services",
+  "expected": {
+    "eventType": "CONGESTION",
+    "portName": "Singapore",
+    "portUnlocode": "SGSIN",
+    "vesselNameMentioned": "MV Cycladic Wind",
+    "delayHours": 18,
+    "newBerthTime": "2026-11-26T09:30:00.000Z"
+  }
+}

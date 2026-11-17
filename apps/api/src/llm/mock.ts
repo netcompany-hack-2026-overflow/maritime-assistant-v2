@@ -68,7 +68,11 @@ function detectPort(text: string): { name: string | null; unlocode: string | nul
 }
 
 function detectVessel(text: string): { name: string | null; span: string | null } {
-  const match = text.match(/\bMV\s+[A-Z][\p{L}]+(?:\s+[A-Z][\p{L}]+)*/u);
+  // Uses horizontal whitespace only ([^\S\n]) between name parts so the match
+  // never crosses a line break into an unrelated capitalized word that
+  // happens to start the next line (e.g. a "Dear Captain," greeting
+  // immediately following a vessel name at the end of a subject line).
+  const match = text.match(/\bMV[^\S\n]+[A-Z][\p{L}]+(?:[^\S\n]+[A-Z][\p{L}]+)*/u);
   if (match) {
     return { name: match[0], span: match[0] };
   }

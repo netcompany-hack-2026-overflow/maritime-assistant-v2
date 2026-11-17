@@ -1,0 +1,15 @@
+{
+  "id": "eval-03-closure-no-date",
+  "description": "Closure event with no numeric delay or berth time mentioned.",
+  "fromAddr": "ops@antwerp-agency.example",
+  "subject": "Closure Notice - Port of Antwerp",
+  "body": "Dear Owners,\n\nDue to a terminal workers' strike, the Port of Antwerp (BEANR) has suspended operations until further notice. MV Hellenic Pioneer and other inbound vessels are affected. No revised berth time is available yet; we will update you as soon as operations resume.\n\nRegards,\nAntwerp Agency",
+  "expected": {
+    "eventType": "CLOSURE",
+    "portName": "Antwerp",
+    "portUnlocode": "BEANR",
+    "vesselNameMentioned": "MV Hellenic Pioneer",
+    "delayHours": null,
+    "newBerthTime": null
+  }
+}

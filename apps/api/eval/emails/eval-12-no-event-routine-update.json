@@ -1,0 +1,15 @@
+{
+  "id": "eval-12-no-event-routine-update",
+  "description": "Mentions a real port and a named vessel, but describes no delay/congestion/closure event.",
+  "fromAddr": "ops@santos-agency.example",
+  "subject": "Routine Position Update - MV Poseidon Glory",
+  "body": "Dear Owners,\n\nThis is a routine position update: MV Poseidon Glory has departed Santos (BRSSZ) and is proceeding to her next port of call as scheduled. No further action is required.\n\nRegards,\nSantos Agency",
+  "expected": {
+    "eventType": "NONE",
+    "portName": null,
+    "portUnlocode": null,
+    "vesselNameMentioned": null,
+    "delayHours": null,
+    "newBerthTime": null
+  }
+}

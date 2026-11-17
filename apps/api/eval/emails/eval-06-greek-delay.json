@@ -1,0 +1,15 @@
+{
+  "id": "eval-06-greek-delay",
+  "description": "Berth delay email written entirely in Greek.",
+  "fromAddr": "agent@valencia-portcall.example",
+  "subject": "Ειδοποίηση καθυστέρησης - Λιμάνι Valencia",
+  "body": "Αγαπητέ πλοίαρχε,\n\nΛόγω κακών καιρικών συνθηκών, υπάρχει καθυστέρηση 10 ωρών για το MV Ionian Trader στο λιμάνι Valencia (ESVLC). Νέα ώρα προσόρμισης: 2026-11-27 06:00 UTC.\n\nΜε εκτίμηση,\nValencia Port Agency",
+  "expected": {
+    "eventType": "BERTH_DELAY",
+    "portName": "Valencia",
+    "portUnlocode": "ESVLC",
+    "vesselNameMentioned": "MV Ionian Trader",
+    "delayHours": 10,
+    "newBerthTime": "2026-11-27T06:00:00.000Z"
+  }
+}

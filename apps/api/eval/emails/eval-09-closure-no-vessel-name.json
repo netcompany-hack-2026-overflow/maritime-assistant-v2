@@ -1,0 +1,15 @@
+{
+  "id": "eval-09-closure-no-vessel-name",
+  "description": "Closure event referring only generically to 'inbound vessels', no named ship.",
+  "fromAddr": "ops@algeciras-agency.example",
+  "subject": "Operational Notice - Port of Algeciras",
+  "body": "Dear Owners,\n\nThe port of Algeciras (ESALG) has suspended operations due to a labor strike. Inbound vessels should expect to be delayed by 20 hours, with berth time updated to 2026-12-01 08:00 UTC.\n\nRegards,\nAlgeciras Agency",
+  "expected": {
+    "eventType": "CLOSURE",
+    "portName": "Algeciras",
+    "portUnlocode": "ESALG",
+    "vesselNameMentioned": null,
+    "delayHours": 20,
+    "newBerthTime": "2026-12-01T08:00:00.000Z"
+  }
+}

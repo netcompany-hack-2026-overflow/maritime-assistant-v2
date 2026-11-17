@@ -1,0 +1,15 @@
+{
+  "id": "eval-11-earliest-keyword-wins",
+  "description": "Subject announces congestion; body later also mentions closure and delay wording. The earliest-mentioned event type (congestion, from the subject) should win.",
+  "fromAddr": "ops@houston-agency.example",
+  "subject": "Congestion Update - Port of Houston",
+  "body": "Dear Owners,\n\nCongestion at the Port of Houston (USHOU) continues to affect MV Marathon Spirit. Although the terminal has now been closed for emergency maintenance, resumption is expected soon. Vessels should expect a delay of 10 hours, with berth time updated to 2026-12-02 03:00 UTC.\n\nRegards,\nHouston Agency",
+  "expected": {
+    "eventType": "CONGESTION",
+    "portName": "Houston",
+    "portUnlocode": "USHOU",
+    "vesselNameMentioned": "MV Marathon Spirit",
+    "delayHours": 10,
+    "newBerthTime": "2026-12-02T03:00:00.000Z"
+  }
+}

@@ -32,6 +32,17 @@ Please be advised that the Port of Singapore (SGSIN) is currently experiencing s
     expect(result.delayHours).toBe(18);
   });
 
+  it("does not let the vessel name swallow the next paragraph's greeting", async () => {
+    const body = `Berth Delay - MV Poseidon Glory
+
+Dear Owners,
+
+MV Poseidon Glory departed Piraeus and is proceeding onward. We regret to inform you that upon arrival, the vessel will face a berth delay at the Port of Hamburg (DEHAM): delayed by 30 hours. New berth time: 2026-11-30 05:00 UTC.`;
+
+    const result = await mockExtractEmail(body);
+    expect(result.vesselNameMentioned).toBe("MV Poseidon Glory");
+  });
+
   it("returns NONE for an irrelevant email, never inventing data", async () => {
     const body = `Your monthly invoice for hull & machinery insurance coverage is now available. Total due: EUR 12,450.00.`;
 

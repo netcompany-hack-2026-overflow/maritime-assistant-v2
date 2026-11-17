@@ -1,0 +1,15 @@
+{
+  "id": "eval-04-no-event-invoice",
+  "description": "Irrelevant billing email, must be classified NONE.",
+  "fromAddr": "billing@maritime-insure.example",
+  "subject": "Your invoice #4471 is ready",
+  "body": "Dear Customer,\n\nYour monthly invoice for hull & machinery insurance coverage is now available in your account portal. Total due: EUR 12,450.00. Payment due within 30 days.\n\nThank you for your business,\nMaritime Insure Billing",
+  "expected": {
+    "eventType": "NONE",
+    "portName": null,
+    "portUnlocode": null,
+    "vesselNameMentioned": null,
+    "delayHours": null,
+    "newBerthTime": null
+  }
+}
