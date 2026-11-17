@@ -6,6 +6,8 @@ import { vesselsRouter } from "./routes/vessels.js";
 import { voyagesRouter } from "./routes/voyages.js";
 import { emailsRouter } from "./routes/emails.js";
 import { portEventsRouter } from "./routes/port-events.js";
+import { recommendationsRouter } from "./routes/recommendations.js";
+import { recordsRouter } from "./routes/records.js";
 
 const app = express();
 app.use(cors());
@@ -29,6 +31,8 @@ app.use("/api/vessels", vesselsRouter);
 app.use("/api/voyages", voyagesRouter);
 app.use("/api/emails", emailsRouter);
 app.use("/api/port-events", portEventsRouter);
+app.use("/api/recommendations", recommendationsRouter);
+app.use("/api/records", recordsRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);

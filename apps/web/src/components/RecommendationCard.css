@@ -1,0 +1,157 @@
+.recommendation-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+  margin-bottom: var(--space-4);
+  position: relative;
+}
+
+.recommendation-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.recommendation-card__trigger {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  margin-top: var(--space-1);
+}
+
+.recommendation-card__speed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.recommendation-card__arrow {
+  color: var(--muted);
+}
+
+.recommendation-card__speed--new {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.recommendation-card__kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin: var(--space-5) 0;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.kpi-tile__assumption {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+
+.recommendation-card__rationale {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.recommendation-card__toggle,
+.fact-row__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  color: var(--blue);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+
+.math-table {
+  margin: 0 0 var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+}
+
+.math-table > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+}
+
+.math-table dt {
+  color: var(--muted);
+}
+
+.math-table dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.recommendation-card__facts {
+  margin-top: var(--space-4);
+}
+
+.fact-row__data {
+  font-size: 11px;
+  background: var(--surface);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  max-height: 200px;
+}
+
+.recommendation-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.recommendation-card__decision {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 27, 51, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.modal textarea {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  resize: vertical;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

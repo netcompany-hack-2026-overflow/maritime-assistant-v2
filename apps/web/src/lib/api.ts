@@ -105,6 +105,14 @@ export interface RecommendationRecord {
   rejectReason: string | null;
   decidedAt: string | null;
   createdAt: string;
+  voyage?: VoyageWithRelations;
+  portEvent?: PortEventRecord;
+}
+
+export interface RecordResponse {
+  table: string;
+  id: string;
+  data: Record<string, unknown>;
 }
 
 export interface ProcessEmailResult {
@@ -145,4 +153,16 @@ export const api = {
   processEmail: (id: string) =>
     request<ProcessEmailResult>(`/emails/${id}/process`, { method: "POST" }),
   getPortEvents: () => request<PortEventRecord[]>("/port-events"),
+  getRecommendations: (status?: RecommendationStatus) =>
+    request<RecommendationRecord[]>(`/recommendations${status ? `?status=${status}` : ""}`),
+  approveRecommendation: (id: string) =>
+    request<{ voyage: VoyageWithRelations }>(`/recommendations/${id}/approve`, {
+      method: "POST",
+    }),
+  rejectRecommendation: (id: string, reason: string) =>
+    request<RecommendationRecord>(`/recommendations/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  getRecord: (table: string, id: string) => request<RecordResponse>(`/records/${table}/${id}`),
 };
