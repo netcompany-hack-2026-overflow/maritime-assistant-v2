@@ -4,6 +4,8 @@ import { env } from "./lib/env.js";
 import { portsRouter } from "./routes/ports.js";
 import { vesselsRouter } from "./routes/vessels.js";
 import { voyagesRouter } from "./routes/voyages.js";
+import { emailsRouter } from "./routes/emails.js";
+import { portEventsRouter } from "./routes/port-events.js";
 
 const app = express();
 app.use(cors());
@@ -25,6 +27,8 @@ app.get("/api/meta", (_req, res) => {
 app.use("/api/ports", portsRouter);
 app.use("/api/vessels", vesselsRouter);
 app.use("/api/voyages", voyagesRouter);
+app.use("/api/emails", emailsRouter);
+app.use("/api/port-events", portEventsRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);
