@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VoyageStatus {
+  PLANNED
+  UNDERWAY
+  ARRIVED
+  CANCELLED
+}
+
+enum PortEventType {
+  BERTH_DELAY
+  CONGESTION
+  CLOSURE
+  NONE
+}
+
+enum RecommendationActionType {
+  ADJUST_SPEED
+}
+
+enum RecommendationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Port {
+  id            String      @id @default(cuid())
+  unlocode      String      @unique
+  name          String
+  country       String
+  lat           Float
+  lon           Float
+  originVoyages Voyage[]    @relation("OriginPort")
+  destVoyages   Voyage[]    @relation("DestPort")
+  portEvents    PortEvent[]
+}
+
+model Vessel {
+  id                  String   @id @default(cuid())
+  imo                 String   @unique
+  name                String
+  type                String
+  dwt                 Float
+  designSpeedKn       Float
+  minSpeedKn           Float
+  fuelTPerDayAtDesign Float
+  auxFuelTPerDay      Float
+  voyages             Voyage[]
+}
+
+model Voyage {
+  id               String       @id @default(cuid())
+  vessel           Vessel       @relation(fields: [vesselId], references: [id])
+  vesselId         String
+  originPort       Port         @relation("OriginPort", fields: [originPortId], references: [id])
+  originPortId     String
+  destPort         Port         @relation("DestPort", fields: [destPortId], references: [id])
+  destPortId       String
+  departedAt       DateTime
+  speedKn          Float
+  sailedNmAtRebase Float        @default(0)
+  rebasedAt        DateTime     @default(now())
+  plannedEta       DateTime
+  berthTime        DateTime?
+  status           VoyageStatus @default(UNDERWAY)
+  createdAt        DateTime     @default(now())
+
+  portEvents      PortEvent[] @relation("VoyagePortEvents")
+  recommendations Recommendation[]
+}
+
+model Email {
+  id         String   @id @default(cuid())
+  fromAddr   String
+  subject    String
+  body       String
+  receivedAt DateTime @default(now())
+  processed  Boolean  @default(false)
+  queued     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  portEvents PortEvent[]
+}
+
+model PortEvent {
+  id             String        @id @default(cuid())
+  email          Email         @relation(fields: [emailId], references: [id])
+  emailId        String
+  port           Port?         @relation(fields: [portId], references: [id])
+  portId         String?
+  voyage         Voyage?       @relation("VoyagePortEvents", fields: [voyageId], references: [id])
+  voyageId       String?
+  eventType      PortEventType
+  delayHours     Float?
+  newBerthTime   DateTime?
+  rawExtraction  Json
+  sourceSpans    Json
+  confidence     Float
+  createdAt      DateTime      @default(now())
+
+  recommendations Recommendation[]
+}
+
+model Recommendation {
+  id                 String                   @id @default(cuid())
+  voyage             Voyage                   @relation(fields: [voyageId], references: [id])
+  voyageId           String
+  portEvent          PortEvent                @relation(fields: [portEventId], references: [id])
+  portEventId        String
+  actionType         RecommendationActionType @default(ADJUST_SPEED)
+  currentSpeedKn     Float
+  recommendedSpeedKn Float
+  fuelSavedT         Float
+  costSavedEur       Float
+  co2SavedT          Float
+  calc               Json
+  rationale          String
+  status             RecommendationStatus     @default(PENDING)
+  rejectReason       String?
+  decidedAt          DateTime?
+  createdAt          DateTime                 @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  entity    String
+  entityId  String
+  action    String
+  payload   Json
+  createdAt DateTime @default(now())
+}
