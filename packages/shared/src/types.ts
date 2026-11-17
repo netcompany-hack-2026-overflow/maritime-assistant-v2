@@ -1,3 +1,4 @@
+import type { LatLon } from "./geo.js";
 export type VoyageStatus = "PLANNED" | "UNDERWAY" | "ARRIVED" | "CANCELLED";
 
 export type PortEventType = "BERTH_DELAY" | "CONGESTION" | "CLOSURE" | "NONE";
@@ -52,6 +53,21 @@ export interface VesselPositionDTO {
   destPort: string | null;
   etaSim: string | null;
   hasPendingAction: boolean;
+  /** Remaining sea route from the ship's position to the destination port. */
+  routeAhead: LatLon[];
+}
+
+export interface SeaRouteDTO {
+  from: string;
+  to: string;
+  coords: LatLon[];
+  distanceNm: number;
+}
+
+export interface SettingsDTO {
+  fuelPriceEurPerT: number;
+  co2Factor: number;
+  updatedAt: string;
 }
 
 export interface JitCalc {

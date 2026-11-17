@@ -2,6 +2,8 @@ import type {
   PortDTO,
   PortEventType,
   RecommendationStatus,
+  SeaRouteDTO,
+  SettingsDTO,
   VesselPositionDTO,
   VoyageStatus,
 } from "@maritime/shared";
@@ -46,6 +48,7 @@ export interface VoyageListItem {
   rebasedAt: string;
   plannedEta: string;
   berthTime: string | null;
+  routeNm: number | null;
   status: VoyageStatus;
   createdAt: string;
 }
@@ -160,6 +163,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   getMeta: () => request<MetaResponse>("/meta"),
   getPorts: () => request<PortDTO[]>("/ports"),
+  getSeaRoute: (fromUnlocode: string, toUnlocode: string) =>
+    request<SeaRouteDTO>(
+      `/ports/route?from=${encodeURIComponent(fromUnlocode)}&to=${encodeURIComponent(toUnlocode)}`
+    ),
+  getSettings: () => request<SettingsDTO>("/settings"),
+  updateSettings: (input: { fuelPriceEurPerT: number }) =>
+    request<{ settings: SettingsDTO; repricedRecommendations: number }>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
   getVessels: () => request<VesselListItem[]>("/vessels"),
   getVesselPositions: () => request<VesselPositionDTO[]>("/vessels/positions"),
   getVoyages: () => request<VoyageListItem[]>("/voyages"),

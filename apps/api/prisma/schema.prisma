@@ -70,6 +70,10 @@ model Voyage {
   rebasedAt        DateTime     @default(now())
   plannedEta       DateTime
   berthTime        DateTime?
+  /// Sea route [{lat, lon}, ...] from origin to destination port (searoute-js).
+  routeCoords      Json?
+  /// Length of routeCoords in nautical miles.
+  routeNm          Float?
   status           VoyageStatus @default(UNDERWAY)
   createdAt        DateTime     @default(now())
 
@@ -136,4 +140,12 @@ model AuditLog {
   action    String
   payload   Json
   createdAt DateTime @default(now())
+}
+
+/// Single-row app settings (id is always 1).
+model Settings {
+  id               Int      @id @default(1)
+  fuelPriceEurPerT Float
+  co2Factor        Float
+  updatedAt        DateTime @updatedAt
 }

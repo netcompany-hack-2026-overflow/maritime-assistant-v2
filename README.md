@@ -309,14 +309,17 @@ Full per-field, per-email results are written to
 ## Assumptions
 
 - All data (ports, vessels, voyages, emails) is synthetic; vessel IMOs are fictional.
-- Distances use great-circle (haversine) geometry, not real sea routes — real shipping
-  lanes hug coastlines and avoid land, so actual distances are longer than this app
-  reports (e.g. Piraeus–Rotterdam is ~1173 nm great-circle but considerably more by
-  sea). The relative fuel-saving math is unaffected since both plans use the same
-  distance.
-- Fuel price (€600/t) and CO₂ factor (3.114 t CO₂/t fuel, the standard VLSFO factor)
-  are configurable assumptions (`FUEL_PRICE_EUR_PER_T`, `CO2_FACTOR`), not live market
-  data, and are shown next to every figure that depends on them.
+- Ships follow real sea lanes (via Gibraltar, Suez, Malacca, Panama…) computed with
+  [searoute-js](https://github.com/johnx25bd/searoute) on the Eurostat maritime
+  network ([apps/api/src/services/seaRoute.ts](apps/api/src/services/seaRoute.ts)).
+  Each voyage stores its route and length, which drive the ship's position and ETA
+  (e.g. Piraeus–Rotterdam ~2,890 nm, Hamburg–Singapore ~8,650 nm). The network is
+  coarse near some coasts, so short coastal hops can come out a little long.
+- Fuel price (default €600/t, from `FUEL_PRICE_EUR_PER_T`) is editable on the
+  **Settings** page. Saving a new price re-prices pending recommendations; approved
+  and rejected ones keep the price they were decided at. The CO₂ factor (3.114 t
+  CO₂/t fuel, the standard VLSFO factor) comes from `CO2_FACTOR`. Neither is live
+  market data, and both are shown next to every figure that depends on them.
 - Weather is **mocked**: each destination port gets a deterministic head current
   (−0.5 to +1.5 kn) and sea state (fuel factor 1.00–1.10) per day
   ([apps/api/src/sim/weather.ts](apps/api/src/sim/weather.ts)). An adverse current

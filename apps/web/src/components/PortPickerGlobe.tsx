@@ -1,21 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Globe, { type GlobeMethods } from "react-globe.gl";
 import * as THREE from "three";
-import type { PortDTO } from "@maritime/shared";
+import type { LatLon, PortDTO } from "@maritime/shared";
 import "./PortPickerGlobe.css";
 
 interface PortPickerGlobeProps {
   ports: PortDTO[];
   originPortId: string | null;
   destPortId: string | null;
+  /** Sea route between the picked ports, if known. */
+  route: LatLon[] | null;
   onPickPort: (portId: string) => void;
 }
 
 const NAVY = "#0a2a66";
 const BLUE = "#1e5eff";
 const WARNING = "#b7791f";
+const PORT = "#1f8a5b";
 
-export function PortPickerGlobe({ ports, originPortId, destPortId, onPickPort }: PortPickerGlobeProps) {
+export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPickPort }: PortPickerGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const [size, setSize] = useState({ width: 280, height: 280 });
@@ -57,22 +60,19 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, onPickPort }:
 
   const globeMaterial = useMemo(() => new THREE.MeshPhongMaterial({ color: "#f7f9fc" }), []);
 
-  const originPort = ports.find((p) => p.id === originPortId);
-  const destPort = ports.find((p) => p.id === destPortId);
-  const arcs = useMemo(
-    () =>
-      originPort && destPort
-        ? [
-            {
-              startLat: originPort.lat,
-              startLng: originPort.lon,
-              endLat: destPort.lat,
-              endLng: destPort.lon,
-            },
-          ]
-        : [],
-    [originPort, destPort]
+  const paths = useMemo(
+    () => (route && route.length >= 2 ? [{ coords: route.map((c) => [c.lat, c.lon]) }] : []),
+    [route]
   );
+
+  // Turn the globe to face the picked route.
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe || !route || route.length < 2) return;
+    const mid = route[Math.floor(route.length / 2)];
+    globe.controls().autoRotate = false;
+    globe.pointOfView({ lat: mid.lat, lng: mid.lon, altitude: 2.2 }, 800);
+  }, [route]);
 
   return (
     <div ref={containerRef} className="port-picker-globe">
@@ -84,7 +84,7 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, onPickPort }:
         globeMaterial={globeMaterial}
         showAtmosphere={false}
         hexPolygonsData={countries}
-        hexPolygonResolution={3}
+        hexPolygonResolution={4}
         hexPolygonMargin={0.3}
         hexPolygonUseDots={true}
         hexPolygonColor={() => NAVY}
@@ -100,23 +100,24 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, onPickPort }:
           const p = d as PortDTO;
           if (p.id === originPortId) return BLUE;
           if (p.id === destPortId) return WARNING;
-          return NAVY;
+          return PORT;
         }}
         pointLabel={(d: object) => {
           const p = d as PortDTO;
           return `${p.name} (${p.unlocode})`;
         }}
         onPointClick={(d: object) => onPickPort((d as PortDTO).id)}
-        arcsData={arcs}
-        arcStartLat="startLat"
-        arcStartLng="startLng"
-        arcEndLat="endLat"
-        arcEndLng="endLng"
-        arcColor={() => BLUE}
-        arcStroke={0.5}
-        arcDashLength={0.4}
-        arcDashGap={0.2}
-        arcDashAnimateTime={4000}
+        pathsData={paths}
+        pathPoints="coords"
+        pathPointLat={(c: number[]) => c[0]}
+        pathPointLng={(c: number[]) => c[1]}
+        pathPointAlt={0.004}
+        pathColor={() => BLUE}
+        pathStroke={1.2}
+        pathDashLength={0.03}
+        pathDashGap={0.01}
+        pathDashAnimateTime={12000}
+        pathTransitionDuration={0}
       />
     </div>
   );

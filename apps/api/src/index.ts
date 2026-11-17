@@ -10,6 +10,8 @@ import { portEventsRouter } from "./routes/port-events.js";
 import { recommendationsRouter } from "./routes/recommendations.js";
 import { recordsRouter } from "./routes/records.js";
 import { askRouter } from "./routes/ask.js";
+import { settingsRouter } from "./routes/settings.js";
+import { getSettings } from "./lib/settings.js";
 
 const app = express();
 app.use(cors());
@@ -19,13 +21,18 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("/api/meta", (_req, res) => {
-  res.json({
-    llmProvider: activeLlmProviderName(),
-    simSpeed: env.simSpeed,
-    fuelPriceEurPerT: env.fuelPriceEurPerT,
-    co2Factor: env.co2Factor,
-  });
+app.get("/api/meta", async (_req, res, next) => {
+  try {
+    const settings = await getSettings();
+    res.json({
+      llmProvider: activeLlmProviderName(),
+      simSpeed: env.simSpeed,
+      fuelPriceEurPerT: settings.fuelPriceEurPerT,
+      co2Factor: settings.co2Factor,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.use("/api/ports", portsRouter);
@@ -36,6 +43,7 @@ app.use("/api/port-events", portEventsRouter);
 app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/records", recordsRouter);
 app.use("/api/ask", askRouter);
+app.use("/api/settings", settingsRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);

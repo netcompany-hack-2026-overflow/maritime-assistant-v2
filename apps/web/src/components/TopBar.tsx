@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "/inbox", label: "Inbox", end: false },
   { to: "/actions", label: "Actions", end: false },
   { to: "/ask", label: "Ask", end: false },
+  { to: "/settings", label: "Settings", end: false },
 ];
 
 interface TopBarProps {

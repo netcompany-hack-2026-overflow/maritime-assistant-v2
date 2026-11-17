@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { haversineNm } from "@maritime/shared";
-import type { PortDTO } from "@maritime/shared";
+import type { PortDTO, SeaRouteDTO } from "@maritime/shared";
 import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { PortPickerGlobe } from "../components/PortPickerGlobe.js";
 import "./Voyages.css";
@@ -52,16 +51,32 @@ export function Voyages() {
   const destPort = ports.find((p) => p.id === destPortId);
   const previewSpeedKn = Number(speedKn) || selectedVessel?.designSpeedKn || 0;
 
+  // Sea route between the picked ports (same route the ship will sail).
+  const [route, setRoute] = useState<SeaRouteDTO | null>(null);
+  useEffect(() => {
+    setRoute(null);
+    if (!originPort || !destPort) return;
+    let cancelled = false;
+    api
+      .getSeaRoute(originPort.unlocode, destPort.unlocode)
+      .then((r) => {
+        if (!cancelled) setRoute(r);
+      })
+      .catch(() => {
+        /* preview only; creating the voyage still works */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originPort, destPort]);
+
   const preview = useMemo(() => {
-    if (!originPort || !destPort || previewSpeedKn <= 0) return null;
-    const distanceNm = haversineNm(
-      { lat: originPort.lat, lon: originPort.lon },
-      { lat: destPort.lat, lon: destPort.lon }
-    );
+    if (!route || previewSpeedKn <= 0) return null;
+    const distanceNm = route.distanceNm;
     const hours = distanceNm / previewSpeedKn;
     const eta = new Date(Date.now() + hours * 3_600_000);
     return { distanceNm, eta };
-  }, [originPort, destPort, previewSpeedKn]);
+  }, [route, previewSpeedKn]);
 
   const handlePickPort = (portId: string) => {
     if (originPortId === portId) {
@@ -206,7 +221,7 @@ export function Voyages() {
 
             {preview && (
               <p className="voyage-form__preview">
-                {preview.distanceNm.toFixed(0)} nm · ETA {preview.eta.toLocaleString()}
+                {preview.distanceNm.toFixed(0)} nm by sea · ETA {preview.eta.toLocaleString()}
               </p>
             )}
 
@@ -221,6 +236,7 @@ export function Voyages() {
             ports={ports}
             originPortId={originPortId}
             destPortId={destPortId}
+            route={route?.coords ?? null}
             onPickPort={handlePickPort}
           />
         </form>

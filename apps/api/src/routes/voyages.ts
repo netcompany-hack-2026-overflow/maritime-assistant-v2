@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { body, param, validationResult } from "express-validator";
 import type { Prisma } from "@prisma/client";
-import { haversineNm } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
+import { routeBetweenPorts } from "../services/seaRoute.js";
 
 export const voyagesRouter = Router();
 
@@ -27,6 +27,7 @@ function serializeVoyage(v: VoyageWithRelations) {
     rebasedAt: v.rebasedAt.toISOString(),
     plannedEta: v.plannedEta.toISOString(),
     berthTime: v.berthTime ? v.berthTime.toISOString() : null,
+    routeNm: v.routeNm,
     status: v.status,
     createdAt: v.createdAt.toISOString(),
   };
@@ -81,11 +82,9 @@ voyagesRouter.post(
 
       const speedKn = req.body?.speedKn ? Number(req.body.speedKn) : vessel.designSpeedKn;
       const departedAt = new Date();
-      const distanceNm = haversineNm(
-        { lat: originPort.lat, lon: originPort.lon },
-        { lat: destPort.lat, lon: destPort.lon }
-      );
-      const plannedEta = new Date(departedAt.getTime() + (distanceNm / speedKn) * 3_600_000);
+      // ETA is based on the sea route, not the straight line between ports.
+      const route = routeBetweenPorts(originPort, destPort);
+      const plannedEta = new Date(departedAt.getTime() + (route.lengthNm / speedKn) * 3_600_000);
 
       const voyage = await prisma.voyage.create({
         data: {
@@ -97,6 +96,8 @@ voyagesRouter.post(
           sailedNmAtRebase: 0,
           rebasedAt: departedAt,
           plannedEta,
+          routeCoords: route.coords as unknown as Prisma.InputJsonValue,
+          routeNm: route.lengthNm,
           status: "UNDERWAY",
         },
         include,

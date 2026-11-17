@@ -1,6 +1,8 @@
-import { greatCircleInterpolate, haversineNm, initialBearing } from "@maritime/shared";
+import type { Prisma } from "@prisma/client";
+import { interpolateAlongPolyline } from "@maritime/shared";
 import type { VesselPositionDTO } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
+import { parseStoredRoute, routeBetweenPorts } from "../services/seaRoute.js";
 
 /**
  * Converts elapsed real (wall-clock) time since `since` into simulated hours
@@ -34,9 +36,19 @@ export async function computeVesselPositions(simSpeed: number): Promise<VesselPo
   const results: VesselPositionDTO[] = [];
 
   for (const voyage of voyages) {
-    const origin = { lat: voyage.originPort.lat, lon: voyage.originPort.lon };
-    const dest = { lat: voyage.destPort.lat, lon: voyage.destPort.lon };
-    const totalNm = haversineNm(origin, dest);
+    // Ships follow the stored sea route. Voyages created before routes were
+    // stored get one computed and saved on first sight.
+    let route = parseStoredRoute(voyage.routeCoords);
+    let totalNm = voyage.routeNm ?? 0;
+    if (!route || voyage.routeNm == null) {
+      const computed = routeBetweenPorts(voyage.originPort, voyage.destPort);
+      route = computed.coords;
+      totalNm = computed.lengthNm;
+      await prisma.voyage.update({
+        where: { id: voyage.id },
+        data: { routeCoords: route as unknown as Prisma.InputJsonValue, routeNm: totalNm },
+      });
+    }
 
     const elapsedSimHours = simHoursSince(voyage.rebasedAt, simSpeed, now);
     const sailedNm = voyage.sailedNmAtRebase + elapsedSimHours * voyage.speedKn;
@@ -50,8 +62,8 @@ export async function computeVesselPositions(simSpeed: number): Promise<VesselPo
     }
 
     const fraction = totalNm > 0 ? sailedNm / totalNm : 0;
-    const position = greatCircleInterpolate(origin, dest, fraction);
-    const heading = initialBearing(position, dest);
+    const { position, heading, nextIndex } = interpolateAlongPolyline(route, fraction);
+    const routeAhead = [position, ...route.slice(nextIndex)];
 
     const remainingNm = Math.max(0, totalNm - sailedNm);
     const remainingSimHours = voyage.speedKn > 0 ? remainingNm / voyage.speedKn : 0;
@@ -71,6 +83,7 @@ export async function computeVesselPositions(simSpeed: number): Promise<VesselPo
       destPort: voyage.destPort.name,
       etaSim: etaSim.toISOString(),
       hasPendingAction: pendingVoyageIds.has(voyage.id),
+      routeAhead,
     });
   }
 

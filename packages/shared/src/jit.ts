@@ -98,3 +98,11 @@ export function calculateJit(input: JitInput): JitCalc {
     seaStateFuelFactor: seaState,
   };
 }
+
+/**
+ * Re-price an existing calculation at a new fuel price. Fuel tonnes don't
+ * depend on price, so only the euro figure (and the recorded assumption) change.
+ */
+export function repriceJit(calc: JitCalc, fuelPriceEurPerT: number): JitCalc {
+  return { ...calc, fuelPriceEurPerT, costSavedEur: calc.fuelSavedT * fuelPriceEurPerT };
+}

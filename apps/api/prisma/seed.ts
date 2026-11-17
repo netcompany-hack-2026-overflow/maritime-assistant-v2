@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { haversineNm } from "@maritime/shared";
+import { PrismaClient, type Prisma } from "@prisma/client";
+import { routeBetweenPorts } from "../src/services/seaRoute.js";
 
 const prisma = new PrismaClient();
 
@@ -20,7 +20,8 @@ const PORTS: PortSeed[] = [
   { unlocode: "ESALG", name: "Algeciras", country: "Spain", lat: 36.1246, lon: -5.4418 },
   { unlocode: "ITGOA", name: "Genoa", country: "Italy", lat: 44.4056, lon: 8.9463 },
   { unlocode: "SGSIN", name: "Singapore", country: "Singapore", lat: 1.2644, lon: 103.82 },
-  { unlocode: "CNSHA", name: "Shanghai", country: "China", lat: 31.2304, lon: 121.4737 },
+  // Yangshan deep-water container port (the city centre is ~70 km inland).
+  { unlocode: "CNSHA", name: "Shanghai", country: "China", lat: 30.6200, lon: 122.0700 },
   { unlocode: "AEJEA", name: "Jebel Ali", country: "United Arab Emirates", lat: 25.0118, lon: 55.0618 },
   { unlocode: "BRSSZ", name: "Santos", country: "Brazil", lat: -23.9608, lon: -46.3339 },
   { unlocode: "USHOU", name: "Houston", country: "United States", lat: 29.7355, lon: -95.0086 },
@@ -57,9 +58,9 @@ interface VoyageSeed {
 }
 
 const VOYAGES: VoyageSeed[] = [
-  // Great-circle distances (haversine, ignoring coastlines): GRPIR-NLRTM ~1173nm,
-  // DEHAM-SGSIN ~5480nm, ESVLC-ESALG ~314nm, ITGOA-AEJEA ~2514nm,
-  // BRSSZ-USHOU ~4274nm, BEANR-CNSHA ~4848nm. remainingNmAtStart must stay
+  // Sea-route distances (searoute-js): GRPIR-NLRTM ~2890nm (via Gibraltar),
+  // DEHAM-SGSIN ~8650nm (via Suez), ESVLC-ESALG ~550nm, ITGOA-AEJEA ~4390nm,
+  // BRSSZ-USHOU ~5660nm, BEANR-CNSHA ~10700nm. remainingNmAtStart must stay
   // below the route's total distance.
   { vesselImo: "9000001", originUnlocode: "GRPIR", destUnlocode: "NLRTM", speedKn: 14, remainingNmAtStart: 1100 },
   { vesselImo: "9000002", originUnlocode: "DEHAM", destUnlocode: "SGSIN", speedKn: 13, remainingNmAtStart: 3500 },
@@ -110,10 +111,8 @@ async function main() {
     const origin = portsByCode[v.originUnlocode];
     const dest = portsByCode[v.destUnlocode];
     const vessel = vesselsByImo[v.vesselImo];
-    const totalNm = haversineNm(
-      { lat: origin.lat, lon: origin.lon },
-      { lat: dest.lat, lon: dest.lon }
-    );
+    const route = routeBetweenPorts(origin, dest);
+    const totalNm = route.lengthNm;
     const sailedNmAtRebase = Math.max(0, totalNm - v.remainingNmAtStart);
     const elapsedHours = sailedNmAtRebase / v.speedKn;
     const departedAt = new Date(now.getTime() - elapsedHours * 3_600_000);
@@ -129,6 +128,8 @@ async function main() {
         sailedNmAtRebase,
         rebasedAt: now,
         plannedEta,
+        routeCoords: route.coords as unknown as Prisma.InputJsonValue,
+        routeNm: totalNm,
         status: "UNDERWAY",
       },
     });

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { calculateJit } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
-import { env } from "../lib/env.js";
+import { getSettings } from "../lib/settings.js";
 import { getLlmProvider } from "../llm/index.js";
 import { mockWeatherFor } from "../sim/weather.js";
 
@@ -23,6 +23,7 @@ async function createRecommendationForPortEvent(
   );
   if (distanceNm <= 0) return null;
 
+  const settings = await getSettings();
   const calc = calculateJit({
     distanceNm,
     currentSpeedKn: voyage.speedKn,
@@ -33,8 +34,8 @@ async function createRecommendationForPortEvent(
     fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
     minSpeedKn: voyage.vessel.minSpeedKn,
     auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
-    fuelPriceEurPerT: env.fuelPriceEurPerT,
-    co2Factor: env.co2Factor,
+    fuelPriceEurPerT: settings.fuelPriceEurPerT,
+    co2Factor: settings.co2Factor,
     weather: mockWeatherFor(voyage.destPort.unlocode, newBerthTime),
   });
 

@@ -82,3 +82,54 @@ export function greatCircleInterpolate(
 
   return { lat: toDeg(lat), lon: toDeg(lon) };
 }
+
+/** Total length of a polyline (sum of great-circle legs), in nautical miles. */
+export function polylineLengthNm(coords: LatLon[]): number {
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) total += haversineNm(coords[i - 1], coords[i]);
+  return total;
+}
+
+export interface PolylinePoint {
+  position: LatLon;
+  /** Bearing of the leg the point sits on, degrees [0, 360). */
+  heading: number;
+  /** Index of the first vertex AFTER the point (coords.slice(nextIndex) is what lies ahead). */
+  nextIndex: number;
+}
+
+/**
+ * Locate the point `fraction` (0..1) of the way along a polyline, measured by
+ * distance. Each leg is treated as a great-circle segment.
+ */
+export function interpolateAlongPolyline(coords: LatLon[], fraction: number): PolylinePoint {
+  if (coords.length === 0) throw new Error("interpolateAlongPolyline: empty polyline");
+  if (coords.length === 1) return { position: { ...coords[0] }, heading: 0, nextIndex: 1 };
+
+  const f = Math.max(0, Math.min(1, fraction));
+  const legs: number[] = [];
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const d = haversineNm(coords[i - 1], coords[i]);
+    legs.push(d);
+    total += d;
+  }
+
+  let target = f * total;
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const isLast = i === legs.length - 1;
+    if (target <= leg || isLast) {
+      const a = coords[i];
+      const b = coords[i + 1];
+      const legFraction = leg > 0 ? Math.min(1, target / leg) : 1;
+      const position = greatCircleInterpolate(a, b, legFraction);
+      const heading = leg > 0 ? initialBearing(position, b) : 0;
+      return { position, heading, nextIndex: i + 1 };
+    }
+    target -= leg;
+  }
+  // unreachable
+  const last = coords[coords.length - 1];
+  return { position: { ...last }, heading: 0, nextIndex: coords.length };
+}

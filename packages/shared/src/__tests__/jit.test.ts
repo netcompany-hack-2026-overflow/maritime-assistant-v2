@@ -125,3 +125,28 @@ describe("calculateJit with weather", () => {
     expect(Number.isFinite(calc.fuelB)).toBe(true);
   });
 });
+
+describe("repriceJit", () => {
+  it("scales only the euro saving with the new price", async () => {
+    const { repriceJit } = await import("../jit.js");
+    const now = new Date("2026-01-01T00:00:00Z");
+    const base = calculateJit({
+      distanceNm: 1000,
+      currentSpeedKn: 14,
+      currentEta: new Date(now.getTime() + (1000 / 14) * 3_600_000),
+      newBerthTime: new Date(now.getTime() + 96 * 3_600_000),
+      now,
+      designSpeedKn: 14,
+      fuelTPerDayAtDesign: 40,
+      minSpeedKn: 9,
+      auxFuelTPerDay: 3,
+      fuelPriceEurPerT: 600,
+      co2Factor: 3.114,
+    });
+    const repriced = repriceJit(base, 700);
+    expect(repriced.fuelSavedT).toBe(base.fuelSavedT);
+    expect(repriced.co2SavedT).toBe(base.co2SavedT);
+    expect(repriced.fuelPriceEurPerT).toBe(700);
+    expect(repriced.costSavedEur).toBeCloseTo((base.costSavedEur * 700) / 600, 6);
+  });
+});
