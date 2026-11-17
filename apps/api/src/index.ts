@@ -8,6 +8,7 @@ import { emailsRouter } from "./routes/emails.js";
 import { portEventsRouter } from "./routes/port-events.js";
 import { recommendationsRouter } from "./routes/recommendations.js";
 import { recordsRouter } from "./routes/records.js";
+import { askRouter } from "./routes/ask.js";
 
 const app = express();
 app.use(cors());
@@ -33,6 +34,7 @@ app.use("/api/emails", emailsRouter);
 app.use("/api/port-events", portEventsRouter);
 app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/records", recordsRouter);
+app.use("/api/ask", askRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);

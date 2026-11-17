@@ -115,6 +115,16 @@ export interface RecordResponse {
   data: Record<string, unknown>;
 }
 
+export interface Citation {
+  table: string;
+  id: string;
+}
+
+export interface AskResponse {
+  answer: string;
+  citations: Citation[];
+}
+
 export interface ProcessEmailResult {
   portEvent: PortEventRecord | null;
   matchedVoyage: VoyageWithRelations | null;
@@ -165,4 +175,6 @@ export const api = {
       body: JSON.stringify({ reason }),
     }),
   getRecord: (table: string, id: string) => request<RecordResponse>(`/records/${table}/${id}`),
+  askQuestion: (question: string) =>
+    request<AskResponse>("/ask", { method: "POST", body: JSON.stringify({ question }) }),
 };
