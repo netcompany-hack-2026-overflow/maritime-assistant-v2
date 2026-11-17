@@ -63,6 +63,7 @@ export function Fleet() {
     <div className="page page--fleet">
       <div className="fleet-layout">
         <div className="fleet-layout__globe" role="region" aria-label="Live fleet globe. Use the ship list to select a vessel with the keyboard.">
+          <div className="fleet-layout__canvas">
           {loading ? (
             <div className="loading-state" role="status">Loading fleet…</div>
           ) : error ? (
@@ -75,6 +76,7 @@ export function Fleet() {
               onSelectShip={setSelectedVesselId}
             />
           )}
+          </div>
           {!loading && !error && <SavingsTile />}
           {selectedVessel && (
             <VesselDrawer

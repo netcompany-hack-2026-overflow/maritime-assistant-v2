@@ -9,6 +9,10 @@ describe("env", () => {
   it("defaults the API port to 4000", () => {
     expect(env.port).toBe(4000);
   });
+
+  it("defaults the LLM request timeout to 30 seconds", () => {
+    expect(env.llmTimeoutMs).toBe(30_000);
+  });
 });
 
 describe("resolveLlmModel", () => {

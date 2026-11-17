@@ -15,6 +15,10 @@
   min-width: 0;
 }
 
+.fleet-layout__canvas {
+  height: 100%;
+}
+
 .fleet-layout__list {
   border-left: 1px solid var(--line);
   padding: var(--space-5);
@@ -71,8 +75,22 @@
 
   .fleet-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: 58vh auto;
+    grid-template-rows: auto auto;
     height: auto;
+  }
+
+  /* Stack the savings card above the globe instead of floating over it. */
+  .fleet-layout__globe {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .fleet-layout__globe .savings-tile {
+    order: -1;
+  }
+
+  .fleet-layout__canvas {
+    height: 58vh;
   }
 
   .fleet-layout__list {

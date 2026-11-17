@@ -12,8 +12,9 @@ export class AnthropicProvider implements LlmProvider {
   private client: Anthropic;
   private model: string;
 
-  constructor(apiKey: string, model: string) {
-    this.client = new Anthropic({ apiKey });
+  constructor(apiKey: string, model: string, timeoutMs = 30_000) {
+    // One SDK-level retry on network/5xx errors; the JSON loop below adds at most one more call.
+    this.client = new Anthropic({ apiKey, timeout: timeoutMs, maxRetries: 1 });
     this.model = model;
   }
 

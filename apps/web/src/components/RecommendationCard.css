@@ -121,6 +121,10 @@
   font-size: var(--text-sm);
 }
 
+.recommendation-card__undo {
+  margin-top: var(--space-3);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

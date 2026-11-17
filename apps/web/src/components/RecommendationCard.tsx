@@ -8,6 +8,7 @@ interface RecommendationCardProps {
   fuelPriceEurPerT: number;
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string, reason: string) => Promise<void>;
+  onUndo: (id: string) => Promise<void>;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -74,6 +75,7 @@ export function RecommendationCard({
   fuelPriceEurPerT,
   onApprove,
   onReject,
+  onUndo,
 }: RecommendationCardProps) {
   const [showMath, setShowMath] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -96,6 +98,18 @@ export function RecommendationCard({
     setError(null);
     try {
       await onApprove(recommendation.id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onUndo(recommendation.id);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -213,6 +227,11 @@ export function RecommendationCard({
             {recommendation.decidedAt && new Date(recommendation.decidedAt).toLocaleString()}
           </p>
           {recommendation.rejectReason && <p>Reason: {recommendation.rejectReason}</p>}
+          {recommendation.status === "APPROVED" && (
+            <button className="btn recommendation-card__undo" onClick={handleUndo} disabled={busy}>
+              Undo approval
+            </button>
+          )}
         </div>
       )}
 

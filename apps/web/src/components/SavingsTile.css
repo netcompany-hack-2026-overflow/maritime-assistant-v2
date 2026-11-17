@@ -57,10 +57,9 @@
 
 @media (max-width: 900px) {
   .savings-tile {
-    top: var(--space-3);
-    left: var(--space-3);
-    right: var(--space-3);
+    position: static;
     width: auto;
+    margin: var(--space-3) var(--space-3) 0;
     padding: var(--space-3) var(--space-4);
   }
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { body, param, query, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma.js";
-import { approveRecommendation, rejectRecommendation } from "../services/recommendations.js";
+import { approveRecommendation, rejectRecommendation, undoApproval } from "../services/recommendations.js";
 
 export const recommendationsRouter = Router();
 
@@ -61,6 +61,21 @@ recommendationsRouter.post(
       const id = req.params?.id;
       if (!id) return res.status(400).json({ error: "Invalid request" });
       const result = await approveRecommendation(id);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+recommendationsRouter.post(
+  "/:id/undo",
+  param("id").isString().trim().notEmpty(),
+  async (req, res, next) => {
+    try {
+      const id = req.params?.id;
+      if (!id) return res.status(400).json({ error: "Invalid request" });
+      const result = await undoApproval(id);
       res.json(result);
     } catch (err) {
       next(err);

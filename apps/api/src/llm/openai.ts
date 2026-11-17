@@ -1,13 +1,18 @@
 import OpenAI from "openai";
 import { answerSchema, portEventExtractionSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
 import type { CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+import { mockExplainRecommendation } from "./mock.js";
+
+const MAX_JSON_TOKENS = 4000;
+const MAX_TEXT_TOKENS = 2000;
 
 export class OpenAiProvider implements LlmProvider {
   private client: OpenAI;
   private model: string;
 
-  constructor(apiKey: string, model: string) {
-    this.client = new OpenAI({ apiKey });
+  constructor(apiKey: string, model: string, timeoutMs = 30_000) {
+    // One SDK-level retry on network/5xx errors; the JSON loop below adds at most one more call.
+    this.client = new OpenAI({ apiKey, timeout: timeoutMs, maxRetries: 1 });
     this.model = model;
   }
 
@@ -24,9 +29,16 @@ export class OpenAiProvider implements LlmProvider {
       const response = await this.client.chat.completions.create({
         model: this.model,
         response_format: { type: "json_object" },
+        // Caps total output. GPT-5-family reasoning tokens count toward it, so
+        // leave headroom beyond the ~300 visible tokens a reply actually needs.
+        max_completion_tokens: MAX_JSON_TOKENS,
         messages,
       });
-      const text = response.choices[0]?.message?.content ?? "";
+      const choice = response.choices[0];
+      const text = choice?.message?.content ?? "";
+      if (choice?.finish_reason === "length" && text.trim() === "") {
+        throw new Error("LLM hit its output-token limit before answering.");
+      }
       try {
         return JSON.parse(text);
       } catch {
@@ -58,6 +70,7 @@ export class OpenAiProvider implements LlmProvider {
   async explainRecommendation(facts: RecommendationFacts): Promise<string> {
     const response = await this.client.chat.completions.create({
       model: this.model,
+      max_completion_tokens: MAX_TEXT_TOKENS,
       messages: [
         {
           role: "system",
@@ -69,7 +82,10 @@ export class OpenAiProvider implements LlmProvider {
         { role: "user", content: JSON.stringify(facts) },
       ],
     });
-    return (response.choices[0]?.message?.content ?? "").trim();
+    const text = (response.choices[0]?.message?.content ?? "").trim();
+    // Never show an empty rationale (e.g. the token cap was spent on reasoning):
+    // fall back to the deterministic template built from the same numbers.
+    return text.length > 0 ? text : mockExplainRecommendation(facts);
   }
 
   async answerQuestion(question: string, rows: CitableRow[]): Promise<Answer> {

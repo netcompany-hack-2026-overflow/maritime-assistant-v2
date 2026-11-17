@@ -34,6 +34,11 @@ export function Actions() {
     await refresh();
   };
 
+  const handleUndo = async (id: string) => {
+    await api.undoApproval(id);
+    await refresh();
+  };
+
   const handleReject = async (id: string, reason: string) => {
     await api.rejectRecommendation(id, reason);
     await refresh();
@@ -80,6 +85,7 @@ export function Actions() {
             fuelPriceEurPerT={fuelPriceEurPerT}
             onApprove={handleApprove}
             onReject={handleReject}
+            onUndo={handleUndo}
           />
         ))
       )}

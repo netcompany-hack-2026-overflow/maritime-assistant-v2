@@ -48,6 +48,12 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
       details: null,
     });
   }
+  if (/timeout|timed out/i.test(name) || /timed out/i.test(err?.message ?? "")) {
+    return res.status(504).json({
+      error: "The language model took too long to answer. Please try again.",
+      details: null,
+    });
+  }
   const status: number = err.status ?? 500;
   res.status(status).json({
     // 5xx messages can contain internals (SQL, stack-ish text); keep them in the log

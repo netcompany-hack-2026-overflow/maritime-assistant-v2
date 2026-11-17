@@ -31,6 +31,8 @@ export const env = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
   llmModel: resolveLlmModel(llmProvider, process.env.LLM_MODEL),
+  /** Per-request timeout for LLM calls; keeps a hung provider from stalling the demo. */
+  llmTimeoutMs: Number(process.env.LLM_TIMEOUT_MS || 30_000),
   simSpeed: Number(process.env.SIM_SPEED ?? 120),
   fuelPriceEurPerT: Number(process.env.FUEL_PRICE_EUR_PER_T ?? 600),
   co2Factor: Number(process.env.CO2_FACTOR ?? 3.114),

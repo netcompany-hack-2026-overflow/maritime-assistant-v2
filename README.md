@@ -214,6 +214,13 @@ also set `LLM_MODEL=gpt-6-luna` for the larger model. The top bar shows which
 provider is actually active. Without a key, the Ask page answers only its example
 questions and says so on screen.
 
+Real-LLM calls are bounded: each request times out after `LLM_TIMEOUT_MS` (default
+30 s) and is retried at most once by the SDK, the JSON-repair loop makes at most two
+attempts, and OpenAI output is capped (4,000 tokens for JSON, 2,000 for rationales,
+leaving room for GPT-5 reasoning tokens). The model is only called on user actions
+(processing an email, generating a rationale, asking a question), never from the
+pages' polling. A timeout shows "The language model took too long to answer".
+
 ## Design, devices & accessibility
 
 - Responsive down to phone width: the nav moves to its own scrollable row, the Fleet

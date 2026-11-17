@@ -29,9 +29,9 @@ export function getLlmProvider(): LlmProvider {
   if (cached) return cached;
 
   if (env.llmProvider === "anthropic" && env.anthropicApiKey) {
-    cached = new AnthropicProvider(env.anthropicApiKey, env.llmModel);
+    cached = new AnthropicProvider(env.anthropicApiKey, env.llmModel, env.llmTimeoutMs);
   } else if (env.llmProvider === "openai" && env.openaiApiKey) {
-    cached = new OpenAiProvider(env.openaiApiKey, env.llmModel);
+    cached = new OpenAiProvider(env.openaiApiKey, env.llmModel, env.llmTimeoutMs);
   } else {
     cached = new MockProvider();
   }

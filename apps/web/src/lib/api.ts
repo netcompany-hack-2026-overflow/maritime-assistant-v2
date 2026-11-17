@@ -192,6 +192,11 @@ export const api = {
     request<{ voyage: VoyageWithRelations }>(`/recommendations/${id}/approve`, {
       method: "POST",
     }),
+  undoApproval: (id: string) =>
+    request<{ voyage: VoyageWithRelations; recommendation: RecommendationRecord }>(
+      `/recommendations/${id}/undo`,
+      { method: "POST" }
+    ),
   rejectRecommendation: (id: string, reason: string) =>
     request<RecommendationRecord>(`/recommendations/${id}/reject`, {
       method: "POST",
