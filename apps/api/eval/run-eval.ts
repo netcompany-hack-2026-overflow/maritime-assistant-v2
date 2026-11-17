@@ -1,12 +1,15 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getLlmProvider } from "../src/llm/index.js";
+import { activeLlmProviderName, getLlmProvider } from "../src/llm/index.js";
 import type { PortEventExtraction } from "@maritime/shared";
+import { env } from "../src/lib/env.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EMAILS_DIR = join(__dirname, "emails");
-const RESULTS_PATH = join(__dirname, "results.md");
+// One results file per provider, so a real-LLM run never overwrites the mock baseline.
+const PROVIDER = activeLlmProviderName();
+const RESULTS_PATH = join(__dirname, PROVIDER === "mock" ? "results.md" : `results-${PROVIDER}.md`);
 
 type ExtractionField = "eventType" | "portName" | "portUnlocode" | "vesselNameMentioned" | "delayHours" | "newBerthTime";
 
@@ -86,7 +89,7 @@ async function main() {
   const total = cases.length;
   const lines: string[] = [];
   lines.push("# Extraction Eval Results\n");
-  lines.push(`Provider under test: \`${process.env.LLM_PROVIDER ?? "mock"}\``);
+  lines.push(`Provider under test: \`${PROVIDER}\`${PROVIDER === "mock" ? "" : ` (model \`${env.llmModel}\`)`}`);
   lines.push(`Run at: ${new Date().toISOString()}\n`);
 
   lines.push("## Summary\n");

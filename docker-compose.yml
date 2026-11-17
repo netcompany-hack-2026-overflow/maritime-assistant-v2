@@ -13,8 +13,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    ports:
-      - "5432:5432"
+    # No host port: only the api container talks to Postgres, and publishing
+    # 5432 would clash with any Postgres already running on the host.
 
   api:
     build:
@@ -29,7 +29,8 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-5-5}
+      # Empty = provider-specific default (see apps/api/src/lib/env.ts)
+      LLM_MODEL: ${LLM_MODEL:-}
       SIM_SPEED: ${SIM_SPEED:-120}
       FUEL_PRICE_EUR_PER_T: ${FUEL_PRICE_EUR_PER_T:-600}
       CO2_FACTOR: ${CO2_FACTOR:-3.114}
@@ -37,8 +38,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "4000:4000"
+    # No host port: the web container proxies /api to api:4000 internally.
 
   web:
     build:
@@ -48,7 +48,7 @@ services:
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-8080}:80"
 
 volumes:
   db_data:

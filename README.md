@@ -186,9 +186,18 @@ docker compose up --build
 No `.env` file is required — every variable has a working default (mock LLM provider,
 no API key needed). Then open **http://localhost:8080**.
 
-To try a real LLM provider instead of the mock extractor, copy `.env.example` to
-`.env` and set `LLM_PROVIDER=anthropic` (or `openai`) plus the matching API key before
-running `docker compose up --build`.
+Only the web container publishes a host port. Postgres and the API stay on the internal
+Docker network (nginx proxies `/api` to the API), so a Postgres already running on your
+machine can't clash with the stack. If port 8080 is taken, set `WEB_PORT`, e.g.
+`WEB_PORT=8090 docker compose up --build`.
+
+To use a real LLM instead of the offline mock, copy `.env.example` to `.env` and set
+`LLM_PROVIDER=openai` (or `anthropic`) plus the matching API key before running
+`docker compose up --build`. `LLM_MODEL` is optional: when empty it defaults to
+`gpt-5-mini` for OpenAI and `claude-sonnet-5-5` for Anthropic. With the hackathon-issued OpenAI key you can
+also set `LLM_MODEL=gpt-6-luna` for the larger model. The top bar shows which
+provider is actually active. Without a key, the Ask page answers only its example
+questions and says so on screen.
 
 ## Local dev without Docker
 
@@ -208,6 +217,9 @@ npm run dev                     # runs the api and web dev servers together
 ```bash
 npm run test     # packages/shared (geo + JIT) and apps/api (LLM mock, sim, ask, env)
 npm run eval      # runs apps/api/eval/emails/*.json through the mock extractor
+
+# same 12 emails through a real LLM (writes apps/api/eval/results-openai.md)
+LLM_PROVIDER=openai OPENAI_API_KEY=sk-... npm run eval
 ```
 
 The eval set is 12 synthetic port-agent emails covering plain English, Greek-only,
@@ -233,7 +245,7 @@ Full per-field, per-email results are written to
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | liveness check |
-| GET | `/api/meta` | LLM provider, sim speed, and economics assumptions in effect |
+| GET | `/api/meta` | active LLM provider (after key fallback), sim speed, and economics assumptions |
 | GET | `/api/ports` | all seeded ports |
 | GET | `/api/vessels` | all vessels with their current voyage status |
 | GET | `/api/vessels/positions` | live simulated positions for the globe |

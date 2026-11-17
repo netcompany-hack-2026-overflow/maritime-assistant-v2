@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Send } from "lucide-react";
 import { api, type AskResponse, type Citation, type RecordResponse } from "../lib/api.js";
 import "./Ask.css";
@@ -50,6 +50,20 @@ export function Ask() {
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usingMock, setUsingMock] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getMeta()
+      .then((m) => {
+        if (!cancelled) setUsingMock(m.llmProvider === "mock");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const ask = async (q: string) => {
     const trimmed = q.trim();
@@ -97,6 +111,14 @@ export function Ask() {
           </button>
         ))}
       </div>
+
+      {usingMock && (
+        <p className="ask-notice" role="note">
+          Offline mode: no LLM API key is configured, so Ask understands only the example
+          questions above. Set <code>LLM_PROVIDER</code> and an API key in <code>.env</code> to ask
+          anything about the fleet.
+        </p>
+      )}
 
       {error && <div className="error-state">{error}</div>}
 

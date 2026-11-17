@@ -14,6 +14,17 @@ class MockProvider implements LlmProvider {
 
 let cached: LlmProvider | null = null;
 
+/**
+ * The provider actually in use. LLM_PROVIDER=openai without OPENAI_API_KEY
+ * falls back to the mock, and this reports "mock" in that case so the UI
+ * never claims a real model is answering when it isn't.
+ */
+export function activeLlmProviderName(): "mock" | "anthropic" | "openai" {
+  if (env.llmProvider === "anthropic" && env.anthropicApiKey) return "anthropic";
+  if (env.llmProvider === "openai" && env.openaiApiKey) return "openai";
+  return "mock";
+}
+
 export function getLlmProvider(): LlmProvider {
   if (cached) return cached;
 

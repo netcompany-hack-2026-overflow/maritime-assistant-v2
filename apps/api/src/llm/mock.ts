@@ -231,5 +231,12 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     }
   }
 
-  return { answer: "I can't answer that from the data.", citations: [] };
+  return {
+    answer:
+      "Offline mode (no LLM API key configured): I can only answer a few fixed question types, " +
+      "e.g. fuel saved from approved recommendations, a named vessel's ETA (\"What's MV Aegean " +
+      "Star's ETA?\"), or which vessels are affected by port delays. Configure LLM_PROVIDER and " +
+      "an API key to ask anything about the fleet.",
+    citations: [],
+  };
 }

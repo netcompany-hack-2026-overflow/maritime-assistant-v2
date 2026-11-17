@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
 import { env } from "./lib/env.js";
+import { activeLlmProviderName } from "./llm/index.js";
 import { portsRouter } from "./routes/ports.js";
 import { vesselsRouter } from "./routes/vessels.js";
 import { voyagesRouter } from "./routes/voyages.js";
@@ -20,7 +21,7 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/meta", (_req, res) => {
   res.json({
-    llmProvider: env.llmProvider,
+    llmProvider: activeLlmProviderName(),
     simSpeed: env.simSpeed,
     fuelPriceEurPerT: env.fuelPriceEurPerT,
     co2Factor: env.co2Factor,

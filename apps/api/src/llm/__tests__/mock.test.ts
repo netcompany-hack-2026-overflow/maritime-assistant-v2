@@ -83,9 +83,10 @@ describe("mockAnswerQuestion", () => {
     expect(result.citations).toEqual([{ table: "recommendation", id: "r1" }]);
   });
 
-  it("falls back when nothing matches", async () => {
+  it("falls back with an offline-mode hint when nothing matches", async () => {
     const result = await mockAnswerQuestion("What's the weather like?", []);
-    expect(result.answer).toBe("I can't answer that from the data.");
+    expect(result.answer).toMatch(/Offline mode/);
+    expect(result.answer).toMatch(/API key/);
     expect(result.citations).toEqual([]);
   });
 });
