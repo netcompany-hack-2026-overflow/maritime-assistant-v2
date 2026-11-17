@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import { answerSchema, portEventExtractionSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
+import { answerSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
+import { EXTRACTION_SYSTEM_PROMPT, parseExtraction } from "./extraction.js";
 import type { CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
 import { mockExplainRecommendation } from "./mock.js";
 
@@ -53,18 +54,8 @@ export class OpenAiProvider implements LlmProvider {
   }
 
   async extractEmail(text: string): Promise<PortEventExtraction> {
-    const system =
-      "You extract structured port-event data from maritime port-agent emails. " +
-      "Reply with ONLY a JSON object matching exactly this shape: " +
-      '{"eventType":"BERTH_DELAY"|"CONGESTION"|"CLOSURE"|"NONE","portName":string|null,' +
-      '"portUnlocode":string|null,"vesselNameMentioned":string|null,"delayHours":number|null,' +
-      '"newBerthTime":string|null (ISO 8601),"confidence":number (0-1),' +
-      '"sourceSpans":[{"field":string,"text":string}]}. ' +
-      "Each sourceSpans[].text must be an exact substring copied from the email. " +
-      'If the email describes no port event affecting a vessel, use eventType "NONE" and null fields.';
-
-    const raw = await this.completeJson(system, text);
-    return portEventExtractionSchema.parse(raw);
+    const raw = await this.completeJson(EXTRACTION_SYSTEM_PROMPT, text);
+    return parseExtraction(raw);
   }
 
   async explainRecommendation(facts: RecommendationFacts): Promise<string> {
