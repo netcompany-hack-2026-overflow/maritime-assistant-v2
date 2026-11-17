@@ -125,6 +125,13 @@ export interface AskResponse {
   citations: Citation[];
 }
 
+export interface CreateVoyageInput {
+  vesselId: string;
+  originPortId: string;
+  destPortId: string;
+  speedKn?: number;
+}
+
 export interface ProcessEmailResult {
   portEvent: PortEventRecord | null;
   matchedVoyage: VoyageWithRelations | null;
@@ -156,6 +163,10 @@ export const api = {
   getVessels: () => request<VesselListItem[]>("/vessels"),
   getVesselPositions: () => request<VesselPositionDTO[]>("/vessels/positions"),
   getVoyages: () => request<VoyageListItem[]>("/voyages"),
+  createVoyage: (input: CreateVoyageInput) =>
+    request<VoyageListItem>("/voyages", { method: "POST", body: JSON.stringify(input) }),
+  cancelVoyage: (id: string) =>
+    request<VoyageListItem>(`/voyages/${id}/cancel`, { method: "PATCH" }),
   getEmails: () => request<EmailListItem[]>("/emails"),
   simulateEmail: () => request<EmailListItem>("/emails/simulate", { method: "POST" }),
   createEmail: (input: { fromAddr: string; subject: string; body: string }) =>
