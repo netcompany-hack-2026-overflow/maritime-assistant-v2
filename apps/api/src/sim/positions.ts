@@ -1,0 +1,78 @@
+import { greatCircleInterpolate, haversineNm, initialBearing } from "@maritime/shared";
+import type { VesselPositionDTO } from "@maritime/shared";
+import { prisma } from "../lib/prisma.js";
+
+/**
+ * Converts elapsed real (wall-clock) time since `since` into simulated hours
+ * of vessel travel. SIM_SPEED default 120 means 1 real second = 2 sim minutes:
+ * simHours = realSeconds * simSpeed / 3600.
+ */
+export function simHoursSince(since: Date, simSpeed: number, now: Date = new Date()): number {
+  const realSeconds = (now.getTime() - since.getTime()) / 1000;
+  return (realSeconds * simSpeed) / 3600;
+}
+
+function realSecondsFromSimHours(simHours: number, simSpeed: number): number {
+  return (simHours * 3600) / simSpeed;
+}
+
+export async function computeVesselPositions(simSpeed: number): Promise<VesselPositionDTO[]> {
+  const now = new Date();
+
+  const [voyages, pendingRecs] = await Promise.all([
+    prisma.voyage.findMany({
+      where: { status: "UNDERWAY" },
+      include: { vessel: true, originPort: true, destPort: true },
+    }),
+    prisma.recommendation.findMany({
+      where: { status: "PENDING" },
+      select: { voyageId: true },
+    }),
+  ]);
+
+  const pendingVoyageIds = new Set(pendingRecs.map((r) => r.voyageId));
+  const results: VesselPositionDTO[] = [];
+
+  for (const voyage of voyages) {
+    const origin = { lat: voyage.originPort.lat, lon: voyage.originPort.lon };
+    const dest = { lat: voyage.destPort.lat, lon: voyage.destPort.lon };
+    const totalNm = haversineNm(origin, dest);
+
+    const elapsedSimHours = simHoursSince(voyage.rebasedAt, simSpeed, now);
+    const sailedNm = voyage.sailedNmAtRebase + elapsedSimHours * voyage.speedKn;
+
+    if (totalNm > 0 && sailedNm >= totalNm) {
+      await prisma.voyage.update({
+        where: { id: voyage.id },
+        data: { status: "ARRIVED", sailedNmAtRebase: totalNm, rebasedAt: now },
+      });
+      continue;
+    }
+
+    const fraction = totalNm > 0 ? sailedNm / totalNm : 0;
+    const position = greatCircleInterpolate(origin, dest, fraction);
+    const heading = initialBearing(position, dest);
+
+    const remainingNm = Math.max(0, totalNm - sailedNm);
+    const remainingSimHours = voyage.speedKn > 0 ? remainingNm / voyage.speedKn : 0;
+    const etaSim = new Date(
+      now.getTime() + realSecondsFromSimHours(remainingSimHours, simSpeed) * 1000
+    );
+
+    results.push({
+      vesselId: voyage.vessel.id,
+      name: voyage.vessel.name,
+      lat: position.lat,
+      lon: position.lon,
+      heading,
+      speedKn: voyage.speedKn,
+      voyageId: voyage.id,
+      originPort: voyage.originPort.name,
+      destPort: voyage.destPort.name,
+      etaSim: etaSim.toISOString(),
+      hasPendingAction: pendingVoyageIds.has(voyage.id),
+    });
+  }
+
+  return results;
+}

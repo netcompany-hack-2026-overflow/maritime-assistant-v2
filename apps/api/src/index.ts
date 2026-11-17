@@ -1,6 +1,9 @@
 import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
 import { env } from "./lib/env.js";
+import { portsRouter } from "./routes/ports.js";
+import { vesselsRouter } from "./routes/vessels.js";
+import { voyagesRouter } from "./routes/voyages.js";
 
 const app = express();
 app.use(cors());
@@ -18,6 +21,10 @@ app.get("/api/meta", (_req, res) => {
     co2Factor: env.co2Factor,
   });
 });
+
+app.use("/api/ports", portsRouter);
+app.use("/api/vessels", vesselsRouter);
+app.use("/api/voyages", voyagesRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);

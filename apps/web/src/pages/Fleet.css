@@ -1,3 +1,65 @@
 .page--fleet {
   height: 100%;
+  padding: 0;
+  max-width: none;
+}
+
+.fleet-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  height: 100%;
+}
+
+.fleet-layout__globe {
+  position: relative;
+  min-width: 0;
+}
+
+.fleet-layout__list {
+  border-left: 1px solid var(--line);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.ship-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ship-list__item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ship-list__item:hover {
+  background: var(--surface);
+}
+
+.ship-list__item--active {
+  background: var(--surface);
+  border-left: 2px solid var(--blue);
+}
+
+.ship-list__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.ship-list__meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
