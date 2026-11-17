@@ -98,3 +98,17 @@
   color: var(--danger);
   background: rgba(194, 54, 47, 0.1);
 }
+
+.voyage-table {
+  min-width: 760px;
+}
+
+@media (max-width: 760px) {
+  .voyage-form {
+    grid-template-columns: 1fr;
+  }
+
+  .voyages-toolbar .btn {
+    min-height: 44px;
+  }
+}

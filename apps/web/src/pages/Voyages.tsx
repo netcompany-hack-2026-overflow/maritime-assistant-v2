@@ -210,7 +210,7 @@ export function Voyages() {
               </p>
             )}
 
-            {formError && <div className="error-state">{formError}</div>}
+            {formError && <div className="error-state" role="alert">{formError}</div>}
 
             <button className="btn btn-primary" type="submit" disabled={submitting}>
               Create voyage
@@ -227,14 +227,15 @@ export function Voyages() {
       )}
 
       {loading ? (
-        <div className="loading-state">Loading voyages…</div>
+        <div className="loading-state" role="status">Loading voyages…</div>
       ) : error ? (
-        <div className="error-state">{error}</div>
+        <div className="error-state" role="alert">{error}</div>
       ) : voyages.length === 0 ? (
         <div className="empty-state">
           <p>No voyages yet. Create one above.</p>
         </div>
       ) : (
+        <div className="table-scroll" role="region" aria-label="Voyages table" tabIndex={0}>
         <table className="voyage-table">
           <thead>
             <tr>
@@ -269,6 +270,7 @@ export function Voyages() {
                     <button
                       className="btn"
                       onClick={() => handleCancel(v.id)}
+                      aria-label={`Cancel voyage of ${v.vesselName}`}
                       disabled={cancellingId === v.id}
                     >
                       Cancel
@@ -279,6 +281,7 @@ export function Voyages() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

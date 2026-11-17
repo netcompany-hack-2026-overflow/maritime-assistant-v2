@@ -28,14 +28,14 @@ export function VesselDrawer({
   onClose,
 }: VesselDrawerProps) {
   return (
-    <aside className="vessel-drawer">
+    <aside className="vessel-drawer" aria-label={`${vessel.name} details`}>
       <div className="vessel-drawer__header">
         <div>
           <p className="label">Vessel</p>
           <h2 className="vessel-drawer__title">{vessel.name}</h2>
         </div>
-        <button className="vessel-drawer__close" onClick={onClose} aria-label="Close">
-          <X size={16} />
+        <button className="vessel-drawer__close" onClick={onClose} aria-label={`Close ${vessel.name} details`}>
+          <X size={18} aria-hidden="true" />
         </button>
       </div>
 

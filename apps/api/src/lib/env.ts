@@ -1,3 +1,15 @@
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Local dev (npm run dev) runs from apps/api, so nothing would pick up the repo-root
+// .env the README tells you to create. Load it here; real environment variables
+// (docker compose, CI) always win because loadEnvFile never overrides them.
+const rootEnv = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
+if (!process.env.VITEST && existsSync(rootEnv) && typeof process.loadEnvFile === "function") {
+  process.loadEnvFile(rootEnv);
+}
+
 type LlmProviderName = "mock" | "anthropic" | "openai";
 
 /** Model used when LLM_MODEL is unset or empty, so each provider gets a model name it understands. */

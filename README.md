@@ -1,6 +1,9 @@
-# Maritime Ops Assistant
+# Tidewise
 
-**Smart Maritime Operations Assistant** — built for Netcompany Hackathon Athens 2026, Challenge #2.
+[![CI](https://github.com/netcompany-hack-2026-overflow/maritime-assistant-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/netcompany-hack-2026-overflow/maritime-assistant-v2/actions/workflows/ci.yml)
+
+**Tidewise: Smart Maritime Operations Assistant.** Built for Netcompany Hackathon
+Athens 2026, Challenge #2. *Arrive on time, not early.*
 
 A fleet operator gets a one-line email from a port agent: *"berth delayed 24 hours."*
 Today someone has to read that, remember which ship it affects, do mental arithmetic
@@ -35,28 +38,40 @@ so a human reviewer can check the reasoning before approving.
 
 ## The 90-second demo path
 
+0. **Landing** (`/`): what Tidewise does in one screen; "Open the console" goes to the app.
 1. **Fleet** — a live 3D globe shows 8 fictional vessels in motion (simulated at
    `SIM_SPEED`× real time). MV Aegean Star is underway, Piraeus → Rotterdam, at 14.0 kn.
 2. **Inbox** — click "Simulate incoming email" to release the queued Rotterdam
    berth-delay notice. It gets extracted into a structured port event (highlighted
    directly in the email body) and matched to MV Aegean Star's voyage.
-3. **Actions** — a recommendation is waiting: slow to 10.7 kn, save ~57 t of fuel /
-   ~€34k / ~178 t CO₂. Expand "Show the math" to see every step, then **Approve**.
+3. **Actions** — a recommendation is waiting: slow from 14.0 kn to roughly 10.7–12 kn
+   and save roughly 45–60 t of fuel (~€27–36k), depending on that day's mock weather
+   (calm water gives 10.7 kn / 57 t / €34k). Expand "Show the math" to see every step,
+   including the weather inputs, then **Approve**.
 4. **Fleet** — MV Aegean Star is now visibly slower on the globe, and its ETA has
    moved to match the new berth time exactly.
 5. **Ask** — ask "How much fuel have we saved from approved recommendations?" and get
    an answer with a citation back to the recommendation record.
+6. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
+   `apps/web/public/samples/algeciras-berth-notice.pdf` (also downloadable from the
+   Inbox page). The PDF's text runs through the same pipeline and produces a
+   recommendation for MV Ionian Trader.
 
 ## Pages
 
+- **Landing** (`/`) — hero page explaining the product, with a live "fuel saved so far"
+  figure and a link into the console. The console pages live under `/fleet`, `/voyages`,
+  `/inbox`, `/actions`, `/ask`.
 - **Fleet** — 3D globe (dotted-land style) with every vessel's live position, heading,
   and route arc; a side list of ships; click a ship for a detail drawer. Ships with a
-  pending recommendation are highlighted.
+  pending recommendation are highlighted. A "Saved to date" tile totals fuel, € and
+  CO₂ saved by every approved recommendation.
 - **Voyages** — a table of every voyage with a "New voyage" form: pick a vessel and two
   ports (via dropdowns or by clicking a small rotating globe), see a live distance/ETA
   preview, and create or cancel voyages.
 - **Inbox** — queued and processed port-agent emails. "Simulate incoming email"
-  releases the next queued one; "Paste email" lets you type a custom one. Processing an
+  releases the next queued one; "Paste email" lets you type a custom one; "Upload PDF"
+  turns a text-based PDF (berth notice, port circular) into an inbox item. Processing an
   email shows the extracted fields with their exact source text highlighted in the
   original body, which voyage it matched (or why it didn't), and the recommendation it
   produced.
@@ -199,13 +214,28 @@ also set `LLM_MODEL=gpt-6-luna` for the larger model. The top bar shows which
 provider is actually active. Without a key, the Ask page answers only its example
 questions and says so on screen.
 
+## Design, devices & accessibility
+
+- Responsive down to phone width: the nav moves to its own scrollable row, the Fleet
+  globe stacks above the ship list, the vessel drawer becomes a bottom sheet, Inbox
+  stacks list over detail, the voyages table scrolls sideways, recommendation KPIs stack.
+- Accessibility: skip-to-content link, a page `<h1>` on every route, visible keyboard
+  focus, ARIA tabs on Actions, `aria-expanded` on every disclosure, a labelled dialog
+  for "Reject", `role="alert"`/`role="status"` on errors and loading, labels on all form
+  fields, 44 px touch targets, AA-contrast warning colour, `prefers-reduced-motion`.
+- Type: Inter for UI, Instrument Serif italic for accents (both self-hosted via
+  `@fontsource`, no external font requests). Hero photo by Austin Neill on Unsplash.
+
 ## Local dev without Docker
 
 Requires Node 20+ and a local PostgreSQL instance.
 
 ```bash
 npm install
-cp .env.example .env            # edit DATABASE_URL to point at your local Postgres
+cp .env.example .env            # set DATABASE_URL to your local Postgres, e.g.
+                                # postgresql://<you>@localhost:5432/maritime
+                                # (the example uses host "db", which only exists inside Docker)
+createdb maritime
 npm run build --workspace packages/shared
 npm run prisma:migrate --workspace apps/api
 npm run prisma:seed --workspace apps/api
@@ -214,8 +244,12 @@ npm run dev                     # runs the api and web dev servers together
 
 ## Testing & accuracy evidence
 
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push:
+typecheck, unit tests, the extraction eval (fails below 12/12), and a full
+`docker compose up --build` with smoke tests of the Fleet API, PDF upload and Ask.
+
 ```bash
-npm run test     # packages/shared (geo + JIT) and apps/api (LLM mock, sim, ask, env)
+npm run test     # packages/shared (geo + JIT + weather) and apps/api (LLM mock, sim, weather, PDF, ask, env)
 npm run eval      # runs apps/api/eval/emails/*.json through the mock extractor
 
 # same 12 emails through a real LLM (writes apps/api/eval/results-openai.md)
@@ -255,6 +289,7 @@ Full per-field, per-email results are written to
 | GET | `/api/emails` | all emails (queued + processed) |
 | POST | `/api/emails` | add a custom email |
 | POST | `/api/emails/simulate` | release the next queued demo email |
+| POST | `/api/emails/document?filename=` | upload a PDF (raw body, `Content-Type: application/pdf`, max 5 MB) as an inbox item |
 | POST | `/api/emails/:id/process` | extract + match + (maybe) generate a recommendation |
 | GET | `/api/port-events` | all extracted port events |
 | GET | `/api/recommendations` | recommendations, optional `?status=` filter |
@@ -275,6 +310,14 @@ Full per-field, per-email results are written to
 - Fuel price (€600/t) and CO₂ factor (3.114 t CO₂/t fuel, the standard VLSFO factor)
   are configurable assumptions (`FUEL_PRICE_EUR_PER_T`, `CO2_FACTOR`), not live market
   data, and are shown next to every figure that depends on them.
+- Weather is **mocked**: each destination port gets a deterministic head current
+  (−0.5 to +1.5 kn) and sea state (fuel factor 1.00–1.10) per day
+  ([apps/api/src/sim/weather.ts](apps/api/src/sim/weather.ts)). An adverse current
+  raises the speed through the water needed to arrive on time; rougher seas raise fuel
+  burn for both plans. Both values appear in "Show the math". A real deployment would
+  call a marine-weather API instead.
+- When a notice gives only "delayed by N hours" without a new berth time, the new berth
+  time is the voyage's current planned arrival plus N hours.
 - A recommended speed never exceeds the vessel's current speed (the app only slows
   ships down) and never drops below its `minSpeedKn`; if the available time is too
   short even at minimum speed, the plan still clamps and reports a residual wait.
@@ -293,6 +336,8 @@ Full per-field, per-email results are written to
   "vessel already has an active voyage" — nothing stops two voyages on the same route
   for different vessels.
 - There is no authentication; this is a single-tenant demo app.
+- PDF upload reads the text layer only; scanned (image-only) PDFs are rejected with a
+  clear message rather than OCR'd.
 
 ## Hard rules followed throughout
 

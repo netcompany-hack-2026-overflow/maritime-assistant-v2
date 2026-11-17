@@ -17,8 +17,9 @@
   font-family: inherit;
 }
 
-.ask-form__input:focus {
-  outline: none;
+.ask-form__input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
   border-color: var(--blue);
 }
 
@@ -121,4 +122,15 @@
   border-radius: var(--radius);
   overflow-x: auto;
   max-height: 200px;
+}
+
+@media (max-width: 640px) {
+  .ask-form {
+    flex-direction: column;
+  }
+
+  .ask-form .btn {
+    justify-content: center;
+    min-height: 44px;
+  }
 }

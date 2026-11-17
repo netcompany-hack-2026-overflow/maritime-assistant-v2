@@ -68,3 +68,24 @@
   text-decoration: none;
   font-weight: 500;
 }
+
+.vessel-drawer__close {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* on narrow screens the drawer becomes a bottom sheet over the globe */
+@media (max-width: 900px) {
+  .vessel-drawer {
+    top: auto;
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+    width: auto;
+    max-height: 70%;
+    box-shadow: 0 -10px 30px -10px rgba(11, 27, 51, 0.3);
+  }
+}

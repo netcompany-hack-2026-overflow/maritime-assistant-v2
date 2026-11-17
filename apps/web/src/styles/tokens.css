@@ -7,7 +7,7 @@
   --navy: #0a2a66;
   --blue: #1e5eff;
   --success: #1f8a5b;
-  --warning: #b7791f;
+  --warning: #94600f;
   --danger: #c2362f;
 
   --space-1: 4px;
@@ -22,6 +22,8 @@
   --radius: 8px;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --focus: #1e5eff;
 
   --text-xs: 11px;
   --text-sm: 13px;

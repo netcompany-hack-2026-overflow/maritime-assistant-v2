@@ -193,3 +193,39 @@
   font-weight: 500;
   text-decoration: none;
 }
+
+@media (max-width: 900px) {
+  .page--inbox {
+    height: auto;
+  }
+
+  .inbox-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .inbox-layout__list {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: var(--space-4);
+    max-height: 45vh;
+  }
+
+  .inbox-layout__detail {
+    padding: var(--space-4);
+    max-width: none;
+  }
+
+  .inbox-toolbar__actions {
+    flex-wrap: wrap;
+  }
+
+  .email-list__item {
+    min-height: 44px;
+  }
+}
+
+.inbox-toolbar__hint {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}

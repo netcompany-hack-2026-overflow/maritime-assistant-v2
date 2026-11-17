@@ -110,3 +110,77 @@ button {
   color: var(--muted);
   font-size: var(--text-sm);
 }
+
+/* ---------- brand ---------- */
+
+.monogram {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.monogram__w {
+  margin-left: -0.08em;
+}
+
+/* ---------- accessibility ---------- */
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: -100px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--navy);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- console shell ---------- */
+
+.console {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.console__main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.console__main:focus {
+  outline: none;
+}

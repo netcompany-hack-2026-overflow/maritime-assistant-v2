@@ -3,12 +3,18 @@ import { calculateJit } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import { env } from "../lib/env.js";
 import { getLlmProvider } from "../llm/index.js";
+import { mockWeatherFor } from "../sim/weather.js";
 
 async function createRecommendationForPortEvent(
   voyage: Prisma.VoyageGetPayload<{ include: { vessel: true; originPort: true; destPort: true } }>,
   portEvent: { id: string; eventType: string; delayHours: number | null; newBerthTime: Date | null }
 ) {
-  if (!portEvent.newBerthTime || portEvent.delayHours === null) return null;
+  if (portEvent.delayHours === null) return null;
+  // Notices often give only "delayed by N hours". In that case the new berth
+  // time is the voyage's current planned arrival pushed back by the delay.
+  const newBerthTime =
+    portEvent.newBerthTime ??
+    new Date(voyage.plannedEta.getTime() + portEvent.delayHours * 3_600_000);
 
   const now = new Date();
   const distanceNm = Math.max(
@@ -21,7 +27,7 @@ async function createRecommendationForPortEvent(
     distanceNm,
     currentSpeedKn: voyage.speedKn,
     currentEta: voyage.plannedEta,
-    newBerthTime: portEvent.newBerthTime,
+    newBerthTime,
     now,
     designSpeedKn: voyage.vessel.designSpeedKn,
     fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
@@ -29,6 +35,7 @@ async function createRecommendationForPortEvent(
     auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
     fuelPriceEurPerT: env.fuelPriceEurPerT,
     co2Factor: env.co2Factor,
+    weather: mockWeatherFor(voyage.destPort.unlocode, newBerthTime),
   });
 
   if (calc.fuelSavedT <= 0) return null;
@@ -133,7 +140,12 @@ export async function processEmail(emailId: string) {
       voyageId: matchedVoyage?.id ?? null,
       eventType: extraction.eventType,
       delayHours: extraction.delayHours,
-      newBerthTime: extraction.newBerthTime ? new Date(extraction.newBerthTime) : null,
+      newBerthTime: extraction.newBerthTime
+        ? new Date(extraction.newBerthTime)
+        : matchedVoyage && extraction.delayHours !== null
+          ? // no explicit time in the text: current planned arrival + reported delay
+            new Date(matchedVoyage.plannedEta.getTime() + extraction.delayHours * 3_600_000)
+          : null,
       rawExtraction: extraction as unknown as Prisma.InputJsonValue,
       sourceSpans: extraction.sourceSpans as unknown as Prisma.InputJsonValue,
       confidence: extraction.confidence,

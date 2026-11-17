@@ -75,6 +75,16 @@ export interface JitCalc {
   fuelSavedT: number;
   costSavedEur: number;
   co2SavedT: number;
+  /** Adverse (positive) or following (negative) current along the route, kn. 0 = no weather. */
+  headCurrentKn: number;
+  /** Multiplier on daily fuel for added resistance in waves/wind. 1 = calm. */
+  seaStateFuelFactor: number;
+}
+
+/** Simple weather input for the JIT calculation (mocked in this prototype). */
+export interface JitWeather {
+  headCurrentKn: number;
+  seaStateFuelFactor: number;
 }
 
 export interface RecommendationDTO {

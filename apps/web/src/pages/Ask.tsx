@@ -34,7 +34,7 @@ function CitationChip({ citation }: { citation: Citation }) {
 
   return (
     <div className="citation-chip">
-      <button className="citation-chip__toggle" onClick={toggle}>
+      <button className="citation-chip__toggle" onClick={toggle} aria-expanded={expanded}>
         {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         {citation.table} · {citation.id.slice(0, 8)}
       </button>
@@ -94,6 +94,7 @@ export function Ask() {
           className="ask-form__input"
           type="text"
           placeholder="Ask a question about the fleet…"
+          aria-label="Question about the fleet"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={busy}
@@ -120,7 +121,7 @@ export function Ask() {
         </p>
       )}
 
-      {error && <div className="error-state">{error}</div>}
+      {error && <div className="error-state" role="alert">{error}</div>}
 
       {exchanges.length === 0 ? (
         <div className="empty-state">
@@ -128,7 +129,7 @@ export function Ask() {
           <p>Try one of the example questions above, or ask your own.</p>
         </div>
       ) : (
-        <div className="ask-exchanges">
+        <div className="ask-exchanges" aria-live="polite">
           {exchanges.map((ex) => (
             <div key={ex.id} className="ask-exchange">
               <p className="ask-exchange__question">{ex.question}</p>

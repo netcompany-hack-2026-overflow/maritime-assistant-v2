@@ -20,6 +20,8 @@ const EVENT_LABELS: Record<string, string> = {
 const CALC_ROWS: Array<{ key: string; label: string; unit?: string; digits?: number }> = [
   { key: "distanceNm", label: "Remaining distance", unit: "nm" },
   { key: "hoursAvailable", label: "Hours available until berth", unit: "h" },
+  { key: "headCurrentKn", label: "Head current (mock weather, + = adverse)", unit: "kn", digits: 1 },
+  { key: "seaStateFuelFactor", label: "Sea-state fuel factor (mock weather)", unit: "×" },
   { key: "v0", label: "Current speed (v₀)", unit: "kn" },
   { key: "v1Raw", label: "Computed JIT speed (unclamped)", unit: "kn" },
   { key: "v1", label: "Recommended speed (v₁)", unit: "kn" },
@@ -54,7 +56,7 @@ function FactRow({ table, id, label }: { table: string; id: string; label: strin
 
   return (
     <div className="fact-row">
-      <button className="fact-row__toggle" onClick={toggle}>
+      <button className="fact-row__toggle" onClick={toggle} aria-expanded={expanded}>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         {label}
       </button>
@@ -151,7 +153,11 @@ export function RecommendationCard({
 
       <p className="recommendation-card__rationale">{recommendation.rationale}</p>
 
-      <button className="recommendation-card__toggle" onClick={() => setShowMath((v) => !v)}>
+      <button
+        className="recommendation-card__toggle"
+        onClick={() => setShowMath((v) => !v)}
+        aria-expanded={showMath}
+      >
         {showMath ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         Show the math
       </button>
@@ -189,7 +195,7 @@ export function RecommendationCard({
         )}
       </div>
 
-      {error && <div className="error-state">{error}</div>}
+      {error && <div className="error-state" role="alert">{error}</div>}
 
       {recommendation.status === "PENDING" ? (
         <div className="recommendation-card__actions">
@@ -211,10 +217,19 @@ export function RecommendationCard({
       )}
 
       {showRejectModal && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <p className="label">Reject recommendation</p>
+        <div
+          className="modal-backdrop"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !busy) setShowRejectModal(false);
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`reject-title-${recommendation.id}`}>
+            <p className="label" id={`reject-title-${recommendation.id}`}>
+              Reject recommendation
+            </p>
             <textarea
+              aria-label="Reason for rejecting"
+              autoFocus
               placeholder="Reason for rejecting…"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}

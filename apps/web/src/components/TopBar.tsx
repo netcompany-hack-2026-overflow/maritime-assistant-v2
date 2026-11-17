@@ -1,10 +1,11 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import { Monogram } from "./Monogram.js";
 import { useEffect, useState } from "react";
 import { api, type MetaResponse } from "../lib/api.js";
 import "./TopBar.css";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Fleet", end: true },
+  { to: "/fleet", label: "Fleet", end: true },
   { to: "/voyages", label: "Voyages", end: false },
   { to: "/inbox", label: "Inbox", end: false },
   { to: "/actions", label: "Actions", end: false },
@@ -35,8 +36,11 @@ export function TopBar({ pendingActionCount }: TopBarProps) {
 
   return (
     <header className="top-bar">
-      <div className="top-bar__wordmark">MARITIME OPS</div>
-      <nav className="top-bar__nav">
+      <Link to="/" className="top-bar__wordmark" aria-label="Tidewise home">
+        <Monogram className="top-bar__monogram" />
+        <span className="top-bar__name">Tidewise</span>
+      </Link>
+      <nav className="top-bar__nav" aria-label="Main">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -48,12 +52,17 @@ export function TopBar({ pendingActionCount }: TopBarProps) {
           >
             {item.label}
             {item.to === "/actions" && pendingActionCount > 0 && (
-              <span className="top-bar__badge">{pendingActionCount}</span>
+              <span className="top-bar__badge">
+                {pendingActionCount}
+                <span className="visually-hidden"> pending</span>
+              </span>
             )}
           </NavLink>
         ))}
       </nav>
-      <div className="top-bar__llm">LLM: {meta ? meta.llmProvider : "..."}</div>
+      <div className="top-bar__llm" title="Language model in use">
+        LLM: {meta ? meta.llmProvider : "..."}
+      </div>
     </header>
   );
 }

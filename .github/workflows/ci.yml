@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Typecheck, tests, extraction eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace packages/shared
+      - run: npm run prisma:generate --workspace apps/api
+      - run: npm run lint
+      - run: npm test
+      # mock provider: deterministic, no API key needed
+      - run: npm run eval
+      - name: Fail if the eval regressed below 12/12
+        run: |
+          grep -qF "Exact-match emails: **12 / 12**" apps/api/eval/results.md
+
+  docker:
+    name: docker compose up --build (judging setup)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the stack exactly as the README says
+        run: docker compose up --build -d
+      - name: Wait for the app to answer through nginx
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/health >/dev/null; then
+              echo "API healthy after ${i}s"; break
+            fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8080/api/health
+      - name: Smoke test the main flows
+        run: |
+          curl -fsS http://localhost:8080/ | grep -q "<div id=\"root\">"
+          curl -fsS http://localhost:8080/api/vessels | grep -q "MV Aegean Star"
+          curl -fsS -X POST http://localhost:8080/api/emails/document?filename=sample.pdf \
+            -H "Content-Type: application/pdf" \
+            --data-binary @apps/web/public/samples/algeciras-berth-notice.pdf | grep -q '"id"'
+          curl -fsS -X POST http://localhost:8080/api/ask -H "Content-Type: application/json" \
+            -d '{"question":"Which vessels are affected by port delays?"}' | grep -q '"answer"'
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail 100
+      - if: always()
+        run: docker compose down -v

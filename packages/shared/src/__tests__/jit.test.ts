@@ -77,3 +77,51 @@ describe("calculateJit", () => {
     expect(calc.v1).toBeLessThanOrEqual(14);
   });
 });
+
+describe("calculateJit with weather", () => {
+  const now = new Date("2026-01-01T00:00:00Z");
+  const currentEta = new Date(now.getTime() + (1200 / 14) * 3_600_000);
+  const newBerthTime = new Date(currentEta.getTime() + 24 * 3_600_000);
+  const base = {
+    distanceNm: 1200,
+    currentSpeedKn: 14,
+    currentEta,
+    newBerthTime,
+    now,
+    designSpeedKn: 14,
+    fuelTPerDayAtDesign: 40,
+    minSpeedKn: 9,
+    auxFuelTPerDay: 3,
+    fuelPriceEurPerT: 600,
+    co2Factor: 3.114,
+  };
+
+  it("is identical to the calm-water model when weather is neutral", () => {
+    const calm = calculateJit(base);
+    const neutral = calculateJit({ ...base, weather: { headCurrentKn: 0, seaStateFuelFactor: 1 } });
+    expect(neutral.v1).toBeCloseTo(calm.v1, 6);
+    expect(neutral.fuelSavedT).toBeCloseTo(calm.fuelSavedT, 6);
+    expect(calm.headCurrentKn).toBe(0);
+    expect(calm.seaStateFuelFactor).toBe(1);
+  });
+
+  it("asks for a higher speed through the water against a head current", () => {
+    const calm = calculateJit(base);
+    const head = calculateJit({ ...base, weather: { headCurrentKn: 1, seaStateFuelFactor: 1 } });
+    expect(head.v1).toBeCloseTo(calm.v1 + 1, 6);
+    expect(head.residualWaitHoursPlanB).toBeCloseTo(0, 6);
+  });
+
+  it("scales fuel burn by the sea-state factor", () => {
+    const calm = calculateJit(base);
+    const rough = calculateJit({ ...base, weather: { headCurrentKn: 0, seaStateFuelFactor: 1.1 } });
+    expect(rough.fAtV0).toBeCloseTo(calm.fAtV0 * 1.1, 6);
+    expect(rough.fuelSavedT).toBeGreaterThan(calm.fuelSavedT);
+  });
+
+  it("caps an extreme current so the ship always makes headway", () => {
+    const calc = calculateJit({ ...base, weather: { headCurrentKn: 50, seaStateFuelFactor: 1 } });
+    expect(calc.headCurrentKn).toBe(8);
+    expect(Number.isFinite(calc.fuelB)).toBe(true);
+  });
+});

@@ -1,7 +1,10 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { body, param, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma.js";
 import { processEmail } from "../services/emailProcessing.js";
+import { DocumentError, pdfToText, subjectFromText } from "../services/documentText.js";
+
+const MAX_PDF_BYTES = 5 * 1024 * 1024;
 
 export const emailsRouter = Router();
 
@@ -34,6 +37,40 @@ emailsRouter.post(
       });
       res.status(201).json(email);
     } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * Upload a PDF document (berth notice, port circular, supplier quote). Its text
+ * layer becomes an inbox item that goes through the same extract → match →
+ * recommend pipeline as an email. Body: raw PDF bytes; ?filename= for display.
+ */
+emailsRouter.post(
+  "/document",
+  express.raw({ type: "application/pdf", limit: MAX_PDF_BYTES }),
+  async (req, res, next) => {
+    try {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ error: "Send the PDF as the request body with Content-Type: application/pdf." });
+      }
+      const filename = String(req.query.filename ?? "document.pdf").slice(0, 200);
+      const text = await pdfToText(req.body);
+      const email = await prisma.email.create({
+        data: {
+          fromAddr: `Uploaded document · ${filename}`,
+          subject: subjectFromText(text, filename),
+          body: text,
+          queued: false,
+          processed: false,
+        },
+      });
+      res.status(201).json(email);
+    } catch (err) {
+      if (err instanceof DocumentError) {
+        return res.status(422).json({ error: err.message });
+      }
       next(err);
     }
   }

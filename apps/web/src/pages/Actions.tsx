@@ -43,25 +43,29 @@ export function Actions() {
 
   return (
     <div className="page page--actions">
-      <div className="actions-tabs">
+      <div className="actions-tabs" role="tablist" aria-label="Recommendations">
         <button
           className={tab === "pending" ? "actions-tab actions-tab--active" : "actions-tab"}
           onClick={() => setTab("pending")}
+          role="tab"
+          aria-selected={tab === "pending"}
         >
           Pending{pending.length > 0 ? ` (${pending.length})` : ""}
         </button>
         <button
           className={tab === "history" ? "actions-tab actions-tab--active" : "actions-tab"}
           onClick={() => setTab("history")}
+          role="tab"
+          aria-selected={tab === "history"}
         >
           History
         </button>
       </div>
 
       {loading ? (
-        <div className="loading-state">Loading actions…</div>
+        <div className="loading-state" role="status">Loading actions…</div>
       ) : error ? (
-        <div className="error-state">{error}</div>
+        <div className="error-state" role="alert">{error}</div>
       ) : visible.length === 0 ? (
         <div className="empty-state">
           {tab === "pending"

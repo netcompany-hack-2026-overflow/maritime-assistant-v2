@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FileUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, type EmailListItem, type ProcessEmailResult } from "../lib/api.js";
 import { highlightSourceSpans } from "../lib/highlight.js";
@@ -30,6 +31,9 @@ export function Inbox() {
     refresh().finally(() => setLoading(false));
   }, []);
 
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const selectedEmail = emails.find((e) => e.id === selectedId) ?? null;
   const selectedResult = selectedId ? results[selectedId] : undefined;
 
@@ -41,6 +45,22 @@ export function Inbox() {
       setSelectedId(released.id);
     } catch (e) {
       setSimulateError((e as Error).message);
+    }
+  };
+
+  const handleUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setSimulateError(null);
+    setUploading(true);
+    try {
+      const created = await api.uploadDocument(file);
+      await refresh();
+      setSelectedId(created.id);
+    } catch (e) {
+      setSimulateError((e as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -95,29 +115,56 @@ export function Inbox() {
               <button className="btn" onClick={() => setShowCustomForm((v) => !v)}>
                 Paste email
               </button>
+              <button
+                className="btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <FileUp size={14} aria-hidden="true" />
+                {uploading ? "Reading PDF…" : "Upload PDF"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="visually-hidden"
+                tabIndex={-1}
+                aria-label="Upload a PDF document"
+                onChange={(e) => void handleUpload(e.target.files?.[0])}
+              />
               <button className="btn btn-primary" onClick={handleSimulate}>
                 Simulate incoming email
               </button>
             </div>
+            <p className="inbox-toolbar__hint">
+              Port notices and quotes as PDF work too.{" "}
+              <a href="/samples/algeciras-berth-notice.pdf" download>
+                Download a sample
+              </a>
+            </p>
           </div>
-          {simulateError && <div className="error-state">{simulateError}</div>}
+          {simulateError && <div className="error-state" role="alert">{simulateError}</div>}
 
           {showCustomForm && (
             <form className="custom-email-form" onSubmit={handleCustomSubmit}>
               <input
                 placeholder="From address"
+                aria-label="From address"
+                type="email"
                 value={customForm.fromAddr}
                 onChange={(e) => setCustomForm({ ...customForm, fromAddr: e.target.value })}
                 required
               />
               <input
                 placeholder="Subject"
+                aria-label="Subject"
                 value={customForm.subject}
                 onChange={(e) => setCustomForm({ ...customForm, subject: e.target.value })}
                 required
               />
               <textarea
                 placeholder="Body"
+                aria-label="Email body"
                 rows={4}
                 value={customForm.body}
                 onChange={(e) => setCustomForm({ ...customForm, body: e.target.value })}
@@ -130,9 +177,9 @@ export function Inbox() {
           )}
 
           {loading ? (
-            <div className="loading-state">Loading inbox…</div>
+            <div className="loading-state" role="status">Loading inbox…</div>
           ) : error ? (
-            <div className="error-state">{error}</div>
+            <div className="error-state" role="alert">{error}</div>
           ) : emails.length === 0 ? (
             <div className="empty-state">
               <p>No emails yet.</p>
@@ -151,6 +198,7 @@ export function Inbox() {
                         : "email-list__item"
                     }
                     onClick={() => setSelectedId(email.id)}
+                    aria-current={email.id === selectedId ? "true" : undefined}
                   >
                     <span
                       className={

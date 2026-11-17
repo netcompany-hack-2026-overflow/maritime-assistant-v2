@@ -63,3 +63,30 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+@media (max-width: 900px) {
+  .page--fleet {
+    height: auto;
+  }
+
+  .fleet-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 58vh auto;
+    height: auto;
+  }
+
+  .fleet-layout__list {
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding: var(--space-4);
+  }
+
+  .ship-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  .ship-list__item {
+    min-height: 44px;
+  }
+}

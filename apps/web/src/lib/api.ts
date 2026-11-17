@@ -171,6 +171,18 @@ export const api = {
   simulateEmail: () => request<EmailListItem>("/emails/simulate", { method: "POST" }),
   createEmail: (input: { fromAddr: string; subject: string; body: string }) =>
     request<EmailListItem>("/emails", { method: "POST", body: JSON.stringify(input) }),
+  uploadDocument: async (file: File): Promise<EmailListItem> => {
+    const res = await fetch(`/api/emails/document?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/pdf" },
+      body: file,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error ?? `Upload failed with ${res.status}`);
+    }
+    return res.json() as Promise<EmailListItem>;
+  },
   processEmail: (id: string) =>
     request<ProcessEmailResult>(`/emails/${id}/process`, { method: "POST" }),
   getPortEvents: () => request<PortEventRecord[]>("/port-events"),

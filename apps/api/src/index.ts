@@ -39,9 +39,20 @@ app.use("/api/ask", askRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);
-  res.status(err.status ?? 500).json({
-    error: err.message ?? "Internal server error",
-    details: err.details ?? null,
+  // Prisma connection/config failures: don't leak the raw client message to
+  // the UI, say what is wrong in plain words instead.
+  const name: string = err?.name ?? "";
+  if (name === "PrismaClientInitializationError" || /DATABASE_URL/.test(err?.message ?? "")) {
+    return res.status(503).json({
+      error: "The database is not reachable. Check DATABASE_URL and that Postgres is running.",
+      details: null,
+    });
+  }
+  const status: number = err.status ?? 500;
+  res.status(status).json({
+    // 5xx messages can contain internals (SQL, stack-ish text); keep them in the log
+    error: status >= 500 ? "Something went wrong on the server. See the API logs." : err.message,
+    details: status >= 500 ? null : err.details ?? null,
   });
 };
 app.use(errorHandler);

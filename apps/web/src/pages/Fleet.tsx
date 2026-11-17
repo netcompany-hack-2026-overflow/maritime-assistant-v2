@@ -3,6 +3,7 @@ import type { PortDTO, VesselPositionDTO } from "@maritime/shared";
 import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { FleetGlobe } from "../components/FleetGlobe.js";
 import { VesselDrawer } from "../components/VesselDrawer.js";
+import { SavingsTile } from "../components/SavingsTile.js";
 import "./Fleet.css";
 
 const POLL_INTERVAL_MS = 2000;
@@ -61,11 +62,11 @@ export function Fleet() {
   return (
     <div className="page page--fleet">
       <div className="fleet-layout">
-        <div className="fleet-layout__globe">
+        <div className="fleet-layout__globe" role="region" aria-label="Live fleet globe. Use the ship list to select a vessel with the keyboard.">
           {loading ? (
-            <div className="loading-state">Loading fleet…</div>
+            <div className="loading-state" role="status">Loading fleet…</div>
           ) : error ? (
-            <div className="error-state">{error}</div>
+            <div className="error-state" role="alert">{error}</div>
           ) : (
             <FleetGlobe
               ports={ports}
@@ -74,6 +75,7 @@ export function Fleet() {
               onSelectShip={setSelectedVesselId}
             />
           )}
+          {!loading && !error && <SavingsTile />}
           {selectedVessel && (
             <VesselDrawer
               vessel={selectedVessel}
@@ -88,7 +90,7 @@ export function Fleet() {
           )}
         </div>
         <div className="fleet-layout__list">
-          <p className="label">Ships</p>
+          <h2 className="label">Ships</h2>
           {vessels.length === 0 ? (
             <div className="empty-state">No vessels yet.</div>
           ) : (
@@ -102,6 +104,7 @@ export function Fleet() {
                         : "ship-list__item"
                     }
                     onClick={() => setSelectedVesselId(v.id)}
+                    aria-pressed={v.id === selectedVesselId}
                   >
                     <span className="ship-list__name">{v.name}</span>
                     <span className="ship-list__meta">
