@@ -1,7 +1,15 @@
 import OpenAI from "openai";
-import { answerSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
+import { answerSchema, type Answer, type CharterPartyTerms, type PortEventExtraction } from "@maritime/shared";
+import {
+  CHARTER_PARTY_SYSTEM_PROMPT,
+  NOTICE_SYSTEM_PROMPT,
+  mockDraftNotice,
+  noticeDraftSchema,
+  parseCharterPartyTerms,
+} from "./charterParty.js";
+
 import { EXTRACTION_SYSTEM_PROMPT, parseExtraction } from "./extraction.js";
-import type { CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+import type { CitableRow, LlmProvider, NoticeDraft, NoticeFacts, RecommendationFacts } from "./types.js";
 import { mockExplainRecommendation } from "./mock.js";
 
 const MAX_JSON_TOKENS = 4000;
@@ -92,5 +100,21 @@ export class OpenAiProvider implements LlmProvider {
       `Question: ${question}\n\nRows:\n${JSON.stringify(rows)}`
     );
     return answerSchema.parse(raw);
+  }
+
+  async extractCharterParty(text: string): Promise<CharterPartyTerms> {
+    const raw = await this.completeJson(CHARTER_PARTY_SYSTEM_PROMPT, text.slice(0, 60_000));
+    return parseCharterPartyTerms(raw);
+  }
+
+  async draftNotice(facts: NoticeFacts): Promise<NoticeDraft> {
+    try {
+      const raw = await this.completeJson(NOTICE_SYSTEM_PROMPT, JSON.stringify(facts));
+      return noticeDraftSchema.parse(raw);
+    } catch (err) {
+      // An approval must never fail because the email draft did: use the template.
+      console.warn(`Notice draft via LLM failed, using template: ${(err as Error).message}`);
+      return mockDraftNotice(facts);
+    }
   }
 }

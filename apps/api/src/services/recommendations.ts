@@ -1,6 +1,10 @@
+import type { Prisma } from "@prisma/client";
+import { polylineLengthNm, type ScenarioId } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
-import { simHoursSince } from "../sim/positions.js";
+import { remainingDistanceNm, simHoursSince } from "../sim/positions.js";
 import { env } from "../lib/env.js";
+import { parseScenarioSet, recommendationFields } from "./scenarioFields.js";
+import { draftNoticeForApproval } from "./notices.js";
 import { calculateVoyageCII } from "./cii.js";
 
 class HttpError extends Error {
@@ -11,7 +15,7 @@ class HttpError extends Error {
   }
 }
 
-export async function approveRecommendation(id: string) {
+export async function approveRecommendation(id: string, scenarioId?: ScenarioId) {
   const recommendation = await prisma.recommendation.findUnique({ where: { id } });
   if (!recommendation) throw new HttpError(404, "Recommendation not found");
   if (recommendation.status !== "PENDING") {
@@ -20,7 +24,7 @@ export async function approveRecommendation(id: string) {
 
   const voyage = await prisma.voyage.findUnique({
     where: { id: recommendation.voyageId },
-    include: { vessel: true },
+    include: { vessel: true, originPort: true, destPort: true },
   });
   if (!voyage) throw new HttpError(404, "Voyage not found");
   if (voyage.status !== "UNDERWAY") {
@@ -42,11 +46,20 @@ export async function approveRecommendation(id: string) {
         },
       }),
     ]);
-    return { voyage };
+    return { voyage, notice: null };
   }
 
   const portEvent = await prisma.portEvent.findUnique({ where: { id: recommendation.portEventId } });
   if (!portEvent?.newBerthTime) throw new HttpError(409, "Port event has no berth time to target");
+
+  const set = parseScenarioSet(recommendation.scenarios);
+  const chosenId: ScenarioId = scenarioId ?? set?.recommendedId ?? "B";
+  if (chosenId === "A") {
+    throw new HttpError(400, "Scenario A is the baseline (no change). Reject the recommendation instead.");
+  }
+  const scenario = set?.scenarios.find((s) => s.id === chosenId) ?? null;
+  if (set && !scenario) throw new HttpError(400, `Scenario ${chosenId} is not available for this recommendation`);
+  const baseline = set?.scenarios.find((s) => s.id === "A") ?? null;
 
   const now = new Date();
 
@@ -55,19 +68,39 @@ export async function approveRecommendation(id: string) {
   const visualSailedNm =
     voyage.sailedNmAtRebase + simHoursSince(voyage.rebasedAt, env.simSpeed, now) * voyage.speedKn;
 
-  // Remaining distance on the real (non-accelerated) operational timeline,
-  // derived from the voyage's current plannedEta and speed.
-  const remainingNm = Math.max(
-    0,
-    (voyage.speedKn * (voyage.plannedEta.getTime() - now.getTime())) / 3_600_000
-  );
-  const newSpeedKn = recommendation.recommendedSpeedKn;
-  const remainingHoursAtNewSpeed = newSpeedKn > 0 ? remainingNm / newSpeedKn : 0;
+  // Remaining distance on the real (non-accelerated) operational timeline.
+  let remainingNm = remainingDistanceNm(voyage, now);
+  const reroute = chosenId === "C" && scenario?.coords && scenario.coords.length >= 2 && baseline;
+  if (reroute) remainingNm *= scenario!.distanceNm / baseline!.distanceNm;
+  // Time has passed since the scenarios were computed: re-solve the speed that
+  // reaches the berth time from where the ship is now, within the scenario's
+  // limits (B never faster than now; C up to design speed), same current.
+  const hoursToBerth = (portEvent.newBerthTime.getTime() - now.getTime()) / 3_600_000;
+  let newSpeedKn = scenario?.speedKn ?? recommendation.recommendedSpeedKn;
+  let sogKn = scenario ? scenario.sogKn : newSpeedKn;
+  if (scenario && hoursToBerth > 0) {
+    const current = scenario.speedKn - scenario.sogKn;
+    const maxKn = chosenId === "C" ? Math.max(voyage.speedKn, voyage.vessel.designSpeedKn) : voyage.speedKn;
+    newSpeedKn = Math.min(maxKn, Math.max(voyage.vessel.minSpeedKn, remainingNm / hoursToBerth + current));
+    sogKn = newSpeedKn - current;
+  }
+  sogKn = Math.max(1, sogKn);
+  const remainingHoursAtNewSpeed = remainingNm / sogKn;
   const newPlannedEta = new Date(now.getTime() + remainingHoursAtNewSpeed * 3_600_000);
+
+  const routeData = reroute
+    ? {
+        routeCoords: scenario!.coords as unknown as Prisma.InputJsonValue,
+        routeNm: polylineLengthNm(scenario!.coords!),
+        sailedNmAtRebase: 0,
+      }
+    : { sailedNmAtRebase: visualSailedNm };
+
+  const fields = set ? { ...recommendationFields(set, chosenId), recommendedSpeedKn: newSpeedKn } : {};
 
   const newCii = calculateVoyageCII({
     dwt: voyage.vessel.dwt,
-    distanceNm: voyage.routeNm ?? 1,
+    distanceNm: (reroute ? polylineLengthNm(scenario!.coords!) : voyage.routeNm) ?? 1,
     speedKn: newSpeedKn,
     designSpeedKn: voyage.vessel.designSpeedKn,
     fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
@@ -80,17 +113,17 @@ export async function approveRecommendation(id: string) {
       where: { id: voyage.id },
       data: {
         speedKn: newSpeedKn,
-        sailedNmAtRebase: visualSailedNm,
         rebasedAt: now,
         plannedEta: newPlannedEta,
         berthTime: portEvent.newBerthTime,
         ciiAttained: newCii.attained,
         ciiRating: newCii.rating,
+        ...routeData,
       },
     }),
     prisma.recommendation.update({
       where: { id },
-      data: { status: "APPROVED", decidedAt: now },
+      data: { status: "APPROVED", decidedAt: now, chosenScenario: chosenId, ...fields },
     }),
     prisma.auditLog.create({
       data: {
@@ -99,19 +132,45 @@ export async function approveRecommendation(id: string) {
         action: "APPROVED",
         payload: {
           voyageId: voyage.id,
+          scenario: chosenId,
           previousSpeedKn: voyage.speedKn,
           previousBerthTime: voyage.berthTime?.toISOString() ?? null,
+          previousPlannedEta: voyage.plannedEta.toISOString(),
           newSpeedKn,
           newPlannedEta: newPlannedEta.toISOString(),
           berthTime: portEvent.newBerthTime.toISOString(),
           newCiiAttained: newCii.attained,
           newCiiRating: newCii.rating,
+          ...(reroute
+            ? {
+                previousRouteCoords: voyage.routeCoords as Prisma.InputJsonValue,
+                previousRouteNm: voyage.routeNm,
+                previousSailedNm: visualSailedNm,
+              }
+            : {}),
         },
       },
     }),
   ]);
 
-  return { voyage: updatedVoyage };
+  // Step 4 of the workflow: draft the notice to charterers and agent.
+  let notice = null;
+  if (set && scenario) {
+    try {
+      notice = await draftNoticeForApproval({
+        recommendationId: id,
+        set,
+        scenario,
+        previousEta: voyage.plannedEta,
+        previousSpeedKn: voyage.speedKn,
+        newEta: newPlannedEta,
+      });
+    } catch (err) {
+      console.error("Could not draft the notice email:", err);
+    }
+  }
+
+  return { voyage: updatedVoyage, notice };
 }
 
 /**
@@ -138,7 +197,7 @@ export async function undoApproval(id: string) {
 
   const voyage = await prisma.voyage.findUnique({
     where: { id: recommendation.voyageId },
-    include: { vessel: true },
+    include: { vessel: true, originPort: true, destPort: true },
   });
   if (!voyage) throw new HttpError(404, "Voyage not found");
   if (voyage.status !== "UNDERWAY") {
@@ -166,24 +225,33 @@ export async function undoApproval(id: string) {
   const payload = (approvalLog?.payload ?? {}) as {
     previousSpeedKn?: number;
     previousBerthTime?: string | null;
+    previousRouteCoords?: unknown;
+    previousRouteNm?: number | null;
+    previousSailedNm?: number;
   };
   const restoredSpeedKn = payload.previousSpeedKn ?? recommendation.currentSpeedKn;
+  const set = parseScenarioSet(recommendation.scenarios);
 
   const now = new Date();
   // Same rebasing as approve: freeze the visual position at the current speed,
   // then recompute the ETA for the remaining distance at the restored speed.
-  const visualSailedNm =
-    voyage.sailedNmAtRebase + simHoursSince(voyage.rebasedAt, env.simSpeed, now) * voyage.speedKn;
-  const remainingNm = Math.max(
-    0,
-    (voyage.speedKn * (voyage.plannedEta.getTime() - now.getTime())) / 3_600_000
-  );
+  const sailedSince = simHoursSince(voyage.rebasedAt, env.simSpeed, now) * voyage.speedKn;
+  const visualSailedNm = voyage.sailedNmAtRebase + sailedSince;
+  // A weather re-route is undone by putting the ship back on its old route,
+  // as far along it as it was at approval plus what it has sailed since.
+  const restoreRoute = payload.previousRouteCoords != null && payload.previousSailedNm != null;
+  let remainingNm = remainingDistanceNm(voyage, now);
+  if (restoreRoute && set) {
+    const a = set.scenarios.find((x) => x.id === "A");
+    const c = set.scenarios.find((x) => x.id === "C");
+    if (a && c && c.distanceNm > 0) remainingNm *= a.distanceNm / c.distanceNm;
+  }
   const hoursAtRestoredSpeed = restoredSpeedKn > 0 ? remainingNm / restoredSpeedKn : 0;
   const restoredEta = new Date(now.getTime() + hoursAtRestoredSpeed * 3_600_000);
 
   const restoredCii = calculateVoyageCII({
     dwt: voyage.vessel.dwt,
-    distanceNm: voyage.routeNm ?? 1,
+    distanceNm: (restoreRoute ? payload.previousRouteNm : voyage.routeNm) ?? 1,
     speedKn: restoredSpeedKn,
     designSpeedKn: voyage.vessel.designSpeedKn,
     fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
@@ -196,11 +264,17 @@ export async function undoApproval(id: string) {
       where: { id: voyage.id },
       data: {
         speedKn: restoredSpeedKn,
-        sailedNmAtRebase: visualSailedNm,
         rebasedAt: now,
         plannedEta: restoredEta,
         ciiAttained: restoredCii.attained,
         ciiRating: restoredCii.rating,
+        ...(restoreRoute
+          ? {
+              routeCoords: payload.previousRouteCoords as Prisma.InputJsonValue,
+              routeNm: payload.previousRouteNm ?? null,
+              sailedNmAtRebase: payload.previousSailedNm! + sailedSince,
+            }
+          : { sailedNmAtRebase: visualSailedNm }),
         ...("previousBerthTime" in payload
           ? { berthTime: payload.previousBerthTime ? new Date(payload.previousBerthTime) : null }
           : {}),
@@ -208,7 +282,17 @@ export async function undoApproval(id: string) {
     }),
     prisma.recommendation.update({
       where: { id },
-      data: { status: "PENDING", decidedAt: null },
+      data: {
+        status: "PENDING",
+        decidedAt: null,
+        chosenScenario: null,
+        ...(set ? recommendationFields(set) : {}),
+      },
+    }),
+    // The notice was never sent by us; withdraw the draft so it is not sent by mistake.
+    prisma.outboundEmail.updateMany({
+      where: { recommendationId: id, status: "DRAFT" },
+      data: { status: "WITHDRAWN" },
     }),
     prisma.auditLog.create({
       data: {

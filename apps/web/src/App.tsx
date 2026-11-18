@@ -8,6 +8,7 @@ import { Inbox } from "./pages/Inbox.js";
 import { Actions } from "./pages/Actions.js";
 import { Ask } from "./pages/Ask.js";
 import { Settings } from "./pages/Settings.js";
+import { Value } from "./pages/Value.js";
 import { api } from "./lib/api.js";
 
 const PENDING_POLL_MS = 5000;
@@ -18,6 +19,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/inbox": "Inbox",
   "/actions": "Actions",
   "/ask": "Ask",
+  "/value": "Business value",
   "/settings": "Settings",
 };
 
@@ -75,6 +77,7 @@ export function App() {
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/actions" element={<Actions />} />
         <Route path="/ask" element={<Ask />} />
+        <Route path="/value" element={<Value />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

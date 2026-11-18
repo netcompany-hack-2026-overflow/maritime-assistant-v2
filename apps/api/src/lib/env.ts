@@ -36,4 +36,13 @@ export const env = {
   simSpeed: Number(process.env.SIM_SPEED ?? 120),
   fuelPriceEurPerT: Number(process.env.FUEL_PRICE_EUR_PER_T ?? 600),
   co2Factor: Number(process.env.CO2_FACTOR ?? 3.114),
+  /** Default EU Allowance price (€/t CO2) until changed in Settings. */
+  euaPriceEurPerT: Number(process.env.EUA_PRICE_EUR_PER_T ?? 90),
+  /** "open-meteo" (real marine forecast, no key needed) or "mock" (offline, deterministic). */
+  weatherProvider: (process.env.WEATHER_PROVIDER || "open-meteo") as "open-meteo" | "mock",
+  weatherTimeoutMs: Number(process.env.WEATHER_TIMEOUT_MS || 6000),
+  /** aisstream.io API key. Empty = live AIS tracking off. Never logged or sent to the UI. */
+  aisApiKey: process.env.AISSTREAM_API_KEY ?? "",
+  /** Minimum minutes between automatic ETA/scenario recomputes for one AIS-tracked vessel. */
+  aisRecomputeMinutes: Number(process.env.AIS_RECOMPUTE_MINUTES || 10),
 };

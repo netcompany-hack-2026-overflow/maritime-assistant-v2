@@ -34,6 +34,11 @@ services:
       SIM_SPEED: ${SIM_SPEED:-120}
       FUEL_PRICE_EUR_PER_T: ${FUEL_PRICE_EUR_PER_T:-600}
       CO2_FACTOR: ${CO2_FACTOR:-3.114}
+      EUA_PRICE_EUR_PER_T: ${EUA_PRICE_EUR_PER_T:-90}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-open-meteo}
+      # Read from .env; empty = live AIS off. Never put the key in this file.
+      AISSTREAM_API_KEY: ${AISSTREAM_API_KEY:-}
+      AIS_RECOMPUTE_MINUTES: ${AIS_RECOMPUTE_MINUTES:-10}
       PORT: 4000
     depends_on:
       db:

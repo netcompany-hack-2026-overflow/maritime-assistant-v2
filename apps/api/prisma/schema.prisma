@@ -63,6 +63,17 @@ model Vessel {
   minSpeedKn           Float
   fuelTPerDayAtDesign Float
   auxFuelTPerDay      Float
+  /// Year-to-date CO2 (t) and distance (nm), for the annual CII projection.
+  ytdCo2T             Float?
+  ytdDistanceNm       Float?
+  /// Maritime Mobile Service Identity; links the vessel to live AIS (aisstream.io).
+  mmsi                String?  @unique
+  /// Latest AIS fix.
+  aisLat              Float?
+  aisLon              Float?
+  aisSogKn            Float?
+  aisCogDeg           Float?
+  aisAt               DateTime?
   voyages             Voyage[]
 }
 
@@ -91,6 +102,22 @@ model Voyage {
 
   portEvents      PortEvent[] @relation("VoyagePortEvents")
   recommendations Recommendation[]
+  charterParty    CharterParty?
+}
+
+/// Voyage charter party: the source text and the terms read from it.
+model CharterParty {
+  id               String   @id @default(cuid())
+  voyage           Voyage   @relation(fields: [voyageId], references: [id])
+  voyageId         String   @unique
+  sourceName       String
+  text             String
+  /// CharterPartyTerms (packages/shared/src/charterParty.ts)
+  terms            Json
+  /// Expected cargo-operations hours at the discharge berth (operator input).
+  expectedOpsHours Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model Email {
@@ -145,11 +172,40 @@ model Recommendation {
   costSavedEur       Float
   co2SavedT          Float
   calc               Json
+  /// ScenarioSet A/B/C (packages/shared/src/scenarios.ts)
+  scenarios          Json?
+  /// Scenario approved ("B" or "C"); null while pending/rejected.
+  chosenScenario     String?
+  etsSavedEur        Float                    @default(0)
+  /// Demurrage avoided vs baseline, in the charter party's currency.
+  demurrageAvoided   Float?
   rationale          String
   status             RecommendationStatus     @default(PENDING)
   rejectReason       String?
   decidedAt          DateTime?
   createdAt          DateTime                 @default(now())
+  outboundEmails     OutboundEmail[]
+}
+
+enum OutboundEmailStatus {
+  DRAFT
+  SENT
+  WITHDRAWN
+}
+
+/// Notice to charterers and agent, drafted automatically on approval.
+model OutboundEmail {
+  id               String              @id @default(cuid())
+  recommendation   Recommendation      @relation(fields: [recommendationId], references: [id])
+  recommendationId String
+  toAddrs          String
+  ccAddrs          String
+  subject          String
+  body             String
+  status           OutboundEmailStatus @default(DRAFT)
+  sentAt           DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 }
 
 model AuditLog {
@@ -165,6 +221,7 @@ model AuditLog {
 model Settings {
   id               Int      @id @default(1)
   fuelPriceEurPerT Float
+  euaPriceEurPerT  Float    @default(90)
   co2Factor        Float
   /// Bunker offers are quoted in USD/t.
   usdEurRate        Float    @default(0.92)

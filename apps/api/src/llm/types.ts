@@ -1,4 +1,4 @@
-import type { Answer, PortEventExtraction } from "@maritime/shared";
+import type { Answer, CharterPartyTerms, PortEventExtraction } from "@maritime/shared";
 
 export interface RecommendationFacts {
   vesselName: string;
@@ -14,6 +14,15 @@ export interface RecommendationFacts {
   co2SavedT: number;
   /** Present for a bunker-detour recommendation; the speed fields then describe the catch-up speed. */
   bunker?: BunkerFacts;
+  /** e.g. "B — Just-in-time" */
+  scenarioLabel?: string;
+  scenarioDescription?: string;
+  etsSavedEur?: number;
+  /** Demurrage avoided vs baseline, in `currency`; null without a charter party. */
+  demurrageAvoided?: number | null;
+  currency?: string | null;
+  jitNote?: string;
+  weather?: string;
 }
 
 export interface BunkerFacts {
@@ -31,6 +40,50 @@ export interface BunkerFacts {
   verdict: "WORTH_IT" | "NOT_WORTH_IT";
 }
 
+/** Everything the notice to charterers/agent may state. Numbers are pre-computed. */
+export interface NoticeFacts {
+  vesselName: string;
+  imo: string;
+  originPortName: string;
+  destPortName: string;
+  portEventType: string;
+  delayHours: number | null;
+  /** Who reported the event (the agent's notice). */
+  reportedBy: string | null;
+  previousEtaUtc: string;
+  newEtaUtc: string;
+  berthTimeUtc: string;
+  scenarioLabel: string;
+  scenarioDescription: string;
+  newSpeedKn: number;
+  previousSpeedKn: number;
+  fuelSavedT: number;
+  co2SavedT: number;
+  weather: string;
+  cp: null | {
+    reference: string | null;
+    chartererName: string | null;
+    laytimeHours: number | null;
+    laytimeBasis: string | null;
+    norNoticeHours: number | null;
+    waitingTimeCounts: boolean | null;
+    demurrageRatePerDay: number | null;
+    currency: string | null;
+    jitClauseName: string | null;
+    jitCoverage: string;
+    /** JitCoverageStatus: COVERED | NEEDS_INSTRUCTION | NOT_COVERED | NOT_APPLICABLE */
+    jitStatus: string;
+    laytimeUsedHours: number | null;
+    withinLaytime: boolean | null;
+    demurrageAvoided: number | null;
+  };
+}
+
+export interface NoticeDraft {
+  subject: string;
+  body: string;
+}
+
 export interface CitableRow {
   table: string;
   id: string;
@@ -41,4 +94,6 @@ export interface LlmProvider {
   extractEmail(text: string): Promise<PortEventExtraction>;
   explainRecommendation(facts: RecommendationFacts): Promise<string>;
   answerQuestion(question: string, rows: CitableRow[]): Promise<Answer>;
+  extractCharterParty(text: string): Promise<CharterPartyTerms>;
+  draftNotice(facts: NoticeFacts): Promise<NoticeDraft>;
 }

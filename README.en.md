@@ -73,27 +73,88 @@ stored with the recommendation (its `calc` field) for the UI to show.
 2. **Inbox** — click "Simulate incoming email" to release the queued Rotterdam
    berth-delay notice. It gets extracted into a structured port event (highlighted
    directly in the email body) and matched to MV Aegean Star's voyage.
-3. **Actions** — a recommendation is waiting: slow from 14.0 kn to about 12 kn and save
-   about 57 t of fuel (~€34k). The exact figures move a little with that day's mock
-   weather. Expand "Show the math" to see every step, then **Approve**.
-4. **Fleet** — MV Aegean Star is now visibly slower on the globe, and its ETA has
-   moved to match the new berth time exactly.
-5. **Bunker offers** — back in Inbox, simulate and process the next two emails. On
+3. **Actions** — a recommendation is waiting with **three scenarios side by side**: A (same
+   speed, wait at anchor), B (slow down for a just-in-time arrival), C (weather re-route).
+   Each shows ETA, fuel, CO₂, fuel + EU ETS cost, laytime/demurrage from the charter party,
+   JIT-clause coverage and the CII rating (A–E). Weather is a real forecast (Open-Meteo waves
+   and ocean currents). Pick a scenario and **Approve**.
+4. **Notice** — approval drafts the email to the charterers (To) and agent (Cc): new ETA,
+   the reason and the charter-party terms. Review it, send it from your own mail client
+   ("Open in mail app"), then "Mark as sent".
+5. **Fleet** — MV Aegean Star is now visibly slower (or on the new route if C was approved),
+   and its ETA matches the new berth time exactly.
+6. **Bunker offers** — back in Inbox, simulate and process the next two emails. On
    Actions, both wait for a decision: Algeciras is marked worth it (net ≈ +€110k),
    Genoa is marked in red as not worth it, with the reason. Reject Genoa.
-6. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
+7. **Voyages → Charter party** — upload `apps/web/public/samples/cycladic-wind-charter-party.pdf`
+   to MV Cycladic Wind's voyage, then process the Singapore congestion email: that CP has
+   **no** JIT clause, so scenario B is flagged "Not covered" (utmost despatch applies).
+8. **Value** — the business-value section: the customer, a per-ship and per-fleet savings
+   calculator (fuel, ETS, demurrage, CII) and "why now", with sources.
+9. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
    from approved recommendations?" and get an answer with a citation back to the
    recommendation record.
-7. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
-   `apps/web/public/samples/algeciras-berth-notice.pdf` (also downloadable from the
-   Inbox page). The PDF's text runs through the same pipeline and produces a
-   recommendation for MV Ionian Trader.
+10. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
+   `apps/web/public/samples/algeciras-berth-notice.pdf`. The PDF's text runs through the
+   same pipeline and produces a recommendation for MV Ionian Trader.
+
+## What sets it apart: scenarios with contractual consequences
+
+A plain JIT calculator says "slow down, save fuel". Tidewise also answers chartering's questions:
+
+1. **Charter-party reading** (Voyages → Charter party, PDF or pasted text). The LLM (or the
+   offline extractor) reads laytime and basis (SHINC/SHEX), NOR turn time, whether waiting
+   for a berth counts as laytime (WIBON), demurrage/despatch, charterer/agent emails and the
+   Just-In-Time Arrival clause, each with its exact source words. Every scenario then shows
+   laytime used, demurrage (and how much is avoided vs A), and whether the JIT clause covers
+   the speed reduction. [packages/shared/src/laytime.ts](packages/shared/src/laytime.ts)
+2. **Scenarios A/B/C on real weather.** Twelve points along the remaining route are read from
+   the [Open-Meteo Marine API](https://open-meteo.com/en/docs/marine-weather-api) at the hour
+   the ship passes them: wave height → fuel factor (1 + 0.012·Hs²), current → component
+   against the heading. C tries detour waypoints 60/120 nm either side of the worst point and
+   keeps the cheapest. If Open-Meteo is down a deterministic mock is used and the UI says so.
+   [packages/shared/src/scenarios.ts](packages/shared/src/scenarios.ts),
+   [apps/api/src/services/weatherRoute.ts](apps/api/src/services/weatherRoute.ts)
+3. **EU ETS in € and CII.** ETS cost = t CO₂ × the year's phase-in (2024: 40%, 2025: 70%,
+   2026 on: 100%) × voyage scope (100% intra-EU/EEA, 50% to/from the EU, 0% outside) × EUA
+   price (Settings). CII per IMO G1–G4 with Z = 11% (2026), 13.625% (2027) … 21.5% (2030),
+   rated A–E for the leg and as a year-to-date projection.
+   [packages/shared/src/ets.ts](packages/shared/src/ets.ts), [packages/shared/src/cii.ts](packages/shared/src/cii.ts)
+4. **Automatic email after approval** (step 4 of the plan), as a DRAFT the operator sends;
+   undoing the approval withdraws it. [apps/api/src/services/notices.ts](apps/api/src/services/notices.ts)
+5. **Live AIS** from [aisstream.io](https://aisstream.io): link a vessel's MMSI in its Fleet
+   panel. Position updates on every report; at most every `AIS_RECOMPUTE_MINUTES` the ETA
+   (sea-route distance from the AIS position / SOG) and pending scenarios are recomputed. The
+   key lives **only** in `.env` as `AISSTREAM_API_KEY` (git-ignored) and never reaches the
+   browser. [apps/api/src/services/ais.ts](apps/api/src/services/ais.ts)
+
+## Business value
+
+**Customer.** Dry bulk and tanker owner-operators (10–60 ships) on voyage charters, starting
+with Greek fleets; used by operations, chartering and technical/ESG.
+
+**Savings** (calculator on the **Value** page, same engine). Supramax 58,000 dwt, 13.5 kn,
+29 t/day, 24 h berth delay notified 1,200 nm out: ~43 t fuel and ~135 t CO₂ less, ~€26k fuel
++ ~€7k EU ETS (60% average ETS scope, EUA €90) ≈ **€33k per notice**; at 10 notices a year
+**~€330k per ship**, ~€6.7M for a 20-ship fleet, ~6% lower attained CII per ship. Demurrage
+avoided is shown separately (it moves between charterer and owner).
+
+**Why now.** EU ETS covers 40% / 70% / 100% of shipping emissions for 2024 / 2025 / 2026 with
+EUAs around €90/t in November 2026
+([European Commission](https://climate.ec.europa.eu/eu-action/transport/reducing-emissions-shipping-sector_en),
+[2 Nov 2026 auction at €89.43/t](https://www.tradingview.com/news/reuters.com,2026-11-02:newsml_APNB56IHF:0-european-union-auctions-2-792-mln-spot-carbon-permits-at-89-43-eur-t/));
+CII tightens to 13.625% in 2027 and 21.5% in 2030
+([DNV on MEPC 83](https://www.dnv.com/news/imo-mepc-83-ghg-requirements-approved-taking-effect-from-2028/));
+Rotterdam VLSFO is ~$734/t (17 Nov 2026, [Ship & Bunker](https://shipandbunker.com/prices));
+and IMO's Low Carbon GIA found ships spend 4.6% of their time at anchor from early arrival,
+with JIT cutting fuel/CO₂ by up to 14% per voyage
+([IMO](https://www.imo.org/en/MediaCentre/Pages/WhatsNew-1326.aspx)).
 
 ## Pages
 
 - **Landing** (`/`) — hero page explaining the product, with a live "fuel saved so far"
   figure and a link into the console. The console pages live under `/fleet`, `/voyages`,
-  `/inbox`, `/actions`, `/ask`, `/settings`.
+  `/inbox`, `/actions`, `/ask`, `/value`, `/settings`.
 - **Fleet** — 3D globe (dotted-land style) with every vessel's live position, heading,
   and remaining sea route, plus labelled ports; a side list of ships; click a ship for a detail drawer. Ships with a
   pending recommendation are highlighted. A "Saved to date" tile totals fuel, € and
@@ -337,12 +398,21 @@ Full per-field, per-email results are written to
 | GET | `/api/port-events` | all extracted port events |
 | GET | `/api/recommendations` | recommendations, optional `?status=` filter |
 | GET | `/api/recommendations/:id` | one recommendation |
-| POST | `/api/recommendations/:id/approve` | approve: updates voyage speed/ETA, logs the decision |
+| POST | `/api/recommendations/:id/approve` | approve a scenario (`{"scenarioId":"B"\|"C"}`): speed/ETA/route, audit log, notice draft |
+| POST | `/api/recommendations/:id/refresh` | recompute scenarios (position, weather, prices, charter party) |
+| POST | `/api/recommendations/:id/undo` | undo an approval (restores speed/route, withdraws the draft) |
+| GET/POST/PATCH/DELETE | `/api/voyages/:id/charter-party` | voyage charter party (POST `{text}`; PATCH term fixes/`expectedOpsHours`) |
+| POST | `/api/voyages/:id/charter-party/document?filename=` | upload a charter party PDF |
+| GET | `/api/outbound-emails` | notices to charterers/agents |
+| PATCH | `/api/outbound-emails/:id` | edit a draft |
+| POST | `/api/outbound-emails/:id/sent` | mark as sent |
+| PUT | `/api/vessels/:id/ais` | link/unlink an MMSI for live AIS |
+| GET | `/api/ais/status` | aisstream.io connection status (never the key) |
 | POST | `/api/recommendations/:id/reject` | reject (requires a reason) |
 | GET | `/api/records/:table/:id` | generic record lookup, used by "Facts used" and Ask citations |
 | POST | `/api/ask` | natural-language Q&A with validated citations |
-| GET | `/api/settings` | current fuel price, CO₂ factor, USD→EUR rate and bunker assumptions |
-| PUT | `/api/settings` | set `fuelPriceEurPerT` (0–5000) and/or `usdEurRate` (0.5–2); re-prices pending recommendations |
+| GET | `/api/settings` | fuel price, EUA price, CO₂ factor, USD→EUR rate and bunker assumptions |
+| PUT | `/api/settings` | set `fuelPriceEurPerT` (0–5000), `usdEurRate` (0.5–2) and/or `euaPriceEurPerT` (0–1000); re-prices pending recommendations |
 
 ## Assumptions
 
@@ -358,12 +428,17 @@ Full per-field, per-email results are written to
   and rejected ones keep the price they were decided at. The CO₂ factor (3.114 t
   CO₂/t fuel, the standard VLSFO factor) comes from `CO2_FACTOR`. Neither is live
   market data, and both are shown next to every figure that depends on them.
-- Weather is **mocked**: each destination port gets a deterministic head current
-  (−0.5 to +1.5 kn) and sea state (fuel factor 1.00–1.10) per day
-  ([apps/api/src/sim/weather.ts](apps/api/src/sim/weather.ts)). An adverse current
-  raises the speed through the water needed to arrive on time; rougher seas raise fuel
-  burn for both plans. Both values appear in "Show the math". A real deployment would
-  call a marine-weather API instead.
+- Weather comes from the Open-Meteo Marine API (wave height, currents; no key). Waves become
+  a fuel factor `1 + 0.012·Hs²` (capped at 1.35): a simple documented proxy, not a
+  vessel-specific seakeeping model; wind is not modelled separately. With
+  `WEATHER_PROVIDER=mock`, or when the API does not answer, a deterministic mock per 2°×2°
+  cell and day is used; the UI always shows the source.
+- Laytime starts at the earlier of (arrival + NOR turn time) and berthing when waiting counts
+  (WIBON), otherwise at berthing; used = counted waiting + cargo-operations hours (operator
+  estimate, default 80% of laytime). Exceptions, holidays, laycan and shifting are not modelled.
+- The annual CII projection uses seeded year-to-date data per vessel (`ytdCo2T`, `ytdDistanceNm`).
+- The demo charter parties are fictional, GENCON-style; the JIT clause wording was written for
+  this prototype (it is not BIMCO's text).
 - Bunker offers: prices are in USD/t and converted with a USD→EUR rate (default 0.92,
   set with `PUT /api/settings`; changing it re-prices pending offers). A bunker call is
   assumed to take 8 h alongside and cost €5,000 in port and agency fees. An offer with

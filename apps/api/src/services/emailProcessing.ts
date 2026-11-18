@@ -1,11 +1,12 @@
 import type { Prisma } from "@prisma/client";
-import { calculateBunker, calculateJit, nearestPointOnRoute } from "@maritime/shared";
+import { calculateBunker, nearestPointOnRoute } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import { getSettings } from "../lib/settings.js";
 import { getLlmProvider } from "../llm/index.js";
-import { mockWeatherFor } from "../sim/weather.js";
 import { voyageProgressNow } from "./voyagePosition.js";
 import { crossesLand } from "./land.js";
+import { computeScenarios, rationaleFor, voyageInclude, type VoyageForScenarios } from "./scenarios.js";
+import { recommendationFields } from "./scenarioFields.js";
 
 type VoyageWithPorts = Prisma.VoyageGetPayload<{ include: { vessel: true; originPort: true; destPort: true } }>;
 type PortRow = { id: string; name: string; lat: number; lon: number };
@@ -139,7 +140,7 @@ async function createBunkerRecommendation(
 }
 
 async function createRecommendationForPortEvent(
-  voyage: Prisma.VoyageGetPayload<{ include: { vessel: true; originPort: true; destPort: true } }>,
+  voyage: VoyageForScenarios,
   portEvent: { id: string; eventType: string; delayHours: number | null; newBerthTime: Date | null }
 ) {
   if (portEvent.delayHours === null) return null;
@@ -149,44 +150,15 @@ async function createRecommendationForPortEvent(
     portEvent.newBerthTime ??
     new Date(voyage.plannedEta.getTime() + portEvent.delayHours * 3_600_000);
 
-  const now = new Date();
-  const distanceNm = Math.max(
-    0,
-    (voyage.speedKn * (voyage.plannedEta.getTime() - now.getTime())) / 3_600_000
-  );
-  if (distanceNm <= 0) return null;
+  const result = await computeScenarios(voyage, newBerthTime);
+  if (!result) return null;
+  const { set, calc } = result;
+  // Nothing beats carrying on as planned: no action to recommend.
+  if (set.recommendedId === "A") return null;
+  const fields = recommendationFields(set);
+  if (fields.fuelSavedT <= 0 && fields.etsSavedEur <= 0) return null;
 
-  const settings = await getSettings();
-  const calc = calculateJit({
-    distanceNm,
-    currentSpeedKn: voyage.speedKn,
-    currentEta: voyage.plannedEta,
-    newBerthTime,
-    now,
-    designSpeedKn: voyage.vessel.designSpeedKn,
-    fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
-    minSpeedKn: voyage.vessel.minSpeedKn,
-    auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
-    fuelPriceEurPerT: settings.fuelPriceEurPerT,
-    co2Factor: settings.co2Factor,
-    weather: mockWeatherFor(voyage.destPort.unlocode, newBerthTime),
-  });
-
-  if (calc.fuelSavedT <= 0) return null;
-
-  const rationale = await getLlmProvider().explainRecommendation({
-    vesselName: voyage.vessel.name,
-    originPortName: voyage.originPort.name,
-    destPortName: voyage.destPort.name,
-    portEventType: portEvent.eventType,
-    portName: voyage.destPort.name,
-    delayHours: portEvent.delayHours,
-    currentSpeedKn: voyage.speedKn,
-    recommendedSpeedKn: calc.v1,
-    fuelSavedT: calc.fuelSavedT,
-    costSavedEur: calc.costSavedEur,
-    co2SavedT: calc.co2SavedT,
-  });
+  const rationale = await rationaleFor(voyage, portEvent, set);
 
   return prisma.recommendation.create({
     data: {
@@ -194,11 +166,9 @@ async function createRecommendationForPortEvent(
       portEventId: portEvent.id,
       actionType: "ADJUST_SPEED",
       currentSpeedKn: voyage.speedKn,
-      recommendedSpeedKn: calc.v1,
-      fuelSavedT: calc.fuelSavedT,
-      costSavedEur: calc.costSavedEur,
-      co2SavedT: calc.co2SavedT,
+      ...fields,
       calc: calc as unknown as Prisma.InputJsonValue,
+      scenarios: set as unknown as Prisma.InputJsonValue,
       rationale,
       status: "PENDING",
     },
@@ -246,20 +216,18 @@ export async function processEmail(emailId: string) {
     });
   }
 
-  let matchedVoyage: Prisma.VoyageGetPayload<{
-    include: { vessel: true; originPort: true; destPort: true };
-  }> | null = null;
+  let matchedVoyage: VoyageForScenarios | null = null;
 
   if (port && extraction.eventType === "BUNKER_OFFER") {
     const candidates = await prisma.voyage.findMany({
       where: { status: "UNDERWAY" },
-      include: { vessel: true, originPort: true, destPort: true },
+      include: voyageInclude,
     });
-    matchedVoyage = matchBunkerVoyage(candidates, port, extraction.vesselNameMentioned);
+    matchedVoyage = matchBunkerVoyage(candidates, port, extraction.vesselNameMentioned) as VoyageForScenarios | null;
   } else if (port && extraction.eventType !== "NONE") {
     const candidates = await prisma.voyage.findMany({
       where: { destPortId: port.id, status: "UNDERWAY" },
-      include: { vessel: true, originPort: true, destPort: true },
+      include: voyageInclude,
     });
     if (candidates.length === 1) {
       matchedVoyage = candidates[0];

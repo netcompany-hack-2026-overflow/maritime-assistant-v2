@@ -12,6 +12,9 @@ import { recordsRouter } from "./routes/records.js";
 import { askRouter } from "./routes/ask.js";
 import { settingsRouter } from "./routes/settings.js";
 import { getSettings } from "./lib/settings.js";
+import { outboundEmailsRouter } from "./routes/outbound-emails.js";
+import { aisTracker } from "./services/ais.js";
+import { lastWeatherError } from "./services/weather.js";
 
 const app = express();
 app.use(cors());
@@ -28,7 +31,11 @@ app.get("/api/meta", async (_req, res, next) => {
       llmProvider: activeLlmProviderName(),
       simSpeed: env.simSpeed,
       fuelPriceEurPerT: settings.fuelPriceEurPerT,
+      euaPriceEurPerT: settings.euaPriceEurPerT,
       co2Factor: settings.co2Factor,
+      weatherProvider: env.weatherProvider,
+      weatherError: lastWeatherError(),
+      ais: aisTracker.status(),
     });
   } catch (err) {
     next(err);
@@ -44,6 +51,8 @@ app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/records", recordsRouter);
 app.use("/api/ask", askRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/outbound-emails", outboundEmailsRouter);
+app.get("/api/ais/status", (_req, res) => res.json(aisTracker.status()));
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);
@@ -73,4 +82,8 @@ app.use(errorHandler);
 
 app.listen(env.port, () => {
   console.log(`API listening on port ${env.port}`);
+  if (env.aisApiKey) {
+    aisTracker.start();
+    console.log("Live AIS tracking enabled (aisstream.io).");
+  }
 });

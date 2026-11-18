@@ -18,8 +18,10 @@ export async function pdfToText(buf: Buffer): Promise<string> {
   let text: string;
   try {
     const pdf = await getDocumentProxy(new Uint8Array(buf));
-    const result = await extractText(pdf, { mergePages: true });
-    text = result.text;
+    // Per page, not mergePages: merging collapses every newline, and charter
+    // parties are read clause by clause.
+    const result = await extractText(pdf, { mergePages: false });
+    text = (Array.isArray(result.text) ? result.text : [result.text]).join("\n\n");
   } catch {
     throw new DocumentError("Could not read the PDF. Is it password-protected or damaged?");
   }
