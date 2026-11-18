@@ -3,6 +3,7 @@ import { body, param, validationResult } from "express-validator";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { routeBetweenPorts } from "../services/seaRoute.js";
+import { calculateVoyageCII } from "../services/cii.js";
 
 export const voyagesRouter = Router();
 
@@ -29,6 +30,8 @@ function serializeVoyage(v: VoyageWithRelations) {
     berthTime: v.berthTime ? v.berthTime.toISOString() : null,
     routeNm: v.routeNm,
     status: v.status,
+    ciiAttained: v.ciiAttained,
+    ciiRating: v.ciiRating,
     createdAt: v.createdAt.toISOString(),
   };
 }
@@ -86,6 +89,18 @@ voyagesRouter.post(
       const route = routeBetweenPorts(originPort, destPort);
       const plannedEta = new Date(departedAt.getTime() + (route.lengthNm / speedKn) * 3_600_000);
 
+      const cii = calculateVoyageCII({
+        dwt: vessel.dwt,
+        distanceNm: route.lengthNm,
+        speedKn,
+        designSpeedKn: vessel.designSpeedKn,
+        fuelTPerDayAtDesign: vessel.fuelTPerDayAtDesign,
+        auxFuelTPerDay: vessel.auxFuelTPerDay,
+        vesselType: vessel.type,
+        });
+
+
+
       const voyage = await prisma.voyage.create({
         data: {
           vesselId,
@@ -99,6 +114,8 @@ voyagesRouter.post(
           routeCoords: route.coords as unknown as Prisma.InputJsonValue,
           routeNm: route.lengthNm,
           status: "UNDERWAY",
+          ciiAttained: cii.attained,
+          ciiRating: cii.rating,
         },
         include,
       });
