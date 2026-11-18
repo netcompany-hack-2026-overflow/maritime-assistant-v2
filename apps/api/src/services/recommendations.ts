@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { simHoursSince } from "../sim/positions.js";
 import { env } from "../lib/env.js";
+import { calculateVoyageCII } from "./cii.js";
 
 class HttpError extends Error {
   status: number;
@@ -17,7 +18,10 @@ export async function approveRecommendation(id: string) {
     throw new HttpError(409, `Recommendation is already ${recommendation.status.toLowerCase()}`);
   }
 
-  const voyage = await prisma.voyage.findUnique({ where: { id: recommendation.voyageId } });
+  const voyage = await prisma.voyage.findUnique({
+    where: { id: recommendation.voyageId },
+    include: { vessel: true },
+  });
   if (!voyage) throw new HttpError(404, "Voyage not found");
   if (voyage.status !== "UNDERWAY") {
     throw new HttpError(409, "Voyage is no longer underway");
@@ -61,6 +65,16 @@ export async function approveRecommendation(id: string) {
   const remainingHoursAtNewSpeed = newSpeedKn > 0 ? remainingNm / newSpeedKn : 0;
   const newPlannedEta = new Date(now.getTime() + remainingHoursAtNewSpeed * 3_600_000);
 
+  const newCii = calculateVoyageCII({
+    dwt: voyage.vessel.dwt,
+    distanceNm: voyage.routeNm ?? 1,
+    speedKn: newSpeedKn,
+    designSpeedKn: voyage.vessel.designSpeedKn,
+    fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
+    auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
+    vesselType: voyage.vessel.type,
+  });
+
   const [updatedVoyage] = await prisma.$transaction([
     prisma.voyage.update({
       where: { id: voyage.id },
@@ -70,6 +84,8 @@ export async function approveRecommendation(id: string) {
         rebasedAt: now,
         plannedEta: newPlannedEta,
         berthTime: portEvent.newBerthTime,
+        ciiAttained: newCii.attained,
+        ciiRating: newCii.rating,
       },
     }),
     prisma.recommendation.update({
@@ -88,6 +104,8 @@ export async function approveRecommendation(id: string) {
           newSpeedKn,
           newPlannedEta: newPlannedEta.toISOString(),
           berthTime: portEvent.newBerthTime.toISOString(),
+          newCiiAttained: newCii.attained,
+          newCiiRating: newCii.rating,
         },
       },
     }),
@@ -118,7 +136,10 @@ export async function undoApproval(id: string) {
     return { voyage, recommendation: updatedRecommendation };
   }
 
-  const voyage = await prisma.voyage.findUnique({ where: { id: recommendation.voyageId } });
+  const voyage = await prisma.voyage.findUnique({
+    where: { id: recommendation.voyageId },
+    include: { vessel: true },
+  });
   if (!voyage) throw new HttpError(404, "Voyage not found");
   if (voyage.status !== "UNDERWAY") {
     throw new HttpError(409, "Voyage is no longer underway, so the approval can't be undone");
@@ -160,6 +181,16 @@ export async function undoApproval(id: string) {
   const hoursAtRestoredSpeed = restoredSpeedKn > 0 ? remainingNm / restoredSpeedKn : 0;
   const restoredEta = new Date(now.getTime() + hoursAtRestoredSpeed * 3_600_000);
 
+  const restoredCii = calculateVoyageCII({
+    dwt: voyage.vessel.dwt,
+    distanceNm: voyage.routeNm ?? 1,
+    speedKn: restoredSpeedKn,
+    designSpeedKn: voyage.vessel.designSpeedKn,
+    fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
+    auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
+    vesselType: voyage.vessel.type,
+  });
+
   const [updatedVoyage, updatedRecommendation] = await prisma.$transaction([
     prisma.voyage.update({
       where: { id: voyage.id },
@@ -168,6 +199,8 @@ export async function undoApproval(id: string) {
         sailedNmAtRebase: visualSailedNm,
         rebasedAt: now,
         plannedEta: restoredEta,
+        ciiAttained: restoredCii.attained,
+        ciiRating: restoredCii.rating,
         ...("previousBerthTime" in payload
           ? { berthTime: payload.previousBerthTime ? new Date(payload.previousBerthTime) : null }
           : {}),
@@ -187,6 +220,8 @@ export async function undoApproval(id: string) {
           undoneSpeedKn: voyage.speedKn,
           restoredSpeedKn,
           restoredPlannedEta: restoredEta.toISOString(),
+          restoredCiiAttained: restoredCii.attained,
+          restoredCiiRating: restoredCii.rating,
         },
       },
     }),

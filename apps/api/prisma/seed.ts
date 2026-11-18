@@ -76,6 +76,50 @@ function formatUtc(d: Date): string {
   return `${d.toISOString().slice(0, 10)} ${d.toISOString().slice(11, 16)} UTC`;
 }
 
+
+function calculateVoyageCII(params: {
+  dwt: number;
+  distanceNm: number;
+  speedKn: number;
+  designSpeedKn: number;
+  fuelTPerDayAtDesign: number;
+  auxFuelTPerDay: number;
+  vesselType: string;
+}) {
+  const co2Factor = 3.114;
+  const days = params.distanceNm / (params.speedKn * 24);
+  const speedRatio = params.speedKn / params.designSpeedKn;
+  const mainFuelT = params.fuelTPerDayAtDesign * Math.pow(speedRatio, 3) * days;
+  const totalFuelT = mainFuelT + params.auxFuelTPerDay * days;
+
+  const co2Grams = totalFuelT * co2Factor * 1_000_000;
+  const attained = co2Grams / (params.dwt * params.distanceNm);
+
+  const baselineByType: Record<string, number> = {
+    "Bulk Carrier": 5.2,
+    "Tanker": 5.8,
+    "Container": 8.5,
+    "General Cargo": 7.5,
+  };
+  const required = baselineByType[params.vesselType] ?? 6.5;
+  const ratio = attained / required;
+
+  let rating: "A" | "B" | "C" | "D" | "E" = "C";
+  if (ratio <= 0.83) rating = "A";
+  else if (ratio <= 0.94) rating = "B";
+  else if (ratio <= 1.07) rating = "C";
+  else if (ratio <= 1.19) rating = "D";
+  else rating = "E";
+
+  return { attained: Number(attained.toFixed(2)), rating };
+}
+
+
+
+
+
+
+
 async function main() {
   for (const p of PORTS) {
     await prisma.port.upsert({
@@ -120,6 +164,16 @@ async function main() {
     const departedAt = new Date(now.getTime() - elapsedHours * 3_600_000);
     const plannedEta = new Date(departedAt.getTime() + (totalNm / v.speedKn) * 3_600_000);
 
+const cii = calculateVoyageCII({
+      dwt: vessel.dwt,
+      distanceNm: totalNm,
+      speedKn: v.speedKn,
+      designSpeedKn: vessel.designSpeedKn,
+      fuelTPerDayAtDesign: vessel.fuelTPerDayAtDesign,
+      auxFuelTPerDay: vessel.auxFuelTPerDay,
+      vesselType: vessel.type,
+    });
+
     const voyage = await prisma.voyage.create({
       data: {
         vesselId: vessel.id,
@@ -133,6 +187,8 @@ async function main() {
         routeCoords: route.coords as unknown as Prisma.InputJsonValue,
         routeNm: totalNm,
         status: "UNDERWAY",
+        ciiAttained: cii.attained,
+        ciiRating: cii.rating,
       },
     });
     createdVoyages[v.vesselImo] = { id: voyage.id, plannedEta };
