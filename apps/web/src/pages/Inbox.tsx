@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FileUp } from "lucide-react";
+import { FileUp, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, type EmailListItem, type ProcessEmailResult } from "../lib/api.js";
 import { highlightSourceSpans } from "../lib/highlight.js";
@@ -48,6 +48,27 @@ export function Inbox() {
     }
   };
 
+const handleDeleteEmail = async (e: React.MouseEvent, emailId: string) => {
+    e.stopPropagation();
+    try {
+      // Προσπαθούμε να το διαγράψουμε από τον server (αν υπάρχει)
+      await api.deleteEmail(emailId).catch(() => {});
+      
+      // Καθαρίζουμε αμέσως το UI και τα αποτελέσματα τοπικά
+      setEmails((prev) => prev.filter((item) => item.id !== emailId));
+      setResults((prev) => {
+        const copy = { ...prev };
+        delete copy[emailId];
+        return copy;
+      });
+
+      if (selectedId === emailId) {
+        setSelectedId(null);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
     setSimulateError(null);
@@ -190,7 +211,7 @@ export function Inbox() {
           ) : (
             <ul className="email-list">
               {emails.map((email) => (
-                <li key={email.id}>
+                <li key={email.id} className="email-list__item-container">
                   <button
                     className={
                       email.id === selectedId
@@ -213,6 +234,14 @@ export function Inbox() {
                         {email.fromAddr} · {new Date(email.receivedAt).toLocaleString()}
                       </span>
                     </span>
+                  </button>
+                  <button
+                    className="email-list__delete"
+                    title="Delete email"
+                    aria-label="Delete email"
+                    onClick={(e) => void handleDeleteEmail(e, email.id)}
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </li>
               ))}

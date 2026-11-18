@@ -229,3 +229,35 @@
   font-size: var(--text-xs);
   color: var(--muted);
 }
+
+.email-list__item-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  position: relative;
+}
+
+.email-list__item-container .email-list__item {
+  flex: 1;
+}
+
+.email-list__delete {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  border-radius: var(--radius);
+}
+
+.email-list__item-container:hover .email-list__delete {
+  opacity: 1;
+}
+
+.email-list__delete:hover {
+  color: var(--danger);
+  background: rgba(194, 54, 47, 0.1);
+}

@@ -170,7 +170,7 @@ export const api = {
       `/ports/route?from=${encodeURIComponent(fromUnlocode)}&to=${encodeURIComponent(toUnlocode)}`
     ),
   getSettings: () => request<SettingsDTO>("/settings"),
-  updateSettings: (input: { fuelPriceEurPerT: number }) =>
+  updateSettings: (input: { fuelPriceEurPerT: number; etsPrice?: number }) =>
     request<{ settings: SettingsDTO; repricedRecommendations: number }>("/settings", {
       method: "PUT",
       body: JSON.stringify(input),
@@ -186,6 +186,7 @@ export const api = {
   simulateEmail: () => request<EmailListItem>("/emails/simulate", { method: "POST" }),
   createEmail: (input: { fromAddr: string; subject: string; body: string }) =>
     request<EmailListItem>("/emails", { method: "POST", body: JSON.stringify(input) }),
+  deleteEmail: (id: string) => request<void>(`/emails/${id}`, { method: "DELETE" }), // <-- ΝΕΑ ΓΡΑΜΜΗ ΓΙΑ ΔΙΑΓΡΑΦΗ EMAIL
   uploadDocument: async (file: File): Promise<EmailListItem> => {
     const res = await fetch(`/api/emails/document?filename=${encodeURIComponent(file.name)}`, {
       method: "POST",
@@ -207,7 +208,7 @@ export const api = {
     request<{ voyage: VoyageWithRelations }>(`/recommendations/${id}/approve`, {
       method: "POST",
     }),
-  undoApproval: (id: string) =>
+    undoApproval: (id: string) =>
     request<{ voyage: VoyageWithRelations; recommendation: RecommendationRecord }>(
       `/recommendations/${id}/undo`,
       { method: "POST" }
