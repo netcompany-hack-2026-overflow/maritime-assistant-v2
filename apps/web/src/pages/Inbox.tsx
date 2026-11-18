@@ -3,7 +3,85 @@ import { FileUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, type EmailListItem, type ProcessEmailResult } from "../lib/api.js";
 import { highlightSourceSpans } from "../lib/highlight.js";
+import { bunkerCalc, confidenceWord, eurShort, EVENT_LABELS, isBunker } from "../lib/recommendationText.js";
 import "./Inbox.css";
+
+type StepState = "done" | "stopped";
+
+function Step({ n, title, state, children }: { n: number; title: string; state: StepState; children: React.ReactNode }) {
+  return (
+    <li className={`result-strip__step result-strip__step--${state}`}>
+      <span className="result-strip__n" aria-hidden="true">{n}</span>
+      <span>
+        <span className="result-strip__title">{title}</span>
+        <span className="result-strip__detail">{children}</span>
+      </span>
+    </li>
+  );
+}
+
+/** Read → Matched → Recommendation, or where and why processing stopped. */
+function ResultStrip({ result }: { result: ProcessEmailResult }) {
+  const ev = result.portEvent;
+  if (!ev) return null;
+  const isOffer = ev.eventType === "BUNKER_OFFER";
+  const port = ev.port?.name;
+
+  if (ev.eventType === "NONE" || !port) {
+    return (
+      <ol className="result-strip" aria-label="What happened">
+        <Step n={1} title="Read" state="stopped">
+          {ev.eventType === "NONE" ? "No port event or fuel offer in this email." : "Couldn't tell which port this is about."}
+        </Step>
+      </ol>
+    );
+  }
+
+  const v = result.matchedVoyage;
+  const rec = result.recommendation;
+  let recStep: React.ReactNode;
+  if (!v) {
+    recStep = null;
+  } else if (!rec) {
+    recStep = (
+      <Step n={3} title="Recommendation" state="stopped">
+        {isOffer ? "Not enough detail in the offer to price it." : "Nothing to gain: slowing down wouldn't save fuel."}
+      </Step>
+    );
+  } else if (isBunker(rec) && bunkerCalc(rec).verdict === "NOT_WORTH_IT") {
+    recStep = (
+      <Step n={3} title="Recommendation" state="stopped">
+        Not worth it ({eurShort(rec.costSavedEur, true)}).{" "}
+        <Link to="/actions">See why →</Link>
+      </Step>
+    );
+  } else {
+    recStep = (
+      <Step n={3} title="Recommendation" state="done">
+        {isBunker(rec) ? `Worth it: net ${eurShort(rec.costSavedEur, true)}.` : `Saves ${eurShort(rec.costSavedEur)}.`}{" "}
+        <Link to="/actions">Review →</Link>
+      </Step>
+    );
+  }
+
+  return (
+    <ol className="result-strip" aria-label="What happened">
+      <Step n={1} title="Read" state="done">
+        {EVENT_LABELS[ev.eventType]} · {port}
+        {ev.delayHours != null ? ` · +${ev.delayHours} h` : ""}
+        {isOffer && ev.priceUsdPerT != null ? ` · $${ev.priceUsdPerT}/t` : ""}
+      </Step>
+      <Step n={2} title="Matched" state={v ? "done" : "stopped"}>
+        {v
+          ? `${v.vessel?.name} (${v.originPort?.name} → ${v.destPort?.name})`
+          : isOffer
+            ? `No ship passes near ${port}.`
+            : `No ship heading to ${port}.`}
+      </Step>
+      {recStep}
+    </ol>
+  );
+}
 
 export function Inbox() {
   const [emails, setEmails] = useState<EmailListItem[]>([]);
@@ -255,60 +333,79 @@ export function Inbox() {
 
               {selectedResult?.portEvent && (
                 <div className="extraction-card">
-                  <p className="label">Extraction</p>
-                  {selectedResult.portEvent.eventType === "NONE" ? (
-                    <p className="extraction-card__none">No port event found.</p>
-                  ) : (
-                    <>
+                  <ResultStrip result={selectedResult} />
+                  {selectedResult.portEvent.eventType !== "NONE" && (
+                    <details className="extraction-card__details">
+                      <summary>Details the AI read from the email</summary>
                       <dl className="extraction-card__fields">
                         <div>
-                          <dt>Event type</dt>
-                          <dd>{selectedResult.portEvent.eventType}</dd>
+                          <dt>Event</dt>
+                          <dd>{EVENT_LABELS[selectedResult.portEvent.eventType]}</dd>
                         </div>
                         <div>
                           <dt>Port</dt>
                           <dd>{selectedResult.portEvent.port?.name ?? "—"}</dd>
                         </div>
-                        <div>
-                          <dt>Delay</dt>
-                          <dd>
-                            {selectedResult.portEvent.delayHours != null
-                              ? `${selectedResult.portEvent.delayHours} h`
-                              : "—"}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>New berth time</dt>
-                          <dd>
-                            {selectedResult.portEvent.newBerthTime
-                              ? new Date(selectedResult.portEvent.newBerthTime).toLocaleString()
-                              : "—"}
-                          </dd>
-                        </div>
+                        {selectedResult.portEvent.eventType === "BUNKER_OFFER" ? (
+                          <>
+                            <div>
+                              <dt>Fuel</dt>
+                              <dd>{selectedResult.portEvent.fuelGrade ?? "—"}</dd>
+                            </div>
+                            <div>
+                              <dt>Price</dt>
+                              <dd>
+                                {selectedResult.portEvent.priceUsdPerT != null
+                                  ? `$${selectedResult.portEvent.priceUsdPerT}/t`
+                                  : "—"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Quantity</dt>
+                              <dd>
+                                {selectedResult.portEvent.qtyMaxT != null
+                                  ? selectedResult.portEvent.qtyMinT != null &&
+                                    selectedResult.portEvent.qtyMinT !== selectedResult.portEvent.qtyMaxT
+                                    ? `${selectedResult.portEvent.qtyMinT}–${selectedResult.portEvent.qtyMaxT} t`
+                                    : `${selectedResult.portEvent.qtyMaxT} t`
+                                  : "—"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Valid until</dt>
+                              <dd>
+                                {selectedResult.portEvent.validUntil
+                                  ? new Date(selectedResult.portEvent.validUntil).toLocaleString()
+                                  : "—"}
+                              </dd>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <dt>Delay</dt>
+                              <dd>
+                                {selectedResult.portEvent.delayHours != null
+                                  ? `${selectedResult.portEvent.delayHours} h`
+                                  : "—"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>New berth time</dt>
+                              <dd>
+                                {selectedResult.portEvent.newBerthTime
+                                  ? new Date(selectedResult.portEvent.newBerthTime).toLocaleString()
+                                  : "—"}
+                              </dd>
+                            </div>
+                          </>
+                        )}
                         <div>
                           <dt>Confidence</dt>
-                          <dd>{Math.round(selectedResult.portEvent.confidence * 100)}%</dd>
+                          <dd>{confidenceWord(selectedResult.portEvent.confidence)}</dd>
                         </div>
                       </dl>
-
-                      {selectedResult.matchedVoyage ? (
-                        <p className="extraction-card__match">
-                          Affected: {selectedResult.matchedVoyage.vessel?.name} (
-                          {selectedResult.matchedVoyage.originPort?.name} →{" "}
-                          {selectedResult.matchedVoyage.destPort?.name})
-                        </p>
-                      ) : (
-                        <p className="extraction-card__match extraction-card__match--none">
-                          No matching underway voyage found.
-                        </p>
-                      )}
-
-                      {selectedResult.recommendation && (
-                        <Link className="extraction-card__action-link" to="/actions">
-                          View action →
-                        </Link>
-                      )}
-                    </>
+                    </details>
                   )}
                 </div>
               )}

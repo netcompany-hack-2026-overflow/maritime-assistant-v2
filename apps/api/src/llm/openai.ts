@@ -66,8 +66,9 @@ export class OpenAiProvider implements LlmProvider {
         {
           role: "system",
           content:
-            "You write a 2-3 sentence plain-English rationale for a ship speed-adjustment " +
-            "recommendation, given the facts and numbers already computed. Never invent numbers; " +
+            "You write a 2-3 sentence plain-English rationale for a ship operations recommendation " +
+            "(a speed adjustment, or, when a bunker block is present, whether a bunker detour is worth it), " +
+            "given the facts and numbers already computed. Never invent numbers; " +
             "only restate the ones given.",
         },
         { role: "user", content: JSON.stringify(facts) },

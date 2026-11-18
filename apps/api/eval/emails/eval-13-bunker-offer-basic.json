@@ -1,0 +1,20 @@
+{
+  "id": "eval-13-bunker-offer-basic",
+  "description": "Clear bunker offer: supply port, grade, USD/mt price, quantity range and validity. The ship's destination (Rotterdam) is also named and must not be taken as the supply port.",
+  "fromAddr": "trading@strait-bunkering.example",
+  "subject": "Bunker offer - VLSFO at Algeciras - MV Aegean Star",
+  "body": "Dear Sirs,\n\nFor MV Aegean Star, bound for Rotterdam, we are pleased to offer VLSFO delivered at Algeciras (ESALG) at USD 540/mt, 800-1,200 mt, by barge alongside within 6 hours of arrival.\n\nOffer valid until 2026-11-23 18:00 UTC.\n\nBest regards,\nStrait Bunkering Ltd",
+  "expected": {
+    "eventType": "BUNKER_OFFER",
+    "portName": "Algeciras",
+    "portUnlocode": "ESALG",
+    "vesselNameMentioned": "MV Aegean Star",
+    "delayHours": null,
+    "newBerthTime": null,
+    "fuelGrade": "VLSFO",
+    "priceUsdPerT": 540,
+    "qtyMinT": 800,
+    "qtyMaxT": 1200,
+    "validUntil": "2026-11-23T18:00:00.000Z"
+  }
+}

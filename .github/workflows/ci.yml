@@ -22,9 +22,9 @@ jobs:
       - run: npm test
       # mock provider: deterministic, no API key needed
       - run: npm run eval
-      - name: Fail if the eval regressed below 12/12
+      - name: Fail if the eval regressed below 18/18
         run: |
-          grep -qF "Exact-match emails: **12 / 12**" apps/api/eval/results.md
+          grep -qF "Exact-match emails: **18 / 18**" apps/api/eval/results.md
 
   docker:
     name: docker compose up --build (judging setup)

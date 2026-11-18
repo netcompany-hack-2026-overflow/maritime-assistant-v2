@@ -38,6 +38,32 @@ Worked example (the reference case checked by
 one of these numbers — not just the total — under "Show the math" on the Actions page,
 so a human reviewer can check the reasoning before approving.
 
+### Second scenario: is a bunker offer worth the detour?
+
+Fuel suppliers email offers like *"VLSFO at Algeciras, USD 540/mt, 800–1,200 mt, valid
+until 23 Nov"*. Cheaper fuel only pays if the detour doesn't eat the saving. Tidewise
+reads the offer, finds the ship whose remaining route passes nearest the port, and
+compares two plans that both end at the berth time:
+
+- **Stay on route** at the current speed (waiting out any slack at anchor).
+- **Bunker**: sail out to the port and back, spend 8 h alongside, and speed up only as
+  much as needed to still make the berth (cube-law fuel again).
+
+```
+net € = qty × (our price − offer price × USD→EUR) − extra fuel × our price − port costs
+```
+
+It's only **worth it** if the net is positive, the ship still makes its berth at or
+below design speed, and the offer is still valid when the ship gets there. With the
+seeded demo, Algeciras (≈10 nm off the route) comes out **worth it, net ≈ +€110k**
+once the berth delay has given the ship slack. Genoa (≈580 nm off the route) is
+**not worth it**: the detour burns more than the cheaper fuel saves, and the ship
+would miss its berth. Not-worth-it offers are recorded as declined automatically, with
+the reason, so you can later ask *"why didn't we take the Genoa offer?"*. The
+calculation is a pure, unit-tested function
+([packages/shared/src/bunker.ts](packages/shared/src/bunker.ts)) and every step is
+shown under "Show the math".
+
 ## The 90-second demo path
 
 0. **Landing** (`/`): what Tidewise does in one screen; "Open the console" goes to the app.
@@ -46,15 +72,20 @@ so a human reviewer can check the reasoning before approving.
 2. **Inbox** — click "Simulate incoming email" to release the queued Rotterdam
    berth-delay notice. It gets extracted into a structured port event (highlighted
    directly in the email body) and matched to MV Aegean Star's voyage.
-3. **Actions** — a recommendation is waiting: slow from 14.0 kn to roughly 10.7–12 kn
-   and save roughly 45–60 t of fuel (~€27–36k), depending on that day's mock weather
-   (calm water gives 10.7 kn / 57 t / €34k). Expand "Show the math" to see every step,
-   including the weather inputs, then **Approve**.
+3. **Actions** — a recommendation is waiting, led by one plain sentence: *"Slow MV
+   Aegean Star from 14.0 to 12.0 kn. Arrives right when the Rotterdam berth opens…
+   Saves €34k."* The exact figures move a little with that day's mock weather. Expand
+   "Show the math" for a Plan A vs Plan B table and every step, then **Approve**.
 4. **Fleet** — MV Aegean Star is now visibly slower on the globe, and its ETA has
    moved to match the new berth time exactly.
-5. **Ask** — ask "How much fuel have we saved from approved recommendations?" and get
-   an answer with a citation back to the recommendation record.
-6. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
+5. **Bunker offers** — back in Inbox, simulate the next two emails. The Algeciras offer
+   shows **Read → Matched → Recommendation: worth it, net ≈ +€110k**. The Genoa offer
+   shows **not worth it**. On Actions, the Algeciras card waits for approval, and the
+   Genoa card sits in History, declined with its reason.
+6. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
+   from approved recommendations?" and get an answer with a citation back to the
+   recommendation record.
+7. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
    `apps/web/public/samples/algeciras-berth-notice.pdf` (also downloadable from the
    Inbox page). The PDF's text runs through the same pipeline and produces a
    recommendation for MV Ionian Trader.
@@ -256,34 +287,35 @@ npm run dev                     # runs the api and web dev servers together
 ## Testing & accuracy evidence
 
 GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push:
-typecheck, unit tests, the extraction eval (fails below 12/12), and a full
+typecheck, unit tests, the extraction eval (fails below 18/18), and a full
 `docker compose up --build` with smoke tests of the Fleet API, PDF upload and Ask.
 
 ```bash
-npm run test     # packages/shared (geo + JIT + weather) and apps/api (LLM mock, sim, weather, PDF, ask, env)
+npm run test     # packages/shared (geo + JIT + bunker) and apps/api (LLM mock, extraction, settings, land, sim, weather, PDF, ask, env)
 npm run eval      # runs apps/api/eval/emails/*.json through the mock extractor
 
-# same 12 emails through a real LLM (writes apps/api/eval/results-openai.md)
+# same 18 emails through a real LLM (writes apps/api/eval/results-openai.md)
 LLM_PROVIDER=openai OPENAI_API_KEY=sk-... npm run eval
 ```
 
-The eval set is 12 synthetic port-agent emails covering plain English, Greek-only,
+The eval set is 18 synthetic emails. Twelve are port-agent notices covering plain English, Greek-only,
 mixed Greek/English wording, multi-port disambiguation (resolved by UN/LOCODE), a
 missing-vessel-name case, an alternate date separator, two pure no-event emails, one
 email that mentions a real port/vessel but describes no event, and an explicit check
 that the earliest-mentioned event type wins when an email touches on more than one.
+Six are bunker offers: a clear offer whose text also names the ship's destination, an
+off-route offer, an expired offer, one with no quantity, one in Greek, and a weekly
+price newsletter that must not count as an offer. Offer fields (grade, price, quantity
+range, validity) are scored too.
 Full per-field, per-email results are written to
 [apps/api/eval/results.md](apps/api/eval/results.md) on every run. Latest run:
 
 | Field | Accuracy |
 |---|---|
-| Exact-match emails | 12 / 12 (100%) |
-| eventType | 100% |
-| portName | 100% |
-| portUnlocode | 100% |
-| vesselNameMentioned | 100% |
-| delayHours | 100% |
-| newBerthTime | 100% |
+| Exact-match emails | 18 / 18 (100%) |
+| eventType, portName, portUnlocode, vesselNameMentioned | 100% |
+| delayHours, newBerthTime | 100% |
+| fuelGrade, priceUsdPerT, qtyMinT, qtyMaxT, validUntil | 100% |
 
 ## REST API
 
@@ -310,8 +342,8 @@ Full per-field, per-email results are written to
 | POST | `/api/recommendations/:id/reject` | reject (requires a reason) |
 | GET | `/api/records/:table/:id` | generic record lookup, used by "Facts used" and Ask citations |
 | POST | `/api/ask` | natural-language Q&A with validated citations |
-| GET | `/api/settings` | current fuel price and CO₂ factor |
-| PUT | `/api/settings` | set `fuelPriceEurPerT` (0–5000); re-prices pending recommendations |
+| GET | `/api/settings` | current fuel price, CO₂ factor, USD→EUR rate and bunker assumptions |
+| PUT | `/api/settings` | set `fuelPriceEurPerT` (0–5000) and/or `usdEurRate` (0.5–2); re-prices pending recommendations |
 
 ## Assumptions
 
@@ -333,6 +365,13 @@ Full per-field, per-email results are written to
   raises the speed through the water needed to arrive on time; rougher seas raise fuel
   burn for both plans. Both values appear in "Show the math". A real deployment would
   call a marine-weather API instead.
+- Bunker offers: prices are in USD/t and converted with the USD→EUR rate on
+  **Settings** (default 0.92; changing it re-prices pending offers). A bunker call is
+  assumed to take 8 h alongside and cost €5,000 in port and agency fees. An offer with
+  no quantity is assumed to be 800 t. The detour is measured as a straight line out to
+  the port and back from the closest point on the ship's remaining route whose line to
+  the port doesn't cross land (Natural Earth 110m coastlines). The sea-route network is
+  too coarse for this at short range. The bunker calculation uses calm water.
 - When a notice gives only "delayed by N hours" without a new berth time, the new berth
   time is the voyage's current planned arrival plus N hours.
 - A recommended speed never exceeds the vessel's current speed (the app only slows
@@ -342,7 +381,7 @@ Full per-field, per-email results are written to
 ## Known limitations
 
 - The mock LLM provider is a deterministic regex extractor, not a real language model.
-  It handles the patterns in the eval set well (100% on all six fields as of the last
+  It handles the patterns in the eval set well (100% on every field as of the last
   run) but is not robust to arbitrary free-form phrasing the way a real LLM call
   (`LLM_PROVIDER=anthropic`/`openai`) would be.
 - Event-type disambiguation uses an "earliest keyword in the email wins" heuristic.
@@ -352,6 +391,10 @@ Full per-field, per-email results are written to
 - Voyage creation does not check for a duplicate route/vessel combination beyond
   "vessel already has an active voyage" — nothing stops two voyages on the same route
   for different vessels.
+- Approving a bunker offer records the decision; it does not yet re-route the ship
+  through the bunker port on the globe or change its speed.
+- The bunker and slow-steaming recommendations are each priced on their own. Approving
+  both on one voyage doesn't re-run the other's numbers against the combined plan.
 - There is no authentication; this is a single-tenant demo app.
 - PDF upload reads the text layer only; scanned (image-only) PDFs are rejected with a
   clear message rather than OCR'd.

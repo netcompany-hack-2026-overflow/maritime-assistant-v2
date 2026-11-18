@@ -32,6 +32,7 @@ COPY --from=build /app/packages/shared/package.json ./packages/shared/package.js
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build /app/apps/api/data ./apps/api/data
 # The seed (run with tsx) imports the sea-route service from src.
 COPY --from=build /app/apps/api/src ./apps/api/src
 

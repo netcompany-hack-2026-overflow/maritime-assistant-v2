@@ -1,0 +1,20 @@
+{
+  "id": "eval-14-bunker-offer-off-route",
+  "description": "Offer at a port far from the ship's route. Extraction is still a plain BUNKER_OFFER; deciding it isn't worth it is the calculation's job.",
+  "fromAddr": "desk@ligurian-fuels.example",
+  "subject": "Bunker offer - VLSFO at Genoa",
+  "body": "Good morning,\n\nWe can offer MV Aegean Star VLSFO at Genoa (ITGOA) at USD 520/mt, 500 mt, delivery ex-pipeline.\n\nOffer valid until 2026-11-24 12:00 UTC.\n\nKind regards,\nLigurian Fuels S.p.A.",
+  "expected": {
+    "eventType": "BUNKER_OFFER",
+    "portName": "Genoa",
+    "portUnlocode": "ITGOA",
+    "vesselNameMentioned": "MV Aegean Star",
+    "delayHours": null,
+    "newBerthTime": null,
+    "fuelGrade": "VLSFO",
+    "priceUsdPerT": 520,
+    "qtyMinT": 500,
+    "qtyMaxT": 500,
+    "validUntil": "2026-11-24T12:00:00.000Z"
+  }
+}

@@ -18,11 +18,13 @@ enum PortEventType {
   BERTH_DELAY
   CONGESTION
   CLOSURE
+  BUNKER_OFFER
   NONE
 }
 
 enum RecommendationActionType {
   ADJUST_SPEED
+  BUNKER_DETOUR
 }
 
 enum RecommendationStatus {
@@ -105,6 +107,13 @@ model PortEvent {
   eventType      PortEventType
   delayHours     Float?
   newBerthTime   DateTime?
+  /// Bunker-offer fields (eventType BUNKER_OFFER); null for other events.
+  fuelGrade      String?
+  priceUsdPerT   Float?
+  qtyMinT        Float?
+  qtyMaxT        Float?
+  validUntil     DateTime?
+  supplier       String?
   rawExtraction  Json
   sourceSpans    Json
   confidence     Float
@@ -147,5 +156,10 @@ model Settings {
   id               Int      @id @default(1)
   fuelPriceEurPerT Float
   co2Factor        Float
+  /// Bunker offers are quoted in USD/t.
+  usdEurRate        Float    @default(0.92)
+  bunkerPortHours   Float    @default(8)
+  bunkerPortFeeEur  Float    @default(5000)
+  bunkerDefaultQtyT Float    @default(800)
   updatedAt        DateTime @updatedAt
 }

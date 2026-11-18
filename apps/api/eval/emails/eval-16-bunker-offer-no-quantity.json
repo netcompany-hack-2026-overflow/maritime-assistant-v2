@@ -1,0 +1,20 @@
+{
+  "id": "eval-16-bunker-offer-no-quantity",
+  "description": "Offer without a quantity or validity; those fields stay null and the app falls back to the default quantity from Settings.",
+  "fromAddr": "bunkers@gulf-energy.example",
+  "subject": "VLSFO quote - Jebel Ali",
+  "body": "Hello,\n\nOur quote for MV Hellenic Pioneer: VLSFO at Jebel Ali (AEJEA) USD 555/mt, delivery on arrival, subject to availability.\n\nBest,\nGulf Energy Supply",
+  "expected": {
+    "eventType": "BUNKER_OFFER",
+    "portName": "Jebel Ali",
+    "portUnlocode": "AEJEA",
+    "vesselNameMentioned": "MV Hellenic Pioneer",
+    "delayHours": null,
+    "newBerthTime": null,
+    "fuelGrade": "VLSFO",
+    "priceUsdPerT": 555,
+    "qtyMinT": null,
+    "qtyMaxT": null,
+    "validUntil": null
+  }
+}

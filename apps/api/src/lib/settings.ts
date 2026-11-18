@@ -1,12 +1,44 @@
 import type { Prisma } from "@prisma/client";
-import { repriceJit, type JitCalc, type SettingsDTO } from "@maritime/shared";
+import {
+  repriceBunker,
+  repriceJit,
+  type BunkerCalc,
+  type JitCalc,
+  type SettingsDTO,
+} from "@maritime/shared";
 import { prisma } from "./prisma.js";
 import { env } from "./env.js";
 
 const SETTINGS_ID = 1;
 
-function toDTO(s: { fuelPriceEurPerT: number; co2Factor: number; updatedAt: Date }): SettingsDTO {
-  return { fuelPriceEurPerT: s.fuelPriceEurPerT, co2Factor: s.co2Factor, updatedAt: s.updatedAt.toISOString() };
+// Defaults for columns added after the first Settings migration (mirrors schema.prisma).
+const BUNKER_DEFAULTS = {
+  usdEurRate: 0.92,
+  bunkerPortHours: 8,
+  bunkerPortFeeEur: 5000,
+  bunkerDefaultQtyT: 800,
+};
+
+type SettingsRow = {
+  fuelPriceEurPerT: number;
+  co2Factor: number;
+  usdEurRate?: number;
+  bunkerPortHours?: number;
+  bunkerPortFeeEur?: number;
+  bunkerDefaultQtyT?: number;
+  updatedAt: Date;
+};
+
+function toDTO(s: SettingsRow): SettingsDTO {
+  return {
+    fuelPriceEurPerT: s.fuelPriceEurPerT,
+    co2Factor: s.co2Factor,
+    usdEurRate: s.usdEurRate ?? BUNKER_DEFAULTS.usdEurRate,
+    bunkerPortHours: s.bunkerPortHours ?? BUNKER_DEFAULTS.bunkerPortHours,
+    bunkerPortFeeEur: s.bunkerPortFeeEur ?? BUNKER_DEFAULTS.bunkerPortFeeEur,
+    bunkerDefaultQtyT: s.bunkerDefaultQtyT ?? BUNKER_DEFAULTS.bunkerDefaultQtyT,
+    updatedAt: s.updatedAt.toISOString(),
+  };
 }
 
 /** App settings. The row is created from env defaults on first read. */
@@ -19,41 +51,61 @@ export async function getSettings(): Promise<SettingsDTO> {
   return toDTO(row);
 }
 
+export interface PriceSettingsUpdate {
+  fuelPriceEurPerT?: number;
+  usdEurRate?: number;
+}
+
 /**
- * Change the fuel price. PENDING recommendations are re-priced so the operator
- * decides with current numbers; APPROVED/REJECTED keep the price they were
- * decided at, so the savings record stays truthful.
+ * Change the fuel price and/or the USD→EUR rate. PENDING recommendations are
+ * re-priced so the operator decides with current numbers; APPROVED/REJECTED
+ * keep the prices they were decided at, so the savings record stays truthful.
  */
-export async function updateFuelPrice(
-  fuelPriceEurPerT: number
+export async function updatePriceSettings(
+  update: PriceSettingsUpdate
 ): Promise<{ settings: SettingsDTO; repricedRecommendations: number }> {
   const before = await getSettings();
+  const fuelPriceEurPerT = update.fuelPriceEurPerT ?? before.fuelPriceEurPerT;
+  const usdEurRate = update.usdEurRate ?? before.usdEurRate;
+  const fuelChanged = fuelPriceEurPerT !== before.fuelPriceEurPerT;
+  const rateChanged = usdEurRate !== before.usdEurRate;
 
   return prisma.$transaction(async (tx) => {
-    const row = await tx.settings.update({
-      where: { id: SETTINGS_ID },
-      data: { fuelPriceEurPerT },
-    });
+    const data: PriceSettingsUpdate = {};
+    if (update.fuelPriceEurPerT !== undefined) data.fuelPriceEurPerT = fuelPriceEurPerT;
+    if (update.usdEurRate !== undefined) data.usdEurRate = usdEurRate;
+    const row = await tx.settings.update({ where: { id: SETTINGS_ID }, data });
 
     let repriced = 0;
-    if (before.fuelPriceEurPerT !== fuelPriceEurPerT) {
+    if (fuelChanged || rateChanged) {
       const pending = await tx.recommendation.findMany({ where: { status: "PENDING" } });
       for (const rec of pending) {
-        const calc = repriceJit(rec.calc as unknown as JitCalc, fuelPriceEurPerT);
-        await tx.recommendation.update({
-          where: { id: rec.id },
-          data: { costSavedEur: calc.costSavedEur, calc: calc as unknown as Prisma.InputJsonValue },
-        });
+        if (rec.actionType === "BUNKER_DETOUR") {
+          const calc = repriceBunker(rec.calc as unknown as BunkerCalc, fuelPriceEurPerT, usdEurRate);
+          await tx.recommendation.update({
+            where: { id: rec.id },
+            data: { costSavedEur: calc.netEur, calc: calc as unknown as Prisma.InputJsonValue },
+          });
+        } else {
+          if (!fuelChanged) continue; // speed recommendations don't depend on the exchange rate
+          const calc = repriceJit(rec.calc as unknown as JitCalc, fuelPriceEurPerT);
+          await tx.recommendation.update({
+            where: { id: rec.id },
+            data: { costSavedEur: calc.costSavedEur, calc: calc as unknown as Prisma.InputJsonValue },
+          });
+        }
         repriced++;
       }
       await tx.auditLog.create({
         data: {
           entity: "settings",
           entityId: String(SETTINGS_ID),
-          action: "FUEL_PRICE_CHANGED",
+          action: fuelChanged ? "FUEL_PRICE_CHANGED" : "USD_EUR_RATE_CHANGED",
           payload: {
             previousFuelPriceEurPerT: before.fuelPriceEurPerT,
             fuelPriceEurPerT,
+            previousUsdEurRate: before.usdEurRate,
+            usdEurRate,
             repricedRecommendations: repriced,
           },
         },
@@ -62,4 +114,9 @@ export async function updateFuelPrice(
 
     return { settings: toDTO(row), repricedRecommendations: repriced };
   });
+}
+
+/** Change only the fuel price (kept for callers that predate the exchange rate). */
+export function updateFuelPrice(fuelPriceEurPerT: number) {
+  return updatePriceSettings({ fuelPriceEurPerT });
 }

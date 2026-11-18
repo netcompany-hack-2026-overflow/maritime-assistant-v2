@@ -62,7 +62,9 @@ const VOYAGES: VoyageSeed[] = [
   // DEHAM-SGSIN ~8650nm (via Suez), ESVLC-ESALG ~550nm, ITGOA-AEJEA ~4390nm,
   // BRSSZ-USHOU ~5660nm, BEANR-CNSHA ~10700nm. remainingNmAtStart must stay
   // below the route's total distance.
-  { vesselImo: "9000001", originUnlocode: "GRPIR", destUnlocode: "NLRTM", speedKn: 14, remainingNmAtStart: 1100 },
+  // Aegean Star starts in the western Med (~320nm east of Gibraltar), so the
+  // Algeciras bunker offer lies just ahead on its route and Genoa well off it.
+  { vesselImo: "9000001", originUnlocode: "GRPIR", destUnlocode: "NLRTM", speedKn: 14, remainingNmAtStart: 1700 },
   { vesselImo: "9000002", originUnlocode: "DEHAM", destUnlocode: "SGSIN", speedKn: 13, remainingNmAtStart: 3500 },
   { vesselImo: "9000003", originUnlocode: "ESVLC", destUnlocode: "ESALG", speedKn: 15, remainingNmAtStart: 150 },
   { vesselImo: "9000004", originUnlocode: "ITGOA", destUnlocode: "AEJEA", speedKn: 14.5, remainingNmAtStart: 2300 },
@@ -185,7 +187,39 @@ Maritime Insure Billing`,
     queued: true,
   };
 
-  for (const email of [emailA, emailB, emailC]) {
+  // Bunker offers for MV Aegean Star. Algeciras is on its route and cheap:
+  // worth it once the berth delay has given the ship slack. Genoa is far off
+  // the route: the detour burns more than the cheaper fuel saves.
+  const validUntil = formatUtc(new Date(now.getTime() + 5 * 24 * 3_600_000));
+  const emailD = {
+    fromAddr: "trading@strait-bunkering.example",
+    subject: "Bunker offer - VLSFO at Algeciras - MV Aegean Star",
+    body: `Dear Sirs,
+
+For MV Aegean Star, bound for Rotterdam, we are pleased to offer VLSFO delivered at Algeciras (ESALG) at USD 540/mt, 800-1,200 mt, by barge alongside within 6 hours of arrival.
+
+Offer valid until ${validUntil}.
+
+Best regards,
+Strait Bunkering Ltd`,
+    queued: true,
+  };
+  const emailE = {
+    fromAddr: "desk@ligurian-fuels.example",
+    subject: "Bunker offer - VLSFO at Genoa - MV Aegean Star",
+    body: `Good morning,
+
+We can offer MV Aegean Star VLSFO at Genoa (ITGOA) at USD 520/mt, 500 mt, delivery ex-pipeline.
+
+Offer valid until ${validUntil}.
+
+Kind regards,
+Ligurian Fuels S.p.A.`,
+    queued: true,
+  };
+
+  // Release order for "Simulate incoming email": berth delay, then the two offers.
+  for (const email of [emailA, emailD, emailE, emailB, emailC]) {
     await prisma.email.create({ data: email });
   }
 

@@ -1,0 +1,20 @@
+{
+  "id": "eval-17-bunker-offer-greek",
+  "description": "Bunker offer written in Greek.",
+  "fromAddr": "info@aegean-bunkers.example",
+  "subject": "Προσφορά καυσίμων - Piraeus",
+  "body": "Αγαπητοί κύριοι,\n\nΠροσφορά για το MV Marathon Spirit: VLSFO στο Piraeus (GRPIR) 545 USD/mt, 600-900 τόνοι. Η προσφορά ισχύει έως 2026-11-26 12:00 UTC.\n\nΜε εκτίμηση,\nAegean Bunkers",
+  "expected": {
+    "eventType": "BUNKER_OFFER",
+    "portName": "Piraeus",
+    "portUnlocode": "GRPIR",
+    "vesselNameMentioned": "MV Marathon Spirit",
+    "delayHours": null,
+    "newBerthTime": null,
+    "fuelGrade": "VLSFO",
+    "priceUsdPerT": 545,
+    "qtyMinT": 600,
+    "qtyMaxT": 900,
+    "validUntil": "2026-11-26T12:00:00.000Z"
+  }
+}

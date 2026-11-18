@@ -1,7 +1,9 @@
 import type { LatLon } from "./geo.js";
 export type VoyageStatus = "PLANNED" | "UNDERWAY" | "ARRIVED" | "CANCELLED";
 
-export type PortEventType = "BERTH_DELAY" | "CONGESTION" | "CLOSURE" | "NONE";
+export type PortEventType = "BERTH_DELAY" | "CONGESTION" | "CLOSURE" | "BUNKER_OFFER" | "NONE";
+
+export type RecommendationActionType = "ADJUST_SPEED" | "BUNKER_DETOUR";
 
 export type RecommendationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -67,6 +69,14 @@ export interface SeaRouteDTO {
 export interface SettingsDTO {
   fuelPriceEurPerT: number;
   co2Factor: number;
+  /** Bunker offers are quoted in USD/t; this converts them to €. */
+  usdEurRate: number;
+  /** Time alongside the bunker port, h. */
+  bunkerPortHours: number;
+  /** Port and agency costs of a bunker call, €. */
+  bunkerPortFeeEur: number;
+  /** Quantity assumed when an offer states none, t. */
+  bunkerDefaultQtyT: number;
   updatedAt: string;
 }
 
@@ -107,16 +117,60 @@ export interface RecommendationDTO {
   id: string;
   voyageId: string;
   portEventId: string;
-  actionType: "ADJUST_SPEED";
+  actionType: RecommendationActionType;
   currentSpeedKn: number;
   recommendedSpeedKn: number;
   fuelSavedT: number;
   costSavedEur: number;
   co2SavedT: number;
-  calc: JitCalc;
+  calc: JitCalc | BunkerCalc;
   rationale: string;
   status: RecommendationStatus;
   rejectReason: string | null;
   decidedAt: string | null;
   createdAt: string;
+}
+
+export type BunkerReason = "NEGATIVE_NET" | "LATE" | "EXPIRED";
+
+/** Every step of the bunker-detour calculation, kept for "Show the math". */
+export interface BunkerCalc {
+  remainingNm: number;
+  offRouteNm: number;
+  alongNm: number;
+  detourNm: number;
+  hoursToDeadline: number;
+  portHours: number;
+  portFeeEur: number;
+  v0: number;
+  designSpeedKn: number;
+  /** Speed needed to still make the berth with the detour; may exceed design speed. */
+  requiredSpeedKn: number;
+  speedBunkerKn: number;
+  sailHoursStay: number;
+  waitHoursStay: number;
+  sailHoursBunker: number;
+  waitHoursBunker: number;
+  lateHours: number;
+  extraHours: number;
+  fuelStayT: number;
+  fuelBunkerT: number;
+  extraFuelT: number;
+  extraCo2T: number;
+  co2Factor: number;
+  priceUsdPerT: number;
+  qtyT: number;
+  qtyAssumed: boolean;
+  etaAtBunker: string;
+  validUntil: string | null;
+  offerValidAtArrival: boolean;
+  arrivalOk: boolean;
+  refPriceEurPerT: number;
+  usdEurRate: number;
+  offerPriceEurPerT: number;
+  priceSavingEur: number;
+  extraFuelCostEur: number;
+  netEur: number;
+  reasons: BunkerReason[];
+  verdict: "WORTH_IT" | "NOT_WORTH_IT";
 }

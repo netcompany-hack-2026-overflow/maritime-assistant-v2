@@ -54,4 +54,31 @@ describe("parseExtraction", () => {
   it("still rejects output that doesn't match the schema", () => {
     expect(() => parseExtraction({ eventType: "STORM" })).toThrow();
   });
+
+  it("clears every field when there is no event (gpt-5-mini echoed a ship on eval-12)", () => {
+    const r = parseExtraction({
+      eventType: "NONE", portName: null, portUnlocode: null, vesselNameMentioned: "MV Poseidon Glory",
+      delayHours: null, newBerthTime: null, confidence: 0.9,
+      sourceSpans: [{ field: "vesselNameMentioned", text: "MV Poseidon Glory" }],
+    });
+    expect(r.vesselNameMentioned).toBeNull();
+    expect(r.sourceSpans).toEqual([]);
+  });
+
+  it("normalises bunker-offer fields and drops them on other events", () => {
+    const offer = parseExtraction({
+      eventType: "BUNKER_OFFER", portName: "Port of Algeciras", portUnlocode: "ES ALG", vesselNameMentioned: null,
+      delayHours: null, newBerthTime: null, fuelGrade: "vlsfo", priceUsdPerT: 540, qtyMinT: null, qtyMaxT: 1200,
+      validUntil: "2026-11-23 18:00", supplier: " Strait Bunkering Ltd ", confidence: 0.9, sourceSpans: [],
+    });
+    expect(offer).toMatchObject({
+      portName: "Algeciras", portUnlocode: "ESALG", fuelGrade: "VLSFO", qtyMinT: 1200, qtyMaxT: 1200,
+      validUntil: "2026-11-23T18:00:00.000Z", supplier: "Strait Bunkering Ltd",
+    });
+    const delay = parseExtraction({
+      eventType: "BERTH_DELAY", portName: "Rotterdam", portUnlocode: "NLRTM", vesselNameMentioned: null,
+      delayHours: 24, newBerthTime: null, priceUsdPerT: 540, confidence: 0.9, sourceSpans: [],
+    });
+    expect(delay.priceUsdPerT).toBeNull();
+  });
 });

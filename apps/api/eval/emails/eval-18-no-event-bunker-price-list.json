@@ -1,0 +1,20 @@
+{
+  "id": "eval-18-no-event-bunker-price-list",
+  "description": "Weekly bunker price newsletter: prices for several ports but no specific offer, so no event.",
+  "fromAddr": "newsletter@bunker-index.example",
+  "subject": "Weekly bunker market report",
+  "body": "Indicative VLSFO prices this week: Rotterdam USD 560/mt, Algeciras USD 575/mt, Singapore USD 590/mt, Houston USD 548/mt.\n\nMarket sentiment is stable ahead of the winter season.\n\nBunker Index Team",
+  "expected": {
+    "eventType": "NONE",
+    "portName": null,
+    "portUnlocode": null,
+    "vesselNameMentioned": null,
+    "delayHours": null,
+    "newBerthTime": null,
+    "fuelGrade": null,
+    "priceUsdPerT": null,
+    "qtyMinT": null,
+    "qtyMaxT": null,
+    "validUntil": null
+  }
+}

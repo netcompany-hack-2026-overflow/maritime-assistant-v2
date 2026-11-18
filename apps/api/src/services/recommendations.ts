@@ -23,6 +23,24 @@ export async function approveRecommendation(id: string) {
     throw new HttpError(409, "Voyage is no longer underway");
   }
 
+  // v1: approving a bunker call records the decision (for the agent to book);
+  // the ship's plan on the globe is not re-routed through the bunker port.
+  if (recommendation.actionType === "BUNKER_DETOUR") {
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.recommendation.update({ where: { id }, data: { status: "APPROVED", decidedAt: now } }),
+      prisma.auditLog.create({
+        data: {
+          entity: "recommendation",
+          entityId: id,
+          action: "APPROVED",
+          payload: { voyageId: voyage.id, actionType: "BUNKER_DETOUR", netEur: recommendation.costSavedEur },
+        },
+      }),
+    ]);
+    return { voyage };
+  }
+
   const portEvent = await prisma.portEvent.findUnique({ where: { id: recommendation.portEventId } });
   if (!portEvent?.newBerthTime) throw new HttpError(409, "Port event has no berth time to target");
 
@@ -87,6 +105,17 @@ export async function undoApproval(id: string) {
   if (!recommendation) throw new HttpError(404, "Recommendation not found");
   if (recommendation.status !== "APPROVED") {
     throw new HttpError(409, "Only approved recommendations can be undone");
+  }
+
+  if (recommendation.actionType === "BUNKER_DETOUR") {
+    const [updatedRecommendation] = await prisma.$transaction([
+      prisma.recommendation.update({ where: { id }, data: { status: "PENDING", decidedAt: null } }),
+      prisma.auditLog.create({
+        data: { entity: "recommendation", entityId: id, action: "APPROVAL_UNDONE", payload: { actionType: "BUNKER_DETOUR" } },
+      }),
+    ]);
+    const voyage = await prisma.voyage.findUnique({ where: { id: recommendation.voyageId } });
+    return { voyage, recommendation: updatedRecommendation };
   }
 
   const voyage = await prisma.voyage.findUnique({ where: { id: recommendation.voyageId } });

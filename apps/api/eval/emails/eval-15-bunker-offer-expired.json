@@ -1,0 +1,20 @@
+{
+  "id": "eval-15-bunker-offer-expired",
+  "description": "Offer whose validity date is already in the past. The date is extracted as written; the calculation flags it expired.",
+  "fromAddr": "sales@iberia-marine-fuels.example",
+  "subject": "MGO offer Valencia",
+  "body": "Dear Operator,\n\nFirm price for MV Ionian Trader: MGO at Valencia (ESVLC) USD 780/mt, 150-200 mt.\nOffer valid until 2026-10-01 12:00 UTC.\n\nRegards,\nIberia Marine Fuels",
+  "expected": {
+    "eventType": "BUNKER_OFFER",
+    "portName": "Valencia",
+    "portUnlocode": "ESVLC",
+    "vesselNameMentioned": "MV Ionian Trader",
+    "delayHours": null,
+    "newBerthTime": null,
+    "fuelGrade": "MGO",
+    "priceUsdPerT": 780,
+    "qtyMinT": 150,
+    "qtyMaxT": 200,
+    "validUntil": "2026-10-01T12:00:00.000Z"
+  }
+}

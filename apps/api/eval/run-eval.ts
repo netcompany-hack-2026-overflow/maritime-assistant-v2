@@ -11,7 +11,18 @@ const EMAILS_DIR = join(__dirname, "emails");
 const PROVIDER = activeLlmProviderName();
 const RESULTS_PATH = join(__dirname, PROVIDER === "mock" ? "results.md" : `results-${PROVIDER}.md`);
 
-type ExtractionField = "eventType" | "portName" | "portUnlocode" | "vesselNameMentioned" | "delayHours" | "newBerthTime";
+type ExtractionField =
+  | "eventType"
+  | "portName"
+  | "portUnlocode"
+  | "vesselNameMentioned"
+  | "delayHours"
+  | "newBerthTime"
+  | "fuelGrade"
+  | "priceUsdPerT"
+  | "qtyMinT"
+  | "qtyMaxT"
+  | "validUntil";
 
 const FIELDS: ExtractionField[] = [
   "eventType",
@@ -20,6 +31,13 @@ const FIELDS: ExtractionField[] = [
   "vesselNameMentioned",
   "delayHours",
   "newBerthTime",
+  // Bunker-offer fields. Cases written before bunker offers leave them out,
+  // which means null.
+  "fuelGrade",
+  "priceUsdPerT",
+  "qtyMinT",
+  "qtyMaxT",
+  "validUntil",
 ];
 
 interface EvalCase {
@@ -28,7 +46,7 @@ interface EvalCase {
   fromAddr: string;
   subject: string;
   body: string;
-  expected: Pick<PortEventExtraction, ExtractionField>;
+  expected: Partial<Pick<PortEventExtraction, ExtractionField>>;
 }
 
 function loadCases(): EvalCase[] {
@@ -47,14 +65,7 @@ async function main() {
   const cases = loadCases();
   const provider = getLlmProvider();
 
-  const fieldCorrect: Record<ExtractionField, number> = {
-    eventType: 0,
-    portName: 0,
-    portUnlocode: 0,
-    vesselNameMentioned: 0,
-    delayHours: 0,
-    newBerthTime: 0,
-  };
+  const fieldCorrect = Object.fromEntries(FIELDS.map((f) => [f, 0])) as Record<ExtractionField, number>;
   let exactMatches = 0;
 
   const rows: string[] = [];
@@ -67,8 +78,8 @@ async function main() {
     const fieldResults: string[] = [];
 
     for (const field of FIELDS) {
-      const expectedValue = testCase.expected[field];
-      const actualValue = actual[field];
+      const expectedValue = testCase.expected[field] ?? null;
+      const actualValue = actual[field] ?? null;
       const match = expectedValue === actualValue;
       if (match) fieldCorrect[field] += 1;
       else allFieldsMatch = false;

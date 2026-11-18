@@ -1,12 +1,20 @@
 import { z } from "zod";
 
 export const portEventExtractionSchema = z.object({
-  eventType: z.enum(["BERTH_DELAY", "CONGESTION", "CLOSURE", "NONE"]),
+  eventType: z.enum(["BERTH_DELAY", "CONGESTION", "CLOSURE", "BUNKER_OFFER", "NONE"]),
   portName: z.string().nullable(),
   portUnlocode: z.string().nullable(),
   vesselNameMentioned: z.string().nullable(),
   delayHours: z.number().nullable(),
   newBerthTime: z.string().nullable(),
+  // Bunker-offer fields. Optional so providers and evals written before
+  // bunker offers existed still parse; parseExtraction fills them with null.
+  fuelGrade: z.string().nullable().optional(),
+  priceUsdPerT: z.number().nullable().optional(),
+  qtyMinT: z.number().nullable().optional(),
+  qtyMaxT: z.number().nullable().optional(),
+  validUntil: z.string().nullable().optional(),
+  supplier: z.string().nullable().optional(),
   confidence: z.number().min(0).max(1),
   sourceSpans: z.array(
     z.object({

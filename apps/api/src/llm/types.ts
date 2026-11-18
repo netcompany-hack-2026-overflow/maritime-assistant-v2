@@ -12,6 +12,23 @@ export interface RecommendationFacts {
   fuelSavedT: number;
   costSavedEur: number;
   co2SavedT: number;
+  /** Present for a bunker-detour recommendation; the speed fields then describe the catch-up speed. */
+  bunker?: BunkerFacts;
+}
+
+export interface BunkerFacts {
+  bunkerPortName: string;
+  fuelGrade: string | null;
+  priceUsdPerT: number;
+  qtyT: number;
+  detourNm: number;
+  extraHours: number;
+  extraFuelT: number;
+  priceSavingEur: number;
+  netEur: number;
+  stillMakesBerth: boolean;
+  offerValidAtArrival: boolean;
+  verdict: "WORTH_IT" | "NOT_WORTH_IT";
 }
 
 export interface CitableRow {

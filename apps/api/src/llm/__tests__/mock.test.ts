@@ -90,3 +90,37 @@ describe("mockAnswerQuestion", () => {
     expect(result.citations).toEqual([]);
   });
 });
+
+describe("mockExtractEmail: bunker offers", () => {
+  it("reads a bunker offer: supply port, grade, price, quantity range, validity", async () => {
+    const text = `Bunker offer - VLSFO at Algeciras - MV Aegean Star
+
+Dear Sirs,
+
+For MV Aegean Star bound for Rotterdam we are pleased to offer VLSFO delivered at Algeciras (ESALG) at USD 540/mt, 800-1,200 mt, by barge alongside. Offer valid until 2026-11-23 18:00 UTC.
+
+Best regards,
+Strait Bunkering Ltd`;
+    const r = await mockExtractEmail(text);
+    expect(r.eventType).toBe("BUNKER_OFFER");
+    expect(r.portName).toBe("Algeciras");
+    expect(r.portUnlocode).toBe("ESALG");
+    expect(r.vesselNameMentioned).toBe("MV Aegean Star");
+    expect(r.fuelGrade).toBe("VLSFO");
+    expect(r.priceUsdPerT).toBe(540);
+    expect(r.qtyMinT).toBe(800);
+    expect(r.qtyMaxT).toBe(1200);
+    expect(r.validUntil).toBe("2026-11-23T18:00:00.000Z");
+    expect(r.supplier).toBe("Strait Bunkering Ltd");
+    expect(r.newBerthTime).toBeNull();
+    for (const span of r.sourceSpans) expect(text).toContain(span.text);
+  });
+
+  it("a weekly price list is not an offer", async () => {
+    const r = await mockExtractEmail(`Weekly bunker market report
+
+Indicative VLSFO prices this week: Rotterdam USD 560/mt, Algeciras USD 575/mt, Singapore USD 590/mt. Market sentiment is stable.`);
+    expect(r.eventType).toBe("NONE");
+    expect(r.priceUsdPerT).toBeNull();
+  });
+});

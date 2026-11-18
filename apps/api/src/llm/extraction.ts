@@ -4,10 +4,17 @@ import { portEventExtractionSchema, type PortEventExtraction } from "@maritime/s
 export const EXTRACTION_SYSTEM_PROMPT =
   "You extract structured port-event data from maritime port-agent emails. " +
   "Reply with ONLY a JSON object (no markdown fences, no commentary) matching exactly this shape: " +
-  '{"eventType":"BERTH_DELAY"|"CONGESTION"|"CLOSURE"|"NONE","portName":string|null,' +
+  '{"eventType":"BERTH_DELAY"|"CONGESTION"|"CLOSURE"|"BUNKER_OFFER"|"NONE","portName":string|null,' +
   '"portUnlocode":string|null,"vesselNameMentioned":string|null,"delayHours":number|null,' +
-  '"newBerthTime":string|null,"confidence":number (0-1),' +
-  '"sourceSpans":[{"field":string,"text":string}]}. ' +
+  '"newBerthTime":string|null,"fuelGrade":string|null,"priceUsdPerT":number|null,' +
+  '"qtyMinT":number|null,"qtyMaxT":number|null,"validUntil":string|null,"supplier":string|null,' +
+  '"confidence":number (0-1),"sourceSpans":[{"field":string,"text":string}]}. ' +
+  "BUNKER_OFFER is a fuel supplier offering a specific fuel delivery at a named port: portName is the " +
+  "port where the fuel is supplied (not the ship's destination), fuelGrade e.g. VLSFO/MGO, " +
+  "priceUsdPerT the price in US dollars per metric ton, qtyMinT/qtyMaxT the offered quantity in " +
+  "metric tons (both equal for a single figure), validUntil when the offer expires (same format as " +
+  "newBerthTime), supplier the company offering. A price list, market report or newsletter with no " +
+  'specific offer is "NONE". For other event types leave the bunker fields null. ' +
   'portName is the plain port name only, e.g. "Rotterdam", never "Port of Rotterdam". ' +
   'newBerthTime is UTC in ISO 8601 ending in "Z", e.g. "2026-11-25T14:00:00.000Z"; ' +
   "treat times without a zone as UTC. " +
@@ -45,10 +52,37 @@ export function normalizeBerthTime(value: string | null): string | null {
 /** Validate a model's raw JSON and smooth over harmless formatting differences. */
 export function parseExtraction(raw: unknown): PortEventExtraction {
   const parsed = portEventExtractionSchema.parse(raw);
+  if (parsed.eventType === "NONE") {
+    // No event means nothing to act on; models sometimes still echo a ship or port.
+    return {
+      eventType: "NONE",
+      portName: null,
+      portUnlocode: null,
+      vesselNameMentioned: null,
+      delayHours: null,
+      newBerthTime: null,
+      fuelGrade: null,
+      priceUsdPerT: null,
+      qtyMinT: null,
+      qtyMaxT: null,
+      validUntil: null,
+      supplier: null,
+      confidence: parsed.confidence,
+      sourceSpans: [],
+    };
+  }
+  const bunker = parsed.eventType === "BUNKER_OFFER";
   return {
     ...parsed,
     portName: normalizePortName(parsed.portName),
     portUnlocode: parsed.portUnlocode ? parsed.portUnlocode.replace(/\s+/g, "").toUpperCase() : null,
     newBerthTime: normalizeBerthTime(parsed.newBerthTime),
+    // Offer fields only mean something on an offer; models sometimes echo prices elsewhere.
+    fuelGrade: bunker ? (parsed.fuelGrade?.trim().toUpperCase() || null) : null,
+    priceUsdPerT: bunker ? (parsed.priceUsdPerT ?? null) : null,
+    qtyMinT: bunker ? (parsed.qtyMinT ?? parsed.qtyMaxT ?? null) : null,
+    qtyMaxT: bunker ? (parsed.qtyMaxT ?? parsed.qtyMinT ?? null) : null,
+    validUntil: bunker ? normalizeBerthTime(parsed.validUntil ?? null) : null,
+    supplier: bunker ? (parsed.supplier?.trim() || null) : null,
   };
 }
