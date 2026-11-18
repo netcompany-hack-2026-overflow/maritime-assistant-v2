@@ -124,3 +124,34 @@ Indicative VLSFO prices this week: Rotterdam USD 560/mt, Algeciras USD 575/mt, S
     expect(r.priceUsdPerT).toBeNull();
   });
 });
+
+describe("mockAnswerQuestion: bunker offers", () => {
+  const offer = (id: string, portName: string, status: string, extra: Record<string, unknown> = {}) => ({
+    table: "recommendation",
+    id,
+    data: { actionType: "BUNKER_DETOUR", portName, vesselName: "MV Aegean Star", status, costSavedEur: -59587, ...extra },
+  });
+
+  it("explains why an offer was flagged and what happened to it, citing only that offer", async () => {
+    const rows = [
+      offer("r1", "Algeciras", "PENDING", { costSavedEur: 109524, verdict: "WORTH_IT", notWorthItBecause: null }),
+      offer("r2", "Genoa", "REJECTED", {
+        rejectReason: "Too far",
+        verdict: "NOT_WORTH_IT",
+        notWorthItBecause: "the detour costs €60k more than the cheaper fuel saves",
+      }),
+    ];
+    const a = await mockAnswerQuestion("Why didn't we take the Genoa offer?", rows);
+    expect(a.answer).toContain("Genoa offer for MV Aegean Star was declined (reason: Too far)");
+    expect(a.answer).toContain("flagged not worth it: the detour costs €60k more");
+    expect(a.citations).toEqual([{ table: "recommendation", id: "r2" }]);
+  });
+
+  it("says when an offer is still waiting for a decision", async () => {
+    const a = await mockAnswerQuestion("Why didn't we take the Algeciras offer?", [
+      offer("r1", "Algeciras", "PENDING", { costSavedEur: 109524, verdict: "WORTH_IT" }),
+    ]);
+    expect(a.answer).toContain("is waiting for a decision (net €109,524)");
+    expect(a.answer).not.toContain("not worth it");
+  });
+});

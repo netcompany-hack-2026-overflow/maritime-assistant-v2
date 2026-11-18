@@ -74,7 +74,7 @@ export function Actions() {
       ) : visible.length === 0 ? (
         <div className="empty-state">
           {tab === "pending"
-            ? "No pending recommendations. Process a delay notice or fuel offer in the Inbox to generate one."
+            ? "No pending recommendations. Process a delay email in the Inbox to generate one."
             : "No decided recommendations yet."}
         </div>
       ) : (

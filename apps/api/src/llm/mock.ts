@@ -338,9 +338,13 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     if (picked.length > 0) {
       const lines = picked.map((r) => {
         const where = `${r.data.portName} offer for ${r.data.vesselName}`;
-        if (r.data.status === "REJECTED") return `The ${where} was declined. ${r.data.rejectReason ?? ""}`.trim();
-        if (r.data.status === "APPROVED") return `The ${where} was approved (net €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}).`;
-        return `The ${where} is waiting for a decision (net €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}).`;
+        const net = `net €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}`;
+        const flagged = r.data.verdict === "NOT_WORTH_IT" ? ` It was flagged not worth it: ${r.data.notWorthItBecause}.` : "";
+        if (r.data.status === "REJECTED") {
+          return `The ${where} was declined${r.data.rejectReason ? ` (reason: ${r.data.rejectReason})` : ""}.${flagged}`;
+        }
+        if (r.data.status === "APPROVED") return `The ${where} was approved (${net}).${flagged}`;
+        return `The ${where} is waiting for a decision (${net}).${flagged}`;
       });
       return { answer: lines.join(" "), citations: picked.map((r) => ({ table: r.table, id: r.id })) };
     }

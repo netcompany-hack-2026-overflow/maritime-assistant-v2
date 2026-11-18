@@ -1,9 +1,6 @@
 import type {
-  BunkerCalc,
-  JitCalc,
   PortDTO,
   PortEventType,
-  RecommendationActionType,
   RecommendationStatus,
   SeaRouteDTO,
   SettingsDTO,
@@ -86,12 +83,6 @@ export interface PortEventRecord {
   eventType: PortEventType;
   delayHours: number | null;
   newBerthTime: string | null;
-  fuelGrade?: string | null;
-  priceUsdPerT?: number | null;
-  qtyMinT?: number | null;
-  qtyMaxT?: number | null;
-  validUntil?: string | null;
-  supplier?: string | null;
   rawExtraction: unknown;
   sourceSpans: SourceSpan[];
   confidence: number;
@@ -105,13 +96,13 @@ export interface RecommendationRecord {
   id: string;
   voyageId: string;
   portEventId: string;
-  actionType: RecommendationActionType;
+  actionType: "ADJUST_SPEED" | "BUNKER_DETOUR";
   currentSpeedKn: number;
   recommendedSpeedKn: number;
   fuelSavedT: number;
   costSavedEur: number;
   co2SavedT: number;
-  calc: JitCalc | BunkerCalc;
+  calc: Record<string, number | boolean>;
   rationale: string;
   status: RecommendationStatus;
   rejectReason: string | null;
@@ -177,7 +168,7 @@ export const api = {
       `/ports/route?from=${encodeURIComponent(fromUnlocode)}&to=${encodeURIComponent(toUnlocode)}`
     ),
   getSettings: () => request<SettingsDTO>("/settings"),
-  updateSettings: (input: { fuelPriceEurPerT?: number; usdEurRate?: number }) =>
+  updateSettings: (input: { fuelPriceEurPerT: number }) =>
     request<{ settings: SettingsDTO; repricedRecommendations: number }>("/settings", {
       method: "PUT",
       body: JSON.stringify(input),

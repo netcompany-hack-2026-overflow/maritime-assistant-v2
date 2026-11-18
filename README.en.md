@@ -58,11 +58,12 @@ below design speed, and the offer is still valid when the ship gets there. With 
 seeded demo, Algeciras (≈10 nm off the route) comes out **worth it, net ≈ +€110k**
 once the berth delay has given the ship slack. Genoa (≈580 nm off the route) is
 **not worth it**: the detour burns more than the cheaper fuel saves, and the ship
-would miss its berth. Not-worth-it offers are recorded as declined automatically, with
-the reason, so you can later ask *"why didn't we take the Genoa offer?"*. The
+would miss its berth. Every offer waits on Actions for a person to decide; not-worth-it
+ones are marked in red with the reason, and you can ask *"why didn't we take the Genoa
+offer?"*. The
 calculation is a pure, unit-tested function
 ([packages/shared/src/bunker.ts](packages/shared/src/bunker.ts)) and every step is
-shown under "Show the math".
+stored with the recommendation (its `calc` field) for the UI to show.
 
 ## The 90-second demo path
 
@@ -72,16 +73,14 @@ shown under "Show the math".
 2. **Inbox** — click "Simulate incoming email" to release the queued Rotterdam
    berth-delay notice. It gets extracted into a structured port event (highlighted
    directly in the email body) and matched to MV Aegean Star's voyage.
-3. **Actions** — a recommendation is waiting, led by one plain sentence: *"Slow MV
-   Aegean Star from 14.0 to 12.0 kn. Arrives right when the Rotterdam berth opens…
-   Saves €34k."* The exact figures move a little with that day's mock weather. Expand
-   "Show the math" for a Plan A vs Plan B table and every step, then **Approve**.
+3. **Actions** — a recommendation is waiting: slow from 14.0 kn to about 12 kn and save
+   about 57 t of fuel (~€34k). The exact figures move a little with that day's mock
+   weather. Expand "Show the math" to see every step, then **Approve**.
 4. **Fleet** — MV Aegean Star is now visibly slower on the globe, and its ETA has
    moved to match the new berth time exactly.
-5. **Bunker offers** — back in Inbox, simulate the next two emails. The Algeciras offer
-   shows **Read → Matched → Recommendation: worth it, net ≈ +€110k**. The Genoa offer
-   shows **not worth it**. On Actions, the Algeciras card waits for approval, and the
-   Genoa card sits in History, declined with its reason.
+5. **Bunker offers** — back in Inbox, simulate and process the next two emails. On
+   Actions, both wait for a decision: Algeciras is marked worth it (net ≈ +€110k),
+   Genoa is marked in red as not worth it, with the reason. Reject Genoa.
 6. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
    from approved recommendations?" and get an answer with a citation back to the
    recommendation record.
@@ -365,8 +364,8 @@ Full per-field, per-email results are written to
   raises the speed through the water needed to arrive on time; rougher seas raise fuel
   burn for both plans. Both values appear in "Show the math". A real deployment would
   call a marine-weather API instead.
-- Bunker offers: prices are in USD/t and converted with the USD→EUR rate on
-  **Settings** (default 0.92; changing it re-prices pending offers). A bunker call is
+- Bunker offers: prices are in USD/t and converted with a USD→EUR rate (default 0.92,
+  set with `PUT /api/settings`; changing it re-prices pending offers). A bunker call is
   assumed to take 8 h alongside and cost €5,000 in port and agency fees. An offer with
   no quantity is assumed to be 800 t. The detour is measured as a straight line out to
   the port and back from the closest point on the ship's remaining route whose line to

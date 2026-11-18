@@ -236,3 +236,25 @@ export function calculateBunker(input: BunkerInput): BunkerCalc {
 export function repriceBunker(calc: BunkerCalc, refPriceEurPerT: number, usdEurRate: number): BunkerCalc {
   return { ...calc, ...priceSide(calc, refPriceEurPerT, usdEurRate) };
 }
+
+/** ["a", "b", "c"] -> "a, b and c" */
+function joinAnd(parts: string[]): string {
+  return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * Why an offer isn't worth it, in plain words (null when it is), e.g.
+ * "the ship would miss the Rotterdam berth by 9 h even at full speed".
+ * Computed from the calc, so it stays right after re-pricing.
+ */
+export function bunkerVerdictReason(calc: BunkerCalc, destPortName: string): string | null {
+  if (calc.verdict === "WORTH_IT") return null;
+  const eurK = `€${Math.round(Math.abs(calc.netEur) / 1000).toLocaleString("en-US")}k`;
+  const parts: string[] = [];
+  if (calc.reasons.includes("NEGATIVE_NET")) parts.push(`the detour costs ${eurK} more than the cheaper fuel saves`);
+  if (calc.reasons.includes("LATE")) {
+    parts.push(`the ship would miss the ${destPortName} berth by ${calc.lateHours.toFixed(0)} h even at full speed`);
+  }
+  if (calc.reasons.includes("EXPIRED")) parts.push("the offer expires before the ship gets there");
+  return joinAnd(parts);
+}

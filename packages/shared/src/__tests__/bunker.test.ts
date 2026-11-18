@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { calculateBunker, nearestPointOnRoute, repriceBunker, routeAhead, type BunkerInput } from "../bunker.js";
+import {
+  bunkerVerdictReason,
+  calculateBunker,
+  nearestPointOnRoute,
+  repriceBunker,
+  routeAhead,
+  type BunkerInput,
+} from "../bunker.js";
 import { haversineNm } from "../geo.js";
 
 const now = new Date("2026-11-20T00:00:00Z");
@@ -135,5 +142,17 @@ describe("route geometry", () => {
     expect(n.point.lon).toBeGreaterThanOrEqual(-3);
     expect(n.offRouteNm).toBeGreaterThan(40);
     expect(nearestPointOnRoute(route, p, () => true)).toBeNull();
+  });
+});
+
+describe("bunkerVerdictReason", () => {
+  it("is null when worth it and names every reason otherwise", () => {
+    expect(bunkerVerdictReason(calculateBunker(baseInput()), "Rotterdam")).toBeNull();
+    const late = calculateBunker(baseInput({ speedKn: 14, deadline: hours(1700 / 14) }));
+    expect(bunkerVerdictReason(late, "Rotterdam")).toMatch(/^the ship would miss the Rotterdam berth by \d+ h/);
+    const far = calculateBunker(
+      baseInput({ offRouteNm: 480, deadline: hours(10), offer: { priceUsdPerT: 565, qtyMinT: null, qtyMaxT: 500, validUntil: hours(5) } })
+    );
+    expect(bunkerVerdictReason(far, "Rotterdam")).toMatch(/costs €\d+k more.*, the ship would miss.* and the offer expires/);
   });
 });

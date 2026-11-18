@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { calculateBunker, calculateJit, nearestPointOnRoute, type BunkerCalc } from "@maritime/shared";
+import { calculateBunker, calculateJit, nearestPointOnRoute } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import { getSettings } from "../lib/settings.js";
 import { getLlmProvider } from "../llm/index.js";
@@ -12,26 +12,6 @@ type PortRow = { id: string; name: string; lat: number; lon: number };
 
 /** Offers further off a ship's remaining route than this aren't matched to it. */
 const BUNKER_MATCH_MAX_OFF_ROUTE_NM = 500;
-
-const eurK = (v: number) => `€${Math.round(Math.abs(v) / 1000).toLocaleString("en-US")}k`;
-
-/** Plain-English reason a bunker offer was turned down, e.g. for the Ask page. */
-export function bunkerRejectReason(calc: BunkerCalc, destPortName: string): string {
-  const parts: string[] = [];
-  if (calc.reasons.includes("NEGATIVE_NET")) {
-    parts.push(`the detour costs ${eurK(calc.netEur)} more than the cheaper fuel saves`);
-  }
-  if (calc.reasons.includes("LATE")) {
-    parts.push(`the ship would miss the ${destPortName} berth by ${calc.lateHours.toFixed(0)} h even at full speed`);
-  }
-  if (calc.reasons.includes("EXPIRED")) parts.push("the offer expires before the ship gets there");
-  return `Not worth it: ${joinAnd(parts)}.`;
-}
-
-/** ["a", "b", "c"] -> "a, b and c" */
-export function joinAnd(parts: string[]): string {
-  return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-}
 
 /**
  * Pick the voyage a bunker offer is for: the ship it names, otherwise the
@@ -139,41 +119,22 @@ async function createBunkerRecommendation(
     },
   });
 
-  const worthIt = calc.verdict === "WORTH_IT";
-  const rejectReason = worthIt ? null : bunkerRejectReason(calc, voyage.destPort.name);
-
-  return prisma.$transaction(async (tx) => {
-    const rec = await tx.recommendation.create({
-      data: {
-        voyageId: voyage.id,
-        portEventId: portEvent.id,
-        actionType: "BUNKER_DETOUR",
-        currentSpeedKn: voyage.speedKn,
-        recommendedSpeedKn: calc.speedBunkerKn,
-        // Negative: the detour burns extra fuel. The € figure is the net result.
-        fuelSavedT: -calc.extraFuelT,
-        costSavedEur: calc.netEur,
-        co2SavedT: -calc.extraCo2T,
-        calc: calc as unknown as Prisma.InputJsonValue,
-        rationale,
-        // Not-worth-it offers are recorded, already declined, so "why didn't we
-        // take it?" has an answer. They never wait for a human.
-        status: worthIt ? "PENDING" : "REJECTED",
-        rejectReason,
-        decidedAt: worthIt ? null : now,
-      },
-    });
-    if (!worthIt) {
-      await tx.auditLog.create({
-        data: {
-          entity: "recommendation",
-          entityId: rec.id,
-          action: "AUTO_REJECTED",
-          payload: { reasons: calc.reasons, netEur: calc.netEur, reason: rejectReason },
-        },
-      });
-    }
-    return rec;
+  // Every offer waits for a human, worth it or not; the card says which, and why.
+  return prisma.recommendation.create({
+    data: {
+      voyageId: voyage.id,
+      portEventId: portEvent.id,
+      actionType: "BUNKER_DETOUR",
+      currentSpeedKn: voyage.speedKn,
+      recommendedSpeedKn: calc.speedBunkerKn,
+      // Negative: the detour burns extra fuel. The € figure is the net result.
+      fuelSavedT: -calc.extraFuelT,
+      costSavedEur: calc.netEur,
+      co2SavedT: -calc.extraCo2T,
+      calc: calc as unknown as Prisma.InputJsonValue,
+      rationale,
+      status: "PENDING",
+    },
   });
 }
 

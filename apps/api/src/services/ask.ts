@@ -1,4 +1,4 @@
-import type { Answer } from "@maritime/shared";
+import { bunkerVerdictReason, type Answer, type BunkerCalc } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import type { CitableRow } from "../llm/types.js";
 
@@ -16,7 +16,7 @@ export async function buildCitableRows(): Promise<CitableRow[]> {
     prisma.portEvent.findMany({ include: { port: true, voyage: { include: { vessel: true } } } }),
     prisma.recommendation.findMany({
       include: {
-        voyage: { include: { vessel: true } },
+        voyage: { include: { vessel: true, destPort: true } },
         portEvent: { include: { port: true } },
       },
     }),
@@ -81,6 +81,7 @@ export async function buildCitableRows(): Promise<CitableRow[]> {
   }
 
   for (const rec of recommendations) {
+    const bunker = rec.actionType === "BUNKER_DETOUR" ? (rec.calc as unknown as BunkerCalc) : null;
     rows.push({
       table: "recommendation",
       id: rec.id,
@@ -88,6 +89,12 @@ export async function buildCitableRows(): Promise<CitableRow[]> {
         actionType: rec.actionType,
         status: rec.status,
         rejectReason: rec.rejectReason,
+        ...(bunker
+          ? {
+              verdict: bunker.verdict,
+              notWorthItBecause: bunkerVerdictReason(bunker, rec.voyage.destPort.name),
+            }
+          : {}),
         currentSpeedKn: rec.currentSpeedKn,
         recommendedSpeedKn: rec.recommendedSpeedKn,
         fuelSavedT: rec.fuelSavedT,
