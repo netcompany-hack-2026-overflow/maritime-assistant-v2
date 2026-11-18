@@ -33,6 +33,14 @@ enum RecommendationStatus {
   REJECTED
 }
 
+enum CiiRating {
+  A
+  B
+  C
+  D
+  E
+}
+
 model Port {
   id            String      @id @default(cuid())
   unlocode      String      @unique
@@ -77,6 +85,8 @@ model Voyage {
   /// Length of routeCoords in nautical miles.
   routeNm          Float?
   status           VoyageStatus @default(UNDERWAY)
+  ciiAttained      Float?    
+  ciiRating        CiiRating?
   createdAt        DateTime     @default(now())
 
   portEvents      PortEvent[] @relation("VoyagePortEvents")
