@@ -30,6 +30,8 @@ export function Actions() {
   }, []);
 
   const pending = recommendations.filter((r) => r.status === "PENDING");
+  const openPerVoyage = new Map<string, number>();
+  for (const r of pending) openPerVoyage.set(r.voyageId, (openPerVoyage.get(r.voyageId) ?? 0) + 1);
   const history = recommendations
     .filter((r) => r.status !== "PENDING")
     .sort((a, b) => (a.id === focusId ? -1 : b.id === focusId ? 1 : 0));
@@ -100,6 +102,7 @@ export function Actions() {
             onRefresh={handleRefresh}
             onReject={handleReject}
             onUndo={handleUndo}
+            alternatives={rec.status === "PENDING" ? (openPerVoyage.get(rec.voyageId) ?? 1) - 1 : 0}
           />
         ))
       )}

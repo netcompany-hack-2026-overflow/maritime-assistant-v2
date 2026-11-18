@@ -79,8 +79,8 @@ vi.mock("../../llm/index.js", async () => {
 
 const { processEmail } = await import("../emailProcessing.js");
 
-const PIRAEUS = { lat: 37.9475, lon: 23.6367 };
-const ROTTERDAM = { id: "pRTM", unlocode: "NLRTM", name: "Rotterdam", lat: 51.9496, lon: 4.1453 };
+const PIRAEUS = { lat: 37.9475, lon: 23.6367, country: "Greece" };
+const ROTTERDAM = { id: "pRTM", unlocode: "NLRTM", name: "Rotterdam", lat: 51.9496, lon: 4.1453, country: "Netherlands" };
 const ALGECIRAS = { id: "pALG", unlocode: "ESALG", name: "Algeciras", lat: 36.1246, lon: -5.4418 };
 const GENOA = { id: "pGOA", unlocode: "ITGOA", name: "Genoa", lat: 44.4056, lon: 8.9463 };
 const route = routeBetweenPorts(PIRAEUS, ROTTERDAM);

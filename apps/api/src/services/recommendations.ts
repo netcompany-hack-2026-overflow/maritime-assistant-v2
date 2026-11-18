@@ -6,6 +6,7 @@ import { env } from "../lib/env.js";
 import { parseScenarioSet, recommendationFields } from "./scenarioFields.js";
 import { draftNoticeForApproval } from "./notices.js";
 import { calculateVoyageCII } from "./cii.js";
+import { closeAlternatives, closedByApproval, describeOption, openAlternatives, reopenAlternatives } from "./alternatives.js";
 
 class HttpError extends Error {
   status: number;
@@ -16,7 +17,10 @@ class HttpError extends Error {
 }
 
 export async function approveRecommendation(id: string, scenarioId?: ScenarioId) {
-  const recommendation = await prisma.recommendation.findUnique({ where: { id } });
+  const recommendation = await prisma.recommendation.findUnique({
+    where: { id },
+    include: { portEvent: { include: { port: true } } },
+  });
   if (!recommendation) throw new HttpError(404, "Recommendation not found");
   if (recommendation.status !== "PENDING") {
     throw new HttpError(409, `Recommendation is already ${recommendation.status.toLowerCase()}`);
@@ -31,18 +35,28 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
     throw new HttpError(409, "Voyage is no longer underway");
   }
 
+  // The ship's other open options are alternatives to this one: approving it closes them.
+  const alternatives = await openAlternatives(recommendation);
+  const chosenLabel = describeOption(recommendation);
+
   // v1: approving a bunker call records the decision (for the agent to book);
   // the ship's plan on the globe is not re-routed through the bunker port.
   if (recommendation.actionType === "BUNKER_DETOUR") {
     const now = new Date();
     await prisma.$transaction([
       prisma.recommendation.update({ where: { id }, data: { status: "APPROVED", decidedAt: now } }),
+      ...closeAlternatives(alternatives, chosenLabel, now),
       prisma.auditLog.create({
         data: {
           entity: "recommendation",
           entityId: id,
           action: "APPROVED",
-          payload: { voyageId: voyage.id, actionType: "BUNKER_DETOUR", netEur: recommendation.costSavedEur },
+          payload: {
+            voyageId: voyage.id,
+            actionType: "BUNKER_DETOUR",
+            netEur: recommendation.costSavedEur,
+            closedAlternatives: alternatives,
+          },
         },
       }),
     ]);
@@ -125,6 +139,7 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
       where: { id },
       data: { status: "APPROVED", decidedAt: now, chosenScenario: chosenId, ...fields },
     }),
+    ...closeAlternatives(alternatives, chosenLabel, now),
     prisma.auditLog.create({
       data: {
         entity: "recommendation",
@@ -141,6 +156,7 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
           berthTime: portEvent.newBerthTime.toISOString(),
           newCiiAttained: newCii.attained,
           newCiiRating: newCii.rating,
+          closedAlternatives: alternatives,
           ...(reroute
             ? {
                 previousRouteCoords: voyage.routeCoords as Prisma.InputJsonValue,
@@ -184,9 +200,13 @@ export async function undoApproval(id: string) {
     throw new HttpError(409, "Only approved recommendations can be undone");
   }
 
+  // The options this approval closed become open again.
+  const reopened = await closedByApproval(id);
+
   if (recommendation.actionType === "BUNKER_DETOUR") {
     const [updatedRecommendation] = await prisma.$transaction([
       prisma.recommendation.update({ where: { id }, data: { status: "PENDING", decidedAt: null, chosenOption: null } }),
+      ...reopenAlternatives(reopened),
       prisma.auditLog.create({
         data: { entity: "recommendation", entityId: id, action: "APPROVAL_UNDONE", payload: { actionType: "BUNKER_DETOUR" } },
       }),
@@ -294,6 +314,7 @@ export async function undoApproval(id: string) {
       where: { recommendationId: id, status: "DRAFT" },
       data: { status: "WITHDRAWN" },
     }),
+    ...reopenAlternatives(reopened),
     prisma.auditLog.create({
       data: {
         entity: "recommendation",

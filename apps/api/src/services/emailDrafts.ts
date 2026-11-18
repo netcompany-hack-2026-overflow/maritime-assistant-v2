@@ -3,6 +3,7 @@ import type { BunkerPlan } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import { sendMail } from "./mailer.js";
 import { draftToDTO } from "./bunkerOffers.js";
+import { NOT_TAKEN_PREFIX, closeAlternatives, describeOption, openAlternatives } from "./alternatives.js";
 
 class HttpError extends Error {
   status: number;
@@ -37,12 +38,19 @@ export async function updateDraft(id: string, edit: DraftEdit) {
 export async function sendDraft(id: string) {
   const draft = await prisma.emailDraft.findUnique({
     where: { id },
-    include: { recommendation: { include: { voyage: true } } },
+    include: { recommendation: { include: { voyage: true, portEvent: { include: { port: true } } } } },
   });
   if (!draft) throw new HttpError(404, "Draft not found");
   if (draft.status === "SENT") throw new HttpError(409, "This email was already sent");
-  if (draft.status === "SUPERSEDED") throw new HttpError(409, "Another reply to this offer was already sent");
   const rec = draft.recommendation;
+  if (draft.status === "SUPERSEDED") {
+    throw new HttpError(
+      409,
+      rec.rejectReason?.startsWith(NOT_TAKEN_PREFIX)
+        ? `This offer is closed (${rec.rejectReason}). Undo that approval to accept it instead.`
+        : "Another reply to this offer was already sent"
+    );
+  }
   if (draft.kind === "ACCEPT" && rec.status === "PENDING" && rec.voyage.status !== "UNDERWAY") {
     throw new HttpError(409, "The voyage is no longer underway, so the offer can't be accepted");
   }
@@ -70,6 +78,26 @@ export async function sendDraft(id: string) {
   if (rec.status === "PENDING" && draft.kind === "ACCEPT") {
     const plan = rec.bunkerPlan as unknown as BunkerPlan | null;
     const option = plan?.options.find((o) => o.key === draft.optionKey);
+    // Accepting this offer is the ship's decision: its other open options close.
+    const alternatives = await openAlternatives(rec);
+    ops.push(...closeAlternatives(alternatives, describeOption(rec), now));
+    ops.push(
+      prisma.auditLog.create({
+        data: {
+          entity: "recommendation",
+          entityId: rec.id,
+          action: "APPROVED",
+          payload: {
+            voyageId: rec.voyageId,
+            actionType: "BUNKER_DETOUR",
+            via: "acceptance email",
+            option: draft.optionKey,
+            netEur: option?.calc.netEur ?? rec.costSavedEur,
+            closedAlternatives: alternatives,
+          },
+        },
+      })
+    );
     ops.push(
       prisma.recommendation.update({
         where: { id: rec.id },

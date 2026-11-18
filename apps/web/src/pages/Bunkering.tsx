@@ -133,15 +133,19 @@ export function Bunkering() {
   const [stemQty, setStemQty] = useState<number | null>(null);
   const [urgency, setUrgency] = useState<Urgency>(DEFAULT_TCO.urgency);
   const [etsEnabled, setEtsEnabled] = useState(DEFAULT_TCO.etsEnabled);
-  const [etsPrice, setEtsPrice] = useState(DEFAULT_TCO.etsPriceEurPerT);
+  // null = the EUA price from Settings (the one the speed scenarios use too).
+  const [etsPriceOverride, setEtsPrice] = useState<number | null>(null);
+  const [settingsEua, setSettingsEua] = useState<number | null>(null);
+  const etsPrice = etsPriceOverride ?? settingsEua ?? DEFAULT_TCO.etsPriceEurPerT;
   const [ai, setAi] = useState<{ text: string; busy: boolean; error: string | null }>({ text: "", busy: false, error: null });
   const now = useNow();
 
   const refresh = () =>
-    Promise.all([api.getBunkerOffers(), api.getMeta()])
-      .then(([list, m]) => {
+    Promise.all([api.getBunkerOffers(), api.getMeta(), api.getSettings()])
+      .then(([list, m, s]) => {
         setOffers(list);
         setMeta(m);
+        setSettingsEua(s.euaPriceEurPerT);
         setError(null);
       })
       .catch((e) => setError((e as Error).message));
@@ -165,8 +169,9 @@ export function Bunkering() {
 
   const voyage = voyages.find((v) => v.id === voyageId) ?? null;
   const voyageOffers = useMemo(() => offers.filter((o) => o.voyage.id === voyageId), [offers, voyageId]);
-  const open = useMemo(() => voyageOffers.filter((o) => o.status !== "REJECTED"), [voyageOffers]);
-  const declined = voyageOffers.filter((o) => o.status === "REJECTED");
+  // Every offer stays in the comparison, decided or not, so the choice can be explained.
+  const open = voyageOffers;
+  const accepted = voyageOffers.find((o) => o.status === "APPROVED") ?? null;
   const defaultStem = open.find((o) => o.plan)?.plan?.input.stemQtyT ?? 800;
 
   const assumptions: TcoAssumptions = {
@@ -331,7 +336,7 @@ export function Bunkering() {
               )}
               <button
                 className="btn whatif__reset"
-                onClick={() => { setCharter(null); setStemQty(null); setUrgency(DEFAULT_TCO.urgency); setEtsEnabled(false); setEtsPrice(DEFAULT_TCO.etsPriceEurPerT); }}
+                onClick={() => { setCharter(null); setStemQty(null); setUrgency(DEFAULT_TCO.urgency); setEtsEnabled(DEFAULT_TCO.etsEnabled); setEtsPrice(null); }}
               >
                 Reset
               </button>
@@ -419,10 +424,12 @@ export function Bunkering() {
                         const o = byId.get(r.offer.id)!;
                         return (
                           <td key={r.offer.id}>
-                            {!r.screen.passed
+                            {o.status === "APPROVED"
+                              ? "Accepted"
+                              : o.status === "REJECTED"
+                                ? o.rejectReason?.startsWith("Not taken") ? "Not taken (another option chosen)" : "Declined"
+                                : !r.screen.passed
                               ? `Not analysed: needs ${r.screen.neededHours.toFixed(1)} h, has ${Math.max(0, r.screen.slackHours).toFixed(1)} h`
-                              : o.status === "APPROVED"
-                                ? "Accepted"
                                 : r.feasible
                                   ? "Fits the schedule"
                                   : "Misses berth or expiry"}
@@ -434,8 +441,12 @@ export function Bunkering() {
                   </tbody>
                 </table>
               </div>
-              {declined.length > 0 && (
-                <p className="muted compare__declined">Declined: {declined.map((o) => `${o.supplier.name} (${o.port.name})`).join(", ")}.</p>
+              {accepted && (
+                <p className="bunkering-notice">
+                  {accepted.supplier.name} ({accepted.port.name}) was accepted. One decision per ship: the other options for{" "}
+                  {accepted.voyage.vesselName} are closed, but you can still send them a polite decline. Undo the approval on
+                  Actions to choose again.
+                </p>
               )}
             </section>
           )}
@@ -484,7 +495,12 @@ export function Bunkering() {
               )}
 
               <p className="label offer-detail__drafts-label">Replies to {selected.email.fromAddr}</p>
-              <EmailDraftEditor drafts={selected.drafts} provider={provider} onChanged={refresh} />
+              <EmailDraftEditor
+                drafts={selected.drafts}
+                provider={provider}
+                onChanged={refresh}
+                closedBecause={selected.rejectReason?.startsWith("Not taken") ? selected.rejectReason : null}
+              />
             </section>
           )}
         </>

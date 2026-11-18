@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, Mail, Send } from "lucide-react";
 import { api, type OutboundEmail } from "../lib/api.js";
+import { useEmailProvider } from "../lib/emailProvider.js";
 import "./NoticePanel.css";
 
 interface Props {
@@ -19,13 +20,15 @@ function mailtoHref(n: Pick<OutboundEmail, "toAddrs" | "ccAddrs" | "subject" | "
 
 /**
  * The notice to charterers and agent drafted on approval (step 4). The
- * operator reviews it, sends it from their own mail client, then marks it sent.
+ * operator reviews it, then sends it through the email provider in .env, or
+ * from their own mail client and marks it sent.
  */
 export function NoticePanel({ notice, onChange }: Props) {
   const [draft, setDraft] = useState(notice);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const provider = useEmailProvider();
   const editable = notice.status === "DRAFT";
   const dirty =
     draft.toAddrs !== notice.toAddrs ||
@@ -79,7 +82,7 @@ export function NoticePanel({ notice, onChange }: Props) {
           {notice.status === "DRAFT"
             ? "Draft — not sent"
             : notice.status === "SENT"
-              ? `Marked sent ${notice.sentAt ? new Date(notice.sentAt).toLocaleString() : ""}`
+              ? `Sent ${notice.sentAt ? new Date(notice.sentAt).toLocaleString() : ""}`
               : "Withdrawn (approval undone)"}
         </span>
       </div>
@@ -127,9 +130,26 @@ export function NoticePanel({ notice, onChange }: Props) {
           <a className="btn" href={mailtoHref(draft)}>
             <Mail size={14} aria-hidden="true" /> Open in mail app
           </a>
+          {editable && provider?.configured && (
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                const to = provider.redirectTo ? `${provider.redirectTo} (test redirect)` : draft.toAddrs;
+                if (window.confirm(`Send "${draft.subject}" to ${to}?`)) void run(() => api.sendOutboundEmail(notice.id));
+              }}
+              disabled={busy || dirty || !draft.toAddrs.trim()}
+              title={dirty ? "Save your edits first" : !draft.toAddrs.trim() ? "Add the charterers' address first" : undefined}
+            >
+              <Send size={14} aria-hidden="true" /> Send
+            </button>
+          )}
           {editable && (
-            <button className="btn btn-primary" onClick={() => run(() => api.markOutboundEmailSent(notice.id))} disabled={busy || dirty}>
-              <Send size={14} aria-hidden="true" /> Mark as sent
+            <button
+              className={provider?.configured ? "btn" : "btn btn-primary"}
+              onClick={() => run(() => api.markOutboundEmailSent(notice.id))}
+              disabled={busy || dirty}
+            >
+              <Check size={14} aria-hidden="true" /> Mark as sent
             </button>
           )}
         </div>

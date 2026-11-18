@@ -28,6 +28,7 @@ vi.mock("../../lib/prisma.js", () => {
       },
     },
     recommendation: {
+      findMany: async () => [],
       update: async ({ data }: { data: Record<string, unknown> }) => Object.assign(db.rec!, data),
     },
     auditLog: { create: async ({ data }: { data: Record<string, unknown> }) => db.audit.push(data) },
@@ -91,7 +92,8 @@ describe("sendDraft", () => {
       recommendedSpeedKn: keep.calc.speedBunkerKn,
       costSavedEur: keep.calc.netEur,
     });
-    expect(db.audit[0]).toMatchObject({ entity: "emailDraft", action: "SENT" });
+    // The approval is logged on the recommendation too, so "Undo approval" can reopen what it closed.
+    expect(db.audit.map((a) => `${a.entity}:${a.action}`)).toEqual(["recommendation:APPROVED", "emailDraft:SENT"]);
   });
 
   it("sending the decline rejects the offer", async () => {

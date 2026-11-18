@@ -297,6 +297,8 @@ export interface BunkerPlanInput {
   co2Factor: number;
   delays: BunkerDelaySource[];
   toleranceHours: number;
+  /** Share of the voyage's CO₂ under the EU ETS (1 / 0.5 / 0, see etsVoyageScope); missing = 1. */
+  etsScope?: number;
 }
 
 /** Everything the reply-email templates need, frozen when the offer is processed. */

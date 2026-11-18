@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import {
+  etsVoyageScope,
   formatUtc,
   nearestPointOnRoute,
   planBunkerOptions,
@@ -212,6 +213,7 @@ async function createBunkerRecommendation(
     co2Factor: settings.co2Factor,
     delays: await bunkerPortDelays(port, terms, etaAtCurrentSpeed, now),
     toleranceHours: settings.bunkerSlackToleranceMin / 60,
+    etsScope: etsVoyageScope(voyage.originPort.country, voyage.destPort.country),
   };
 
   // Cheap time check first; options (and the model call) only for offers that pass.

@@ -7,6 +7,8 @@ interface EmailDraftEditorProps {
   provider: EmailProviderStatus | null;
   /** Called after a save or a send so the page can reload the offer. */
   onChanged: () => Promise<void> | void;
+  /** Set when the offer was closed because another option for the ship was approved. */
+  closedBecause?: string | null;
 }
 
 function draftLabel(d: EmailDraftDTO): string {
@@ -19,7 +21,7 @@ function draftLabel(d: EmailDraftDTO): string {
  * The replies the agent wrote for one offer. Pick one, edit it if needed,
  * send it. Sending one closes the others.
  */
-export function EmailDraftEditor({ drafts, provider, onChanged }: EmailDraftEditorProps) {
+export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = null }: EmailDraftEditorProps) {
   const sent = drafts.find((d) => d.status === "SENT") ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = drafts.find((d) => d.id === selectedId) ?? sent ?? drafts[0] ?? null;
@@ -143,7 +145,11 @@ export function EmailDraftEditor({ drafts, provider, onChanged }: EmailDraftEdit
         {selected.status === "SENT" && selected.sentAt && (
           <p className="drafts__note">Sent {new Date(selected.sentAt).toLocaleString()}.</p>
         )}
-        {selected.status === "SUPERSEDED" && <p className="drafts__note">Not sent: another reply to this offer went out.</p>}
+        {selected.status === "SUPERSEDED" && (
+          <p className="drafts__note">
+            {closedBecause ? `Can't be sent: ${closedBecause}.` : "Not sent: another reply to this offer went out."}
+          </p>
+        )}
         {editable && !provider?.configured && (
           <p className="drafts__note drafts__note--warn">
             Sending needs the email provider. Fill in {provider?.missing.join(", ") || "SMTP_HOST, MAIL_FROM"} in <code>.env</code>{" "}

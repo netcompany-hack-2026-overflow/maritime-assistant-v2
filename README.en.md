@@ -93,7 +93,8 @@ When a fuel offer arrives, the agent:
          + extra fuel for detour & speed
          + delay risk (hours × charter rate × urgency 25/50/100%)
          + cost of credit (8%/yr vs 30 days) + supplier risk (0.3% per point below 10/10)
-         + EU ETS on the extra CO₂ (optional)
+         + EU ETS on the extra CO₂ (same model as the scenarios: Settings EUA price ×
+           the year's phase-in × EU/non-EU voyage scope; can be switched off in the UI)
    ```
    The sliders (charter rate, stem, urgency, ETS) re-run the same pure calculation in the
    browser instantly, no tokens. The plain-English recommendation is built from the
@@ -102,6 +103,13 @@ When a fuel offer arrives, the agent:
    work, a decline) from templates, so figures are exact and cost no tokens. You read,
    edit and send **one**: acceptance approves the offer with that option, decline rejects
    it, counter leaves it pending. The others close. Nothing is sent without pressing Send.
+
+**One decision per ship.** All of a ship's open recommendations (a speed change, each fuel
+offer) are alternatives. Approving one, on Actions or by sending an acceptance email, closes
+the others with the reason "Not taken: …". Their acceptances and counter-offers can no longer
+be sent, though a polite decline still can. "Undo approval" reopens them, except any that
+have had a reply since. A recommendation that arrives *after* the approval is a new decision
+([alternatives.ts](apps/api/src/services/alternatives.ts)).
 
 Code: [bunkerPlan.ts](packages/shared/src/bunkerPlan.ts) (time check, options, route),
 [bunkerTco.ts](packages/shared/src/bunkerTco.ts) (comparison, explanation),
@@ -122,8 +130,9 @@ The four demo emails are in [apps/api/prisma/mock_demo_data.json](apps/api/prism
    JIT-clause coverage and the CII rating (A–E). Weather is a real forecast (Open-Meteo waves
    and ocean currents). Pick a scenario and **Approve**.
 4. **Notice** — approval drafts the email to the charterers (To) and agent (Cc): new ETA,
-   the reason and the charter-party terms. Review it, send it from your own mail client
-   ("Open in mail app"), then "Mark as sent".
+   the reason and the charter-party terms. Review it, then "Send" it through the email
+   provider in `.env` (the same one as the supplier replies), or send it from your own mail
+   client ("Open in mail app") and "Mark as sent".
 5. **Fleet** — MV Aegean Star is now visibly slower (or on the new route if C was approved),
    and its ETA matches the new berth time exactly.
 6. **Bunker offers** — back in Inbox, simulate and process the next two emails. On
@@ -216,7 +225,7 @@ the time check).
 | 0–10 s | **Bunkering** → "Simulate supplier quotes" | "Four suppliers, four emails in trader shorthand, like every day." |
 | 10–20 s | The table: Rock Marine at **$526/t** is cheapest… and ranks **#4** | "Cheapest per tonne is dearest overall: $4,500 barging on top, barge 12 hours after arrival, reliability 5/10." |
 | 20–30 s | The recommendation: "Strait Bunkering is $5.00/t dearer on paper… but ≈$33k cheaper overall" | "Making up 12 hours means sailing faster: ≈$27k of extra fuel no quote shows." |
-| 30–40 s | Ceuta's countdown (**firm 10 mins**, amber) · sliders: charter $40k, urgency High, ETS on | "The ranking re-computes instantly, no model call." |
+| 30–40 s | Ceuta's countdown (**firm 10 mins**, amber) · sliders: charter $40k, urgency High, ETS on/off | "The ranking re-computes instantly, no model call." |
 | 40–50 s | Click the Strait Bunkering column → route sketch, ECO 12.5 kn vs 14 kn, times per waypoint | "It also planned the new route and the speed that arrives exactly at the berth." |
 | 50–60 s | "Accept · eco speed" → tweak the text → **Send** | "A person decides and sends. The model only reads; nobody makes the numbers up, and offers that don't fit the schedule are cut before we spend a token." |
 
@@ -560,8 +569,9 @@ Full per-field, per-email results are written to
 - Approving a bunker offer (or sending its acceptance) records the decision and the
   option; it does not yet re-route the ship through the bunker port on the globe or
   change its speed.
-- Bunker options are compared with slow steaming without bunkering, but approving both
-  recommendations on one voyage doesn't re-run them against the combined plan.
+- One decision per ship: approving closes the ship's other open options. A recommendation
+  that arrives later for the same voyage is worked out from the ship's current state, not on
+  top of an already approved bunker plan.
 - Offers come in through the Inbox (simulate, paste, PDF). A real mailbox (IMAP) isn't
   read yet; `.env` only configures sending.
 - The time check and options are worked out when the offer is processed; if the ship

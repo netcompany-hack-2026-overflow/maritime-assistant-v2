@@ -59,7 +59,9 @@ export class MailerError extends Error {
 }
 
 export interface OutgoingMail {
+  /** One address, or several separated by commas. */
   to: string;
+  cc?: string;
   subject: string;
   text: string;
 }
@@ -74,11 +76,14 @@ export async function sendMail(mail: OutgoingMail): Promise<{ messageId: string;
     );
   }
   const deliveredTo = mailEnv.redirectTo || mail.to;
-  const subject = mailEnv.redirectTo ? `[test, for ${mail.to}] ${mail.subject}` : mail.subject;
+  const original = mail.cc ? `${mail.to}, cc ${mail.cc}` : mail.to;
+  const subject = mailEnv.redirectTo ? `[test, for ${original}] ${mail.subject}` : mail.subject;
   try {
     const info = await transport().sendMail({
       from: { name: mailEnv.fromName, address: mailEnv.from },
       to: deliveredTo,
+      // In test mode nothing reaches the real recipients, Cc included.
+      cc: mailEnv.redirectTo ? undefined : mail.cc || undefined,
       bcc: mailEnv.bcc || undefined,
       replyTo: mailEnv.replyTo || undefined,
       subject,

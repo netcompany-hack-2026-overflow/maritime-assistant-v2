@@ -104,9 +104,14 @@ describe("assessOffer", () => {
     expect(assessOffer({ ...urgent, terms: terms({ paymentDays: 60 }) }, A).breakdown!.paymentTermsUsd).toBeLessThan(0);
   });
 
-  it("EU ETS only counts when switched on", () => {
-    expect(assessOffer(balanced, A).breakdown!.etsUsd).toBe(0);
-    expect(assessOffer(balanced, { ...A, etsEnabled: true }).breakdown!.etsUsd).toBeGreaterThan(0);
+  it("EU ETS only counts when switched on, with the voyage's scope and the year's phase-in", () => {
+    expect(assessOffer(balanced, { ...A, etsEnabled: false }).breakdown!.etsUsd).toBe(0);
+    const on = assessOffer(balanced, { ...A, etsEnabled: true, etsPriceEurPerT: 90 });
+    const extraCo2 = on.option!.calc.extraCo2T;
+    // 2026: 100% phase-in; Piraeus → Rotterdam is EU to EU, scope 1.
+    expect(on.breakdown!.etsUsd).toBeCloseTo((extraCo2 * 90) / 0.92, 6);
+    const halfScope = { ...balanced, planInput: { ...balanced.planInput, etsScope: 0.5 } };
+    expect(assessOffer(halfScope, { ...A, etsEnabled: true, etsPriceEurPerT: 90 }).breakdown!.etsUsd).toBeCloseTo((extraCo2 * 45) / 0.92, 6);
   });
 
   it("flags what it had to assume", () => {

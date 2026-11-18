@@ -13,6 +13,8 @@ vi.mock("../../lib/prisma.js", () => {
     recommendation: {
       findUnique: async () => db.rec,
       findFirst: async () => null,
+      findMany: async () => [],
+      updateMany: async () => ({ count: 0 }),
       update: async ({ data }: { data: object }) => Object.assign(db.rec!, data),
     },
     voyage: {

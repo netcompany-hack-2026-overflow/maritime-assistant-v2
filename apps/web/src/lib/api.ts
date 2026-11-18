@@ -276,6 +276,8 @@ export const api = {
     request<OutboundEmail>(`/outbound-emails/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   markOutboundEmailSent: (id: string) =>
     request<OutboundEmail>(`/outbound-emails/${id}/sent`, { method: "POST" }),
+  sendOutboundEmail: (id: string) =>
+    request<OutboundEmail>(`/outbound-emails/${id}/send`, { method: "POST" }),
   getCharterParty: async (voyageId: string): Promise<CharterPartyDTO | null> => {
     const res = await fetch(`/api/voyages/${voyageId}/charter-party`);
     if (res.status === 404) return null;

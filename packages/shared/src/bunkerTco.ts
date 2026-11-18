@@ -1,4 +1,5 @@
 import { planBunkerOptions, stemQty } from "./bunkerPlan.js";
+import { etsCostEur } from "./ets.js";
 import type { BargingType, BunkerOfferDTO, BunkerOption, BunkerPlanInput, BunkerScreen, OfferTerms } from "./types.js";
 
 /**
@@ -20,6 +21,7 @@ export interface TcoAssumptions {
   charterUsdPerDay: number;
   urgency: Urgency;
   etsEnabled: boolean;
+  /** EU Allowance price, €/t CO₂ (Settings → EUA price). */
   etsPriceEurPerT: number;
   /** Cost of money for comparing payment terms, % per year. */
   financeRatePct: number;
@@ -31,8 +33,9 @@ export interface TcoAssumptions {
 
 export const DEFAULT_TCO: Omit<TcoAssumptions, "stemQtyT" | "charterUsdPerDay"> = {
   urgency: "NORMAL",
-  etsEnabled: false,
-  etsPriceEurPerT: 75,
+  // Same EU ETS model as the speed scenarios: on by default, priced at the Settings EUA price.
+  etsEnabled: true,
+  etsPriceEurPerT: 90,
   financeRatePct: 8,
   standardPaymentDays: 30,
   reliabilityPctPerPoint: 0.3,
@@ -132,7 +135,13 @@ export function assessOffer(offer: TcoOffer, a: TcoAssumptions): TcoRow {
     delayRiskUsd: (c.delayHours ?? 0) * hourUsd * URGENCY_DELAY_WEIGHT[a.urgency] + c.lateHours * hourUsd,
     paymentTermsUsd: (invoiceUsd * (a.financeRatePct / 100) * (a.standardPaymentDays - days)) / 365,
     reliabilityUsd: fuelUsd * (a.reliabilityPctPerPoint / 100) * (10 - score),
-    etsUsd: a.etsEnabled ? c.extraCo2T * a.etsPriceEurPerT * usdPerEur : 0,
+    etsUsd: a.etsEnabled
+      ? etsCostEur(c.extraCo2T, {
+          euaPriceEurPerT: a.etsPriceEurPerT,
+          year: new Date(planInput.now).getUTCFullYear(),
+          voyageScope: planInput.etsScope ?? 1,
+        }) * usdPerEur
+      : 0,
   };
   const totalUsd = Object.values(breakdown).reduce((s, v) => s + v, 0);
   if (c.lateHours > 1e-6) flags.push(`reaches the berth ${Math.round(c.lateHours * 60)} min late (within the tolerance)`);
@@ -186,10 +195,12 @@ function drivers(win: TcoRow, other: TcoRow): string[] {
     if (gain > 250) out.push({ gain, text });
   };
   add(o.bargingUsd - w.bargingUsd, `${bargingWords(win.offer.terms, win.qtyT)} vs ${bargingWords(other.offer.terms, other.qtyT)} (${usd(o.bargingUsd - w.bargingUsd)})`);
-  const fuelAndDelay = o.extraFuelUsd - w.extraFuelUsd + (o.delayRiskUsd - w.delayRiskUsd);
+  // The ETS here is on the extra fuel itself, so it belongs to the same reason.
+  const etsGain = o.etsUsd - w.etsUsd;
+  const fuelAndDelay = o.extraFuelUsd - w.extraFuelUsd + (o.delayRiskUsd - w.delayRiskUsd) + etsGain;
   add(
     fuelAndDelay,
-    `${delayWords(win)} vs ${delayWords(other)}: ${usd(fuelAndDelay)} less in extra fuel to make up the time and delay risk`
+    `${delayWords(win)} vs ${delayWords(other)}: ${usd(fuelAndDelay)} less in extra fuel${Math.abs(etsGain) > 1 ? " (incl. EU ETS)" : ""} to make up the time and delay risk`
   );
   add(o.reliabilityUsd - w.reliabilityUsd, `reliability ${win.offer.reliabilityScore}/10 vs ${other.offer.reliabilityScore}/10 (${usd(o.reliabilityUsd - w.reliabilityUsd)} less supply risk)`);
   add(
@@ -197,7 +208,6 @@ function drivers(win: TcoRow, other: TcoRow): string[] {
     `${win.offer.terms.paymentDays ?? 30}-day vs ${other.offer.terms.paymentDays ?? 30}-day credit (${usd(o.paymentTermsUsd - w.paymentTermsUsd)})`
   );
   add(o.otherFeesUsd - w.otherFeesUsd, `${usd(o.otherFeesUsd - w.otherFeesUsd)} less in overtime/agency fees`);
-  add(o.etsUsd - w.etsUsd, `${usd(o.etsUsd - w.etsUsd)} less EU ETS on the detour's CO₂`);
   add(o.fuelUsd - w.fuelUsd, `${perT((o.fuelUsd - w.fuelUsd) / win.qtyT)} cheaper fuel`);
   return out.sort((x, y) => y.gain - x.gain).slice(0, 3).map((x) => x.text);
 }

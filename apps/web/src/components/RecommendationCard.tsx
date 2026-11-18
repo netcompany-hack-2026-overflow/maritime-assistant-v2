@@ -15,6 +15,8 @@ interface RecommendationCardProps {
   onRefresh: (id: string) => Promise<void>;
   onReject: (id: string, reason: string) => Promise<void>;
   onUndo: (id: string) => Promise<void>;
+  /** Other open options for the same ship; approving this one closes them. */
+  alternatives?: number;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -129,6 +131,7 @@ export function RecommendationCard({
   onRefresh,
   onReject,
   onUndo,
+  alternatives = 0,
 }: RecommendationCardProps) {
   const set = recommendation.scenarios;
   const [selected, setSelected] = useState<ScenarioId | null>(
@@ -354,6 +357,12 @@ export function RecommendationCard({
 
       {error && <div className="error-state" role="alert">{error}</div>}
 
+      {recommendation.status === "PENDING" && alternatives > 0 && (
+        <p className="recommendation-card__alternatives">
+          One decision per ship: approving this closes the other {alternatives} open option
+          {alternatives === 1 ? "" : "s"} for {recommendation.voyage?.vessel?.name ?? "this ship"}.
+        </p>
+      )}
       {recommendation.status === "PENDING" ? (
         <div className="recommendation-card__actions">
           <button className="btn btn-primary" onClick={handleApprove} disabled={busy}>
