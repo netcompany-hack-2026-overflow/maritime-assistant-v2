@@ -6,7 +6,14 @@ import { env } from "../lib/env.js";
 import { parseScenarioSet, recommendationFields } from "./scenarioFields.js";
 import { draftNoticeForApproval } from "./notices.js";
 import { calculateVoyageCII } from "./cii.js";
-import { closeAlternatives, closedByApproval, describeOption, openAlternatives, reopenAlternatives } from "./alternatives.js";
+import {
+  NOT_TAKEN_PREFIX,
+  closeAlternatives,
+  closedByApproval,
+  describeOption,
+  openAlternatives,
+  reopenAlternatives,
+} from "./alternatives.js";
 
 class HttpError extends Error {
   status: number;
@@ -22,6 +29,9 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
     include: { portEvent: { include: { port: true } } },
   });
   if (!recommendation) throw new HttpError(404, "Recommendation not found");
+  if (recommendation.rejectReason?.startsWith(NOT_TAKEN_PREFIX)) {
+    throw new HttpError(409, `${recommendation.rejectReason}. Undo that approval to choose this option instead.`);
+  }
   if (recommendation.status !== "PENDING") {
     throw new HttpError(409, `Recommendation is already ${recommendation.status.toLowerCase()}`);
   }

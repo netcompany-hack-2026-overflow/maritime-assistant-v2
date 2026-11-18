@@ -198,3 +198,12 @@ describe("one decision per ship", () => {
     expect(rec("late-offer").status).toBe("APPROVED");
   });
 });
+
+describe("trying to approve a closed option", () => {
+  it("says which option was chosen and how to change it", async () => {
+    await approveRecommendation("algeciras");
+    await expect(approveRecommendation("ceuta")).rejects.toThrow(
+      "Not taken: bunkering at Algeciras (Strait Bunkering Ltd) was approved for this ship. Undo that approval to choose this option instead."
+    );
+  });
+});
