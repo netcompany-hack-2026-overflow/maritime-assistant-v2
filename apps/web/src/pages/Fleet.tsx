@@ -8,6 +8,14 @@ import "./Fleet.css";
 
 const POLL_INTERVAL_MS = 2000;
 
+const CII_BADGE_STYLES: Record<string, React.CSSProperties> = {
+  A: { backgroundColor: "#dcfce7", color: "#166534", border: "1px solid #86efac" },
+  B: { backgroundColor: "#ecfccb", color: "#3f6212", border: "1px solid #bef264" },
+  C: { backgroundColor: "#fef9c3", color: "#854d0e", border: "1px solid #fde047" },
+  D: { backgroundColor: "#ffedd5", color: "#9a3412", border: "1px solid #fdba74" },
+  E: { backgroundColor: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" },
+};
+
 export function Fleet() {
   const [ports, setPorts] = useState<PortDTO[]>([]);
   const [vessels, setVessels] = useState<VesselListItem[]>([]);
@@ -97,25 +105,47 @@ export function Fleet() {
             <div className="empty-state">No vessels yet.</div>
           ) : (
             <ul className="ship-list">
-              {vessels.map((v) => (
-                <li key={v.id}>
-                  <button
-                    className={
-                      v.id === selectedVesselId
-                        ? "ship-list__item ship-list__item--active"
-                        : "ship-list__item"
-                    }
-                    onClick={() => setSelectedVesselId(v.id)}
-                    aria-pressed={v.id === selectedVesselId}
-                  >
-                    <span className="ship-list__name">{v.name}</span>
-                    <span className="ship-list__meta">
-                      {v.status} · {v.speedKn ? `${v.speedKn.toFixed(1)} kn` : "—"} ·{" "}
-                      {v.destPort ?? "—"}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {vessels.map((v) => {
+                const activeVoyage = voyages.find((voy) => voy.id === v.voyageId);
+                const ciiRating = activeVoyage?.ciiRating;
+                return (
+                  <li key={v.id}>
+                    <button
+                      className={
+                        v.id === selectedVesselId
+                          ? "ship-list__item ship-list__item--active"
+                          : "ship-list__item"
+                      }
+                      onClick={() => setSelectedVesselId(v.id)}
+                      aria-pressed={v.id === selectedVesselId}
+                    >
+                      <span
+                        className="ship-list__name"
+                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}
+                      >
+                        <span>{v.name}</span>
+                        {ciiRating && (
+                          <span
+                            style={{
+                              ...(CII_BADGE_STYLES[ciiRating] ?? CII_BADGE_STYLES.C),
+                              padding: "1px 6px",
+                              borderRadius: "4px",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                            }}
+                          >
+                            CII {ciiRating}
+                          </span>
+                        )}
+                      </span>
+                      <span className="ship-list__meta">
+                        {v.status} · {v.speedKn ? `${v.speedKn.toFixed(1)} kn` : "—"} ·{" "}
+                        {v.destPort ?? "—"}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

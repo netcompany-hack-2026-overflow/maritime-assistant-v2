@@ -10,6 +10,38 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
+const CII_BADGE_STYLES: Record<string, React.CSSProperties> = {
+  A: { backgroundColor: "#dcfce7", color: "#166534", border: "1px solid #86efac" },
+  B: { backgroundColor: "#ecfccb", color: "#3f6212", border: "1px solid #bef264" },
+  C: { backgroundColor: "#fef9c3", color: "#854d0e", border: "1px solid #fde047" },
+  D: { backgroundColor: "#ffedd5", color: "#9a3412", border: "1px solid #fdba74" },
+  E: { backgroundColor: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" },
+};
+
+function CiiBadge({ rating, attained }: { rating?: string | null; attained?: number | null }) {
+  if (!rating) return <span>—</span>;
+  const style = CII_BADGE_STYLES[rating] ?? CII_BADGE_STYLES.C;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+      <span
+        style={{
+          ...style,
+          padding: "2px 8px",
+          borderRadius: "6px",
+          fontWeight: 700,
+          fontSize: "0.8rem",
+          lineHeight: 1.2,
+        }}
+      >
+        {rating}
+      </span>
+      {attained != null && (
+        <span style={{ fontSize: "0.78rem", opacity: 0.75 }}>{attained.toFixed(2)}</span>
+      )}
+    </span>
+  );
+}
+
 export function Voyages() {
   const [voyages, setVoyages] = useState<VoyageListItem[]>([]);
   const [vessels, setVessels] = useState<VesselListItem[]>([]);
@@ -258,6 +290,7 @@ export function Voyages() {
               <th>Vessel</th>
               <th>Route</th>
               <th>Speed</th>
+              <th>CII Rating</th>
               <th>Departed</th>
               <th>ETA</th>
               <th>Berth time</th>
@@ -273,6 +306,9 @@ export function Voyages() {
                   {v.originPortName} → {v.destPortName}
                 </td>
                 <td>{v.speedKn.toFixed(1)} kn</td>
+                <td>
+                  <CiiBadge rating={v.ciiRating} attained={v.ciiAttained} />
+                </td>
                 <td>{formatDate(v.departedAt)}</td>
                 <td>{formatDate(v.plannedEta)}</td>
                 <td>{v.berthTime ? formatDate(v.berthTime) : "—"}</td>

@@ -50,6 +50,8 @@ export interface VoyageListItem {
   berthTime: string | null;
   routeNm: number | null;
   status: VoyageStatus;
+  ciiAttained?: number | null;
+  ciiRating?: "A" | "B" | "C" | "D" | "E" | null;
   createdAt: string;
 }
 
