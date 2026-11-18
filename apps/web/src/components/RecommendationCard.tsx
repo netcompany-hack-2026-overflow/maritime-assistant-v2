@@ -1,14 +1,18 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
-import { bunkerVerdictReason, type BunkerCalc } from "@maritime/shared";
-import { api, type RecommendationRecord, type RecordResponse } from "../lib/api.js";
+import { bunkerVerdictReason, savingsVsBaseline, type BunkerCalc, type ScenarioId } from "@maritime/shared";
+import { api, type OutboundEmail, type RecommendationRecord, type RecordResponse } from "../lib/api.js";
+import { eur, money } from "../lib/format.js";
+import { ScenarioComparison } from "./ScenarioComparison.js";
+import { NoticePanel } from "./NoticePanel.js";
 import "./RecommendationCard.css";
 
 interface RecommendationCardProps {
   recommendation: RecommendationRecord;
   fuelPriceEurPerT: number;
-  onApprove: (id: string) => Promise<void>;
+  onApprove: (id: string, scenarioId?: ScenarioId) => Promise<void>;
+  onRefresh: (id: string) => Promise<void>;
   onReject: (id: string, reason: string) => Promise<void>;
   onUndo: (id: string) => Promise<void>;
 }
@@ -24,8 +28,8 @@ const EVENT_LABELS: Record<string, string> = {
 const CALC_ROWS: Array<{ key: string; label: string; unit?: string; digits?: number }> = [
   { key: "distanceNm", label: "Remaining distance", unit: "nm" },
   { key: "hoursAvailable", label: "Hours available until berth", unit: "h" },
-  { key: "headCurrentKn", label: "Head current (mock weather, + = adverse)", unit: "kn", digits: 1 },
-  { key: "seaStateFuelFactor", label: "Sea-state fuel factor (mock weather)", unit: "×" },
+  { key: "headCurrentKn", label: "Head current along the route (+ = adverse)", unit: "kn", digits: 1 },
+  { key: "seaStateFuelFactor", label: "Sea-state fuel factor (waves)", unit: "×" },
   { key: "v0", label: "Current speed (v₀)", unit: "kn" },
   { key: "v1Raw", label: "Computed JIT speed (unclamped)", unit: "kn" },
   { key: "v1", label: "Recommended speed (v₁)", unit: "kn" },
@@ -73,13 +77,64 @@ function FactRow({ table, id, label }: { table: string; id: string; label: strin
   );
 }
 
+function CharterPartySummary({ recommendation }: { recommendation: RecommendationRecord }) {
+  const [open, setOpen] = useState(false);
+  const cp = recommendation.voyage?.charterParty;
+  if (!cp) {
+    return (
+      <div className="cp-summary cp-summary--missing">
+        <FileText size={14} aria-hidden="true" />
+        <span>
+          No charter party on file, so laytime, demurrage and the JIT clause are not checked.{" "}
+          <Link to="/voyages">Upload it on Voyages</Link>.
+        </span>
+      </div>
+    );
+  }
+  const t = cp.terms;
+  const facts = [
+    t.laytimeHours != null && `Laytime ${t.laytimeHours} h${t.laytimeBasis ? ` ${t.laytimeBasis}` : ""}`,
+    t.norNoticeHours != null && `NOR +${t.norNoticeHours} h`,
+    t.waitingTimeCounts === true ? "waiting counts (WIBON)" : t.waitingTimeCounts === false ? "waiting does not count" : null,
+    t.demurrageRatePerDay != null && `demurrage ${money(t.demurrageRatePerDay, t.currency)}/day`,
+    cp.expectedOpsHours != null && `cargo ops ${cp.expectedOpsHours} h (est.)`,
+  ].filter(Boolean);
+  return (
+    <div className="cp-summary">
+      <FileText size={14} aria-hidden="true" />
+      <div>
+        <p>
+          <strong>{t.reference ?? cp.sourceName}</strong>
+          {t.chartererName && <> · {t.chartererName}</>}
+        </p>
+        <p className="cp-summary__facts">{facts.join(" · ")}</p>
+        {t.jitClause.present ? (
+          <button className="recommendation-card__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {t.jitClause.name ?? "JIT clause"}
+          </button>
+        ) : (
+          <p className="cp-summary__nojit">No just-in-time arrival clause: utmost despatch applies.</p>
+        )}
+        {open && t.jitClause.text && <blockquote className="cp-summary__clause">{t.jitClause.text}</blockquote>}
+      </div>
+    </div>
+  );
+}
+
 export function RecommendationCard({
   recommendation,
   fuelPriceEurPerT,
   onApprove,
+  onRefresh,
   onReject,
   onUndo,
 }: RecommendationCardProps) {
+  const set = recommendation.scenarios;
+  const [selected, setSelected] = useState<ScenarioId | null>(
+    recommendation.chosenScenario ?? set?.recommendedId ?? null
+  );
+  const [notices, setNotices] = useState<OutboundEmail[]>(recommendation.outboundEmails ?? []);
   const [showMath, setShowMath] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -102,12 +157,29 @@ export function RecommendationCard({
   const notWorthIt = bunker?.verdict === "NOT_WORTH_IT";
   const notWorthItBecause =
     bunker && notWorthIt ? bunkerVerdictReason(bunker, recommendation.voyage?.destPort?.name ?? "destination") : null;
+  const isPending = recommendation.status === "PENDING";
+  const shown = isPending ? selected : recommendation.chosenScenario ?? selected;
+  const scenario = set?.scenarios.find((s) => s.id === shown) ?? null;
+  const delta = set && shown ? savingsVsBaseline(set, shown) : null;
+  const currency = scenario?.contract.laytime?.currency ?? recommendation.voyage?.charterParty?.terms.currency ?? "USD";
+
+  const handleRefresh = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onRefresh(recommendation.id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleApprove = async () => {
     setBusy(true);
     setError(null);
     try {
-      await onApprove(recommendation.id);
+      await onApprove(recommendation.id, selected ?? undefined);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -158,21 +230,63 @@ export function RecommendationCard({
           <span>{recommendation.currentSpeedKn.toFixed(1)} kn</span>
           <span className="recommendation-card__arrow">→</span>
           <span className="recommendation-card__speed--new">
-            {recommendation.recommendedSpeedKn.toFixed(1)} kn
+            {(scenario?.speedKn ?? recommendation.recommendedSpeedKn).toFixed(1)} kn
           </span>
+          {shown && <span className="recommendation-card__scenario">scenario {shown}</span>}
         </div>
       </div>
 
+      {set ? (
+        <>
       <div className="recommendation-card__kpis">
+        <div className="kpi-tile">
+          <p className="label">Fuel saved</p>
+          <p className="kpi">{(delta?.fuelT ?? recommendation.fuelSavedT).toFixed(1)} t</p>
+          <p className="kpi-tile__assumption">CO₂ −{(delta?.co2T ?? recommendation.co2SavedT).toFixed(1)} t</p>
+        </div>
+        <div className="kpi-tile">
+          <p className="label">Cost saved</p>
+          <p className="kpi">{eur(delta ? delta.totalCostEur : recommendation.costSavedEur)}</p>
+          <p className="kpi-tile__assumption">
+            {delta
+              ? `fuel ${eur(delta.fuelCostEur)} + EU ETS ${eur(delta.etsCostEur)}`
+              : `assumption: €${fuelPriceEurPerT}/t fuel`}
+          </p>
+        </div>
+        <div className="kpi-tile">
+          <p className="label">Demurrage avoided</p>
+          <p className="kpi">{delta?.demurrageAvoided != null ? money(delta.demurrageAvoided, currency) : "—"}</p>
+          <p className="kpi-tile__assumption">
+            {scenario?.contract.laytime
+              ? scenario.contract.laytime.withinLaytime
+                ? "within laytime"
+                : `laytime exceeded by ${scenario.contract.laytime.demurrageHours.toFixed(0)} h`
+              : "needs a charter party"}
+          </p>
+        </div>
+        <div className="kpi-tile">
+          <p className="label">CII (year to date)</p>
+          <p className="kpi">
+            {scenario?.cii.annual ? scenario.cii.annual.rating : "—"}
+          </p>
+          <p className="kpi-tile__assumption">
+            {scenario?.cii.annual && set
+              ? `ratio ${set.scenarios[0].cii.annual!.ratio.toFixed(3)} → ${scenario.cii.annual.ratio.toFixed(3)}`
+              : ""}
+          </p>
+        </div>
+      </div>
+          <CharterPartySummary recommendation={recommendation} />
+        </>
+      ) : (
+      <div className="recommendation-card__kpis recommendation-card__kpis--three">
         <div className="kpi-tile">
           <p className="label">Fuel saved</p>
           <p className="kpi">{recommendation.fuelSavedT.toFixed(1)} t</p>
         </div>
         <div className="kpi-tile">
           <p className="label">Cost saved</p>
-          <p className="kpi">
-            €{Math.round(recommendation.costSavedEur).toLocaleString("en-US")}
-          </p>
+          <p className="kpi">{eur(recommendation.costSavedEur)}</p>
           <p className="kpi-tile__assumption">assumption: €{fuelPriceEurPerT}/t fuel</p>
         </div>
         <div className="kpi-tile">
@@ -180,6 +294,8 @@ export function RecommendationCard({
           <p className="kpi">{recommendation.co2SavedT.toFixed(1)} t</p>
         </div>
       </div>
+      )}
+
 
       <p className="recommendation-card__rationale">{recommendation.rationale}</p>
       {bunker && (
@@ -188,13 +304,19 @@ export function RecommendationCard({
         </Link>
       )}
 
+      {set ? (
+        <ScenarioComparison set={set} selected={shown} onSelect={isPending ? setSelected : null} />
+      ) : bunker ? null : (
+        <p className="muted">This recommendation predates scenario comparison.</p>
+      )}
+
       <button
         className="recommendation-card__toggle"
         onClick={() => setShowMath((v) => !v)}
         aria-expanded={showMath}
       >
         {showMath ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        Show the math
+        Show the math{set ? " (scenario B)" : ""}
       </button>
 
       {showMath && (
@@ -235,16 +357,22 @@ export function RecommendationCard({
       {recommendation.status === "PENDING" ? (
         <div className="recommendation-card__actions">
           <button className="btn btn-primary" onClick={handleApprove} disabled={busy}>
-            Approve
+            Approve{selected ? ` scenario ${selected}` : ""}
           </button>
           <button className="btn" onClick={() => setShowRejectModal(true)} disabled={busy}>
             Reject
           </button>
+          {set && (
+            <button className="btn recommendation-card__refresh" onClick={handleRefresh} disabled={busy} title="Recompute with the latest position, weather, prices and charter party">
+              <RefreshCw size={14} aria-hidden="true" /> Refresh
+            </button>
+          )}
         </div>
       ) : (
         <div className="recommendation-card__decision">
           <p className="label">
-            {recommendation.status} ·{" "}
+            {recommendation.status}
+            {recommendation.chosenScenario ? ` · scenario ${recommendation.chosenScenario}` : ""} ·{" "}
             {recommendation.decidedAt && new Date(recommendation.decidedAt).toLocaleString()}
           </p>
           {recommendation.rejectReason && <p>Reason: {recommendation.rejectReason}</p>}
@@ -255,6 +383,17 @@ export function RecommendationCard({
           )}
         </div>
       )}
+
+      {notices
+        .filter((n) => n.status !== "WITHDRAWN" || recommendation.status !== "APPROVED")
+        .slice(0, 1)
+        .map((n) => (
+          <NoticePanel
+            key={n.id}
+            notice={n}
+            onChange={(u) => setNotices((all) => all.map((x) => (x.id === u.id ? u : x)))}
+          />
+        ))}
 
       {showRejectModal && (
         <div

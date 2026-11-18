@@ -1,5 +1,9 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
+import { ciiRequired, ciiShipClass } from "@maritime/shared";
 import { routeBetweenPorts } from "../src/services/seaRoute.js";
+import { AEGEAN_STAR_CP } from "../src/demo/charterParties.js";
+import { mockExtractCharterParty } from "../src/llm/charterParty.js";
+import { calculateVoyageCII } from "../src/services/cii.js";
 
 const prisma = new PrismaClient();
 
@@ -48,19 +52,21 @@ interface VesselSeed {
   minSpeedKn: number;
   fuelTPerDayAtDesign: number;
   auxFuelTPerDay: number;
+  /** Year-to-date attained/required CII ratio the demo starts from (C ≈ 1.0, D ≈ 1.1). */
+  ytdCiiRatio: number;
   /** Indicative time-charter rate, prices delays in the bunker-offer comparison. */
   charterRateUsdPerDay: number;
 }
 
 const VESSELS: VesselSeed[] = [
-  { imo: "9000001", name: "MV Aegean Star", type: "Container", dwt: 45000, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3, charterRateUsdPerDay: 18000 },
-  { imo: "9000002", name: "MV Cycladic Wind", type: "Bulk Carrier", dwt: 38000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 32, auxFuelTPerDay: 2.5, charterRateUsdPerDay: 14000 },
-  { imo: "9000003", name: "MV Ionian Trader", type: "Container", dwt: 52000, designSpeedKn: 15, minSpeedKn: 10, fuelTPerDayAtDesign: 45, auxFuelTPerDay: 3.5, charterRateUsdPerDay: 21000 },
-  { imo: "9000004", name: "MV Hellenic Pioneer", type: "Tanker", dwt: 60000, designSpeedKn: 14.5, minSpeedKn: 9.5, fuelTPerDayAtDesign: 42, auxFuelTPerDay: 3, charterRateUsdPerDay: 26000 },
-  { imo: "9000005", name: "MV Aegean Breeze", type: "Bulk Carrier", dwt: 41000, designSpeedKn: 13.5, minSpeedKn: 9, fuelTPerDayAtDesign: 35, auxFuelTPerDay: 2.8, charterRateUsdPerDay: 15000 },
-  { imo: "9000006", name: "MV Poseidon Glory", type: "Container", dwt: 48000, designSpeedKn: 16, minSpeedKn: 10, fuelTPerDayAtDesign: 48, auxFuelTPerDay: 4, charterRateUsdPerDay: 22000 },
-  { imo: "9000007", name: "MV Marathon Spirit", type: "General Cargo", dwt: 30000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 28, auxFuelTPerDay: 2, charterRateUsdPerDay: 12000 },
-  { imo: "9000008", name: "MV Olympic Horizon", type: "Tanker", dwt: 65000, designSpeedKn: 14, minSpeedKn: 9.5, fuelTPerDayAtDesign: 44, auxFuelTPerDay: 3.2, charterRateUsdPerDay: 27000 },
+  { imo: "9000001", name: "MV Aegean Star", type: "Bulk Carrier", dwt: 45000, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3, ytdCiiRatio: 1.04, charterRateUsdPerDay: 18000 },
+  { imo: "9000002", name: "MV Cycladic Wind", type: "Bulk Carrier", dwt: 38000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 32, auxFuelTPerDay: 2.5, ytdCiiRatio: 1.07, charterRateUsdPerDay: 14000 },
+  { imo: "9000003", name: "MV Ionian Trader", type: "Container", dwt: 52000, designSpeedKn: 15, minSpeedKn: 10, fuelTPerDayAtDesign: 45, auxFuelTPerDay: 3.5, ytdCiiRatio: 0.97, charterRateUsdPerDay: 21000 },
+  { imo: "9000004", name: "MV Hellenic Pioneer", type: "Tanker", dwt: 60000, designSpeedKn: 14.5, minSpeedKn: 9.5, fuelTPerDayAtDesign: 42, auxFuelTPerDay: 3, ytdCiiRatio: 1.06, charterRateUsdPerDay: 26000 },
+  { imo: "9000005", name: "MV Aegean Breeze", type: "Bulk Carrier", dwt: 41000, designSpeedKn: 13.5, minSpeedKn: 9, fuelTPerDayAtDesign: 35, auxFuelTPerDay: 2.8, ytdCiiRatio: 0.95, charterRateUsdPerDay: 15000 },
+  { imo: "9000006", name: "MV Poseidon Glory", type: "Container", dwt: 48000, designSpeedKn: 16, minSpeedKn: 10, fuelTPerDayAtDesign: 48, auxFuelTPerDay: 4, ytdCiiRatio: 0.9, charterRateUsdPerDay: 22000 },
+  { imo: "9000007", name: "MV Marathon Spirit", type: "General Cargo", dwt: 30000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 28, auxFuelTPerDay: 2, ytdCiiRatio: 1.02, charterRateUsdPerDay: 12000 },
+  { imo: "9000008", name: "MV Olympic Horizon", type: "Tanker", dwt: 65000, designSpeedKn: 14, minSpeedKn: 9.5, fuelTPerDayAtDesign: 44, auxFuelTPerDay: 3.2, ytdCiiRatio: 1.12, charterRateUsdPerDay: 27000 },
 ];
 
 interface VoyageSeed {
@@ -91,49 +97,6 @@ function formatUtc(d: Date): string {
 }
 
 
-function calculateVoyageCII(params: {
-  dwt: number;
-  distanceNm: number;
-  speedKn: number;
-  designSpeedKn: number;
-  fuelTPerDayAtDesign: number;
-  auxFuelTPerDay: number;
-  vesselType: string;
-}) {
-  const co2Factor = 3.114;
-  const days = params.distanceNm / (params.speedKn * 24);
-  const speedRatio = params.speedKn / params.designSpeedKn;
-  const mainFuelT = params.fuelTPerDayAtDesign * Math.pow(speedRatio, 3) * days;
-  const totalFuelT = mainFuelT + params.auxFuelTPerDay * days;
-
-  const co2Grams = totalFuelT * co2Factor * 1_000_000;
-  const attained = co2Grams / (params.dwt * params.distanceNm);
-
-  const baselineByType: Record<string, number> = {
-    "Bulk Carrier": 5.2,
-    "Tanker": 5.8,
-    "Container": 8.5,
-    "General Cargo": 7.5,
-  };
-  const required = baselineByType[params.vesselType] ?? 6.5;
-  const ratio = attained / required;
-
-  let rating: "A" | "B" | "C" | "D" | "E" = "C";
-  if (ratio <= 0.83) rating = "A";
-  else if (ratio <= 0.94) rating = "B";
-  else if (ratio <= 1.07) rating = "C";
-  else if (ratio <= 1.19) rating = "D";
-  else rating = "E";
-
-  return { attained: Number(attained.toFixed(2)), rating };
-}
-
-
-
-
-
-
-
 async function main() {
   for (const p of PORTS) {
     await prisma.port.upsert({
@@ -143,17 +106,32 @@ async function main() {
     });
   }
 
-  for (const v of VESSELS) {
+  // Year-to-date operations (1 Jan – mid November) for the annual CII
+  // projection: ~58,000 nm sailed, CO2 set so the vessel starts at its ratio.
+  const ytdDistanceNm = 58_000;
+  const year = new Date().getUTCFullYear();
+  for (const { ytdCiiRatio, ...v } of VESSELS) {
+    const required = ciiRequired(ciiShipClass(v.type), v.dwt, year);
+    const ytdCo2T = Math.round((ytdCiiRatio * required * v.dwt * ytdDistanceNm) / 1e6);
+    const data = { ...v, ytdCo2T, ytdDistanceNm };
     await prisma.vessel.upsert({
       where: { imo: v.imo },
-      update: { ...v },
-      create: v,
+      update: data,
+      create: data,
     });
   }
 
   for (const s of SUPPLIERS) {
     await prisma.supplier.upsert({ where: { name: s.name }, update: s, create: s });
   }
+  // Demo charter party for MV Aegean Star's voyage (the Cycladic Wind CP is
+  // the upload demo: apps/web/public/samples/cycladic-wind-charter-party.pdf).
+  const aegean = await prisma.vessel.findUnique({ where: { imo: "9000001" } });
+  const aegeanVoyageForCp = aegean
+    ? await prisma.voyage.findFirst({ where: { vesselId: aegean.id, status: "UNDERWAY" } })
+    : null;
+
+  if (aegeanVoyageForCp) await seedCharterParty(aegeanVoyageForCp.id);
 
   const voyageCount = await prisma.voyage.count();
   if (voyageCount > 0) {
@@ -182,7 +160,7 @@ async function main() {
     const departedAt = new Date(now.getTime() - elapsedHours * 3_600_000);
     const plannedEta = new Date(departedAt.getTime() + (totalNm / v.speedKn) * 3_600_000);
 
-const cii = calculateVoyageCII({
+    const cii = calculateVoyageCII({
       dwt: vessel.dwt,
       distanceNm: totalNm,
       speedKn: v.speedKn,
@@ -297,7 +275,24 @@ Ligurian Fuels S.p.A.`,
     await prisma.email.create({ data: email });
   }
 
+  await seedCharterParty(createdVoyages["9000001"].id);
+
   console.log("Seed complete.");
+}
+
+async function seedCharterParty(voyageId: string) {
+  if (await prisma.charterParty.findUnique({ where: { voyageId } })) return;
+  const terms = await mockExtractCharterParty(AEGEAN_STAR_CP);
+  await prisma.charterParty.create({
+    data: {
+      voyageId,
+      sourceName: "aegean-star-charter-party.pdf",
+      text: AEGEAN_STAR_CP,
+      terms: terms as unknown as Prisma.InputJsonValue,
+      // 60 h of discharge against 72 h laytime: a 24 h wait at anchor tips it into demurrage.
+      expectedOpsHours: 60,
+    },
+  });
 }
 
 main()

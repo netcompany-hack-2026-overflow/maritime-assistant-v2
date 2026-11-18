@@ -5,7 +5,11 @@ import type {
   EmailProviderStatus,
   TcoAssumptions,
   TcoExplanation,
+  CharterPartyDTO,
+  CharterPartyTerms,
   PortDTO,
+  ScenarioId,
+  ScenarioSet,
   PortEventType,
   RecommendationStatus,
   SeaRouteDTO,
@@ -14,13 +18,44 @@ import type {
   VoyageStatus,
 } from "@maritime/shared";
 
+export interface AisStatus {
+  enabled: boolean;
+  connected: boolean;
+  trackedMmsi: string[];
+  messagesReceived: number;
+  lastMessageAt: string | null;
+  lastError: string | null;
+}
+
 export interface MetaResponse {
   llmProvider: "mock" | "anthropic" | "openai";
   simSpeed: number;
   fuelPriceEurPerT: number;
+  euaPriceEurPerT: number;
   co2Factor: number;
   /** Outgoing email (SMTP) status; older APIs leave it out. */
   emailProvider?: EmailProviderStatus;
+  weatherProvider: "open-meteo" | "mock";
+  weatherError: string | null;
+  ais: AisStatus;
+}
+
+export interface OutboundEmail {
+  id: string;
+  recommendationId: string;
+  toAddrs: string;
+  ccAddrs: string;
+  subject: string;
+  body: string;
+  status: "DRAFT" | "SENT" | "WITHDRAWN";
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CharterPartySaveResult {
+  charterParty: CharterPartyDTO;
+  recomputedRecommendations: number;
 }
 
 export interface VesselListItem {
@@ -33,6 +68,10 @@ export interface VesselListItem {
   minSpeedKn: number;
   fuelTPerDayAtDesign: number;
   auxFuelTPerDay: number;
+  ytdCo2T: number | null;
+  ytdDistanceNm: number | null;
+  mmsi: string | null;
+  aisAt: string | null;
   status: VoyageStatus | "IDLE";
   speedKn: number | null;
   destPort: string | null;
@@ -57,6 +96,7 @@ export interface VoyageListItem {
   plannedEta: string;
   berthTime: string | null;
   routeNm: number | null;
+  charterParty: { id: string; sourceName: string } | null;
   status: VoyageStatus;
   ciiAttained?: number | null;
   ciiRating?: "A" | "B" | "C" | "D" | "E" | null;
@@ -79,10 +119,16 @@ export interface SourceSpan {
   text: string;
 }
 
-export interface VoyageWithRelations extends VoyageListItem {
-  vessel?: { id: string; name: string; imo: string };
-  originPort?: { id: string; name: string };
-  destPort?: { id: string; name: string };
+export interface VoyageWithRelations extends Omit<VoyageListItem, "charterParty"> {
+  vessel?: { id: string; name: string; imo: string; type: string; dwt: number };
+  originPort?: { id: string; name: string; country: string };
+  destPort?: { id: string; name: string; country: string };
+  charterParty?: {
+    id: string;
+    sourceName: string;
+    terms: CharterPartyTerms;
+    expectedOpsHours: number | null;
+  } | null;
 }
 
 export interface PortEventRecord {
@@ -112,10 +158,14 @@ export interface RecommendationRecord {
   fuelSavedT: number;
   costSavedEur: number;
   co2SavedT: number;
+  etsSavedEur: number;
+  demurrageAvoided: number | null;
   calc: Record<string, number | boolean>;
   bunkerPlan?: BunkerPlan | null;
   chosenOption?: string | null;
   emailDrafts?: EmailDraftDTO[];
+  scenarios: ScenarioSet | null;
+  chosenScenario: ScenarioId | null;
   rationale: string;
   status: RecommendationStatus;
   rejectReason: string | null;
@@ -123,6 +173,7 @@ export interface RecommendationRecord {
   createdAt: string;
   voyage?: VoyageWithRelations;
   portEvent?: PortEventRecord;
+  outboundEmails?: OutboundEmail[];
 }
 
 export interface RecordResponse {
@@ -181,7 +232,7 @@ export const api = {
       `/ports/route?from=${encodeURIComponent(fromUnlocode)}&to=${encodeURIComponent(toUnlocode)}`
     ),
   getSettings: () => request<SettingsDTO>("/settings"),
-  updateSettings: (input: { fuelPriceEurPerT: number }) =>
+  updateSettings: (input: { fuelPriceEurPerT?: number; euaPriceEurPerT?: number }) =>
     request<{ settings: SettingsDTO; repricedRecommendations: number }>("/settings", {
       method: "PUT",
       body: JSON.stringify(input),
@@ -214,9 +265,50 @@ export const api = {
   getPortEvents: () => request<PortEventRecord[]>("/port-events"),
   getRecommendations: (status?: RecommendationStatus) =>
     request<RecommendationRecord[]>(`/recommendations${status ? `?status=${status}` : ""}`),
-  approveRecommendation: (id: string) =>
-    request<{ voyage: VoyageWithRelations }>(`/recommendations/${id}/approve`, {
+  approveRecommendation: (id: string, scenarioId?: ScenarioId) =>
+    request<{ voyage: VoyageWithRelations; notice: OutboundEmail | null }>(`/recommendations/${id}/approve`, {
       method: "POST",
+      body: JSON.stringify(scenarioId ? { scenarioId } : {}),
+    }),
+  refreshRecommendation: (id: string) =>
+    request<RecommendationRecord>(`/recommendations/${id}/refresh`, { method: "POST" }),
+  updateOutboundEmail: (id: string, input: Partial<Pick<OutboundEmail, "toAddrs" | "ccAddrs" | "subject" | "body">>) =>
+    request<OutboundEmail>(`/outbound-emails/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  markOutboundEmailSent: (id: string) =>
+    request<OutboundEmail>(`/outbound-emails/${id}/sent`, { method: "POST" }),
+  getCharterParty: async (voyageId: string): Promise<CharterPartyDTO | null> => {
+    const res = await fetch(`/api/voyages/${voyageId}/charter-party`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Could not load the charter party (${res.status})`);
+    return res.json() as Promise<CharterPartyDTO>;
+  },
+  saveCharterPartyText: (voyageId: string, text: string, sourceName?: string) =>
+    request<CharterPartySaveResult>(`/voyages/${voyageId}/charter-party`, {
+      method: "POST",
+      body: JSON.stringify({ text, sourceName }),
+    }),
+  uploadCharterParty: async (voyageId: string, file: File): Promise<CharterPartySaveResult> => {
+    const res = await fetch(
+      `/api/voyages/${voyageId}/charter-party/document?filename=${encodeURIComponent(file.name)}`,
+      { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error ?? `Upload failed with ${res.status}`);
+    }
+    return res.json() as Promise<CharterPartySaveResult>;
+  },
+  updateCharterParty: (voyageId: string, input: { terms?: CharterPartyTerms; expectedOpsHours?: number | null }) =>
+    request<CharterPartySaveResult>(`/voyages/${voyageId}/charter-party`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  deleteCharterParty: (voyageId: string) =>
+    request<void>(`/voyages/${voyageId}/charter-party`, { method: "DELETE" }),
+  linkAis: (vesselId: string, mmsi: string | null) =>
+    request<{ id: string; mmsi: string | null; ais: AisStatus }>(`/vessels/${vesselId}/ais`, {
+      method: "PUT",
+      body: JSON.stringify({ mmsi }),
     }),
   undoApproval: (id: string) =>
     request<{ voyage: VoyageWithRelations; recommendation: RecommendationRecord }>(

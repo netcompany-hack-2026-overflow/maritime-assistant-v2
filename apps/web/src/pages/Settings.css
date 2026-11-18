@@ -87,3 +87,37 @@
   font-size: var(--text-xs);
   color: var(--muted);
 }
+
+.page--settings .settings-card + .settings-card {
+  margin-top: var(--space-5);
+}
+
+.settings-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.settings-status > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-3);
+}
+
+.settings-status dt {
+  color: var(--muted);
+}
+
+.settings-status dd {
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .settings-status > div {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}

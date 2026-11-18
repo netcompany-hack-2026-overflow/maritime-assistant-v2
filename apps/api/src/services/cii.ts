@@ -1,5 +1,17 @@
-export type CiiGrade = "A" | "B" | "C" | "D" | "E";
+import { assessCii, type CiiRating } from "@maritime/shared";
 
+export type CiiGrade = CiiRating;
+
+/**
+ * CII rating of a voyage at a given speed, for the Voyage.ciiAttained /
+ * ciiRating columns (badges on Voyages and Fleet). Uses the IMO method shared
+ * with the scenario comparison (packages/shared/src/cii.ts: G2 reference line,
+ * G3 reduction factor for the year, G4 rating boundaries), so a voyage's badge
+ * and its scenarios always agree.
+ *
+ * Fuel: cube-law main engine at `speedKn` plus auxiliary consumption, over the
+ * days the voyage takes at that speed.
+ */
 export function calculateVoyageCII(params: {
   dwt: number;
   distanceNm: number;
@@ -9,31 +21,13 @@ export function calculateVoyageCII(params: {
   auxFuelTPerDay: number;
   vesselType: string;
   co2Factor?: number;
+  year?: number;
 }): { attained: number; rating: CiiGrade } {
   const co2Factor = params.co2Factor ?? 3.114;
+  const year = params.year ?? new Date().getUTCFullYear();
   const days = params.distanceNm / (params.speedKn * 24);
-  const speedRatio = params.speedKn / params.designSpeedKn;
-  const mainFuelT = params.fuelTPerDayAtDesign * Math.pow(speedRatio, 3) * days;
+  const mainFuelT = params.fuelTPerDayAtDesign * (params.speedKn / params.designSpeedKn) ** 3 * days;
   const totalFuelT = mainFuelT + params.auxFuelTPerDay * days;
-
-  const co2Grams = totalFuelT * co2Factor * 1_000_000;
-  const attained = co2Grams / (params.dwt * params.distanceNm);
-
-  const baselineByType: Record<string, number> = {
-    "Bulk Carrier": 5.2,
-    "Tanker": 5.8,
-    "Container": 8.5,
-    "General Cargo": 7.5,
-  };
-  const required = baselineByType[params.vesselType] ?? 6.5;
-  const ratio = attained / required;
-
-  let rating: CiiGrade = "C";
-  if (ratio <= 0.83) rating = "A";
-  else if (ratio <= 0.94) rating = "B";
-  else if (ratio <= 1.07) rating = "C";
-  else if (ratio <= 1.19) rating = "D";
-  else rating = "E";
-
-  return { attained: Number(attained.toFixed(2)), rating };
+  const cii = assessCii(params.vesselType, params.dwt, totalFuelT * co2Factor, params.distanceNm, year);
+  return { attained: Number(cii.attained.toFixed(2)), rating: cii.rating };
 }

@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: "/actions", label: "Actions", end: false },
   { to: "/bunkering", label: "Bunkering", end: false },
   { to: "/ask", label: "Ask", end: false },
+  { to: "/value", label: "Value", end: false },
   { to: "/settings", label: "Settings", end: false },
 ];
 

@@ -57,6 +57,11 @@ export interface VesselPositionDTO {
   hasPendingAction: boolean;
   /** Remaining sea route from the ship's position to the destination port. */
   routeAhead: LatLon[];
+  /** "ais" when the position is a live AIS fix, "sim" when simulated. */
+  source: "ais" | "sim";
+  mmsi: string | null;
+  /** Time of the AIS fix (null for simulated positions). */
+  aisAt: string | null;
 }
 
 export interface SeaRouteDTO {
@@ -68,6 +73,8 @@ export interface SeaRouteDTO {
 
 export interface SettingsDTO {
   fuelPriceEurPerT: number;
+  /** EU Allowance price, € per tonne CO₂. */
+  euaPriceEurPerT: number;
   co2Factor: number;
   /** Bunker offers are quoted in USD/t; this converts them to €. */
   usdEurRate: number;

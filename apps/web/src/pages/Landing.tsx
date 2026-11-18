@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowRight, Check, MailOpen, ShieldCheck, Sigma, X } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, FileText, MailOpen, Send, ShieldCheck, Sigma, X } from "lucide-react";
 import { api } from "../lib/api.js";
 import { Monogram } from "../components/Monogram.js";
 import heroOcean from "../assets/hero-ocean.jpg";
@@ -14,14 +14,24 @@ const STEPS = [
     body: "A port agent writes “berth delayed 24 h”. Tidewise extracts port, delay and new berth time, and highlights the exact words it used.",
   },
   {
+    icon: FileText,
+    title: "Reads the charter party",
+    body: "Laytime, NOR, demurrage/despatch and the just-in-time arrival clause come out of the CP, so every option shows its contractual consequences.",
+  },
+  {
     icon: Sigma,
-    title: "Does the math",
-    body: "It matches the affected voyage and works out the just-in-time speed, fuel, cost and CO₂, showing every step of the calculation.",
+    title: "Compares A, B, C",
+    body: "Keep speed, slow down for JIT, or re-route around the weather: ETA, fuel, CO₂, EU ETS cost, demurrage and CII side by side, on the live marine forecast.",
   },
   {
     icon: ShieldCheck,
     title: "You decide",
-    body: "Nothing runs on its own. An operator approves or rejects, and the ship visibly slows on the live globe.",
+    body: "Nothing runs on its own. An operator approves a scenario, and the ship visibly changes course or speed on the live globe.",
+  },
+  {
+    icon: Send,
+    title: "Tells the charterer",
+    body: "On approval, the email to charterers and agent is drafted: new ETA, the reason, and the charter-party terms that apply.",
   },
 ];
 
@@ -115,6 +125,7 @@ export function Landing() {
           </Link>
           <nav aria-label="Main" className="hero__links">
             <a href="#how">How it works</a>
+            <a href="#value">Business value</a>
             <Link to="/ask">Ask the fleet</Link>
             <Link to="/fleet" className="hero__nav-cta">
               Open console
@@ -189,6 +200,40 @@ export function Landing() {
           </ol>
           <Link to="/fleet" className="how__cta">
             Open the console <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
+
+      <section id="value" className="how value-teaser" aria-labelledby="value-title">
+        <div className="how__inner">
+          <h2 id="value-title" className="how__title">
+            Business <em>value.</em>
+          </h2>
+          <div className="value-teaser__grid">
+            <div>
+              <p className="value-teaser__q">Who is the customer?</p>
+              <p>
+                Dry bulk and tanker owner-operators on voyage charters, starting with Greek fleets. Used daily by
+                operations, chartering and the technical/ESG team.
+              </p>
+            </div>
+            <div>
+              <p className="value-teaser__q">What does it save?</p>
+              <p>
+                One 24 h berth delay on a Supramax 1,200 nm out: about 43 t of fuel and 135 t of CO₂, roughly €33k in fuel plus EU ETS
+                allowances, and the demurrage of a day at anchor. At ten notices a year that is around €330k per ship.
+              </p>
+            </div>
+            <div>
+              <p className="value-teaser__q">Why now?</p>
+              <p>
+                EU ETS covers 100% of shipping emissions from 2026 with EUAs near €90/t, CII tightens every year to 2030,
+                VLSFO is above $700/t, and IMO is pushing just-in-time arrival.
+              </p>
+            </div>
+          </div>
+          <Link to="/value" className="how__cta">
+            Run the numbers for your fleet <ArrowRight size={16} aria-hidden="true" />
           </Link>
           <p className="how__credit">Photo: Austin Neill / Unsplash</p>
         </div>

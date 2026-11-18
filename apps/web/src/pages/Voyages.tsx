@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PortDTO, SeaRouteDTO } from "@maritime/shared";
 import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { PortPickerGlobe } from "../components/PortPickerGlobe.js";
+import { CharterPartyDialog } from "../components/CharterPartyDialog.js";
 import "./Voyages.css";
 
 const ACTIVE_STATUSES = new Set(["UNDERWAY", "PLANNED"]);
@@ -57,6 +58,7 @@ export function Voyages() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cpVoyage, setCpVoyage] = useState<VoyageListItem | null>(null);
 
   const refresh = () =>
     Promise.all([api.getVoyages(), api.getVessels(), api.getPorts()])
@@ -294,6 +296,7 @@ export function Voyages() {
               <th>Departed</th>
               <th>ETA</th>
               <th>Berth time</th>
+              <th>Charter party</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -312,6 +315,19 @@ export function Voyages() {
                 <td>{formatDate(v.departedAt)}</td>
                 <td>{formatDate(v.plannedEta)}</td>
                 <td>{v.berthTime ? formatDate(v.berthTime) : "—"}</td>
+                <td>
+                  {ACTIVE_STATUSES.has(v.status) || v.charterParty ? (
+                    <button
+                      className={v.charterParty ? "btn voyage-cp voyage-cp--on" : "btn voyage-cp"}
+                      onClick={() => setCpVoyage(v)}
+                      aria-label={`${v.charterParty ? "View" : "Add"} charter party for ${v.vesselName}`}
+                    >
+                      {v.charterParty ? "On file" : "Add"}
+                    </button>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td>
                   <span className={`voyage-status voyage-status--${v.status.toLowerCase()}`}>
                     {v.status}
@@ -334,6 +350,16 @@ export function Voyages() {
           </tbody>
         </table>
         </div>
+      )}
+
+      {cpVoyage && (
+        <CharterPartyDialog
+          voyage={cpVoyage}
+          onClose={(changed) => {
+            setCpVoyage(null);
+            if (changed) refresh();
+          }}
+        />
       )}
     </div>
   );

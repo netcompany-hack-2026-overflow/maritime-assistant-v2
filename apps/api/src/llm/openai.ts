@@ -1,7 +1,22 @@
 import OpenAI from "openai";
-import { answerSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
+import { answerSchema, type Answer, type CharterPartyTerms, type PortEventExtraction } from "@maritime/shared";
+import {
+  CHARTER_PARTY_SYSTEM_PROMPT,
+  NOTICE_SYSTEM_PROMPT,
+  mockDraftNotice,
+  noticeDraftSchema,
+  parseCharterPartyTerms,
+} from "./charterParty.js";
+
 import { EXTRACTION_SYSTEM_PROMPT, parseExtraction } from "./extraction.js";
-import type { BunkerComparisonFacts, CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+import type {
+  BunkerComparisonFacts,
+  CitableRow,
+  LlmProvider,
+  NoticeDraft,
+  NoticeFacts,
+  RecommendationFacts,
+} from "./types.js";
 import { mockExplainBunkerComparison, mockExplainRecommendation } from "./mock.js";
 import { BUNKER_COMPARISON_SYSTEM } from "./anthropic.js";
 
@@ -106,5 +121,21 @@ export class OpenAiProvider implements LlmProvider {
       `Question: ${question}\n\nRows:\n${JSON.stringify(rows)}`
     );
     return answerSchema.parse(raw);
+  }
+
+  async extractCharterParty(text: string): Promise<CharterPartyTerms> {
+    const raw = await this.completeJson(CHARTER_PARTY_SYSTEM_PROMPT, text.slice(0, 60_000));
+    return parseCharterPartyTerms(raw);
+  }
+
+  async draftNotice(facts: NoticeFacts): Promise<NoticeDraft> {
+    try {
+      const raw = await this.completeJson(NOTICE_SYSTEM_PROMPT, JSON.stringify(facts));
+      return noticeDraftSchema.parse(raw);
+    } catch (err) {
+      // An approval must never fail because the email draft did: use the template.
+      console.warn(`Notice draft via LLM failed, using template: ${(err as Error).message}`);
+      return mockDraftNotice(facts);
+    }
   }
 }

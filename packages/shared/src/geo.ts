@@ -133,3 +133,21 @@ export function interpolateAlongPolyline(coords: LatLon[], fraction: number): Po
   const last = coords[coords.length - 1];
   return { position: { ...last }, heading: 0, nextIndex: coords.length };
 }
+
+/** Point reached by travelling `distanceNm` from `from` on initial bearing `bearingDeg`. */
+export function destinationPoint(from: LatLon, bearingDeg: number, distanceNm: number): LatLon {
+  const delta = distanceNm / EARTH_RADIUS_NM;
+  const theta = toRad(bearingDeg);
+  const lat1 = toRad(from.lat);
+  const lon1 = toRad(from.lon);
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(delta) + Math.cos(lat1) * Math.sin(delta) * Math.cos(theta)
+  );
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(theta) * Math.sin(delta) * Math.cos(lat1),
+      Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2)
+    );
+  return { lat: toDeg(lat2), lon: ((toDeg(lon2) + 540) % 360) - 180 };
+}

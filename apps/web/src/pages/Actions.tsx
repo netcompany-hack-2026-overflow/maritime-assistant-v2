@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ScenarioId } from "@maritime/shared";
 import { api, type RecommendationRecord } from "../lib/api.js";
 import { RecommendationCard } from "../components/RecommendationCard.js";
 import "./Actions.css";
@@ -11,6 +12,8 @@ export function Actions() {
   const [fuelPriceEurPerT, setFuelPriceEurPerT] = useState(600);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Just-approved card: shown first in History so its notice draft is in view.
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   const refresh = () => {
     return Promise.all([api.getRecommendations(), api.getMeta()])
@@ -27,10 +30,20 @@ export function Actions() {
   }, []);
 
   const pending = recommendations.filter((r) => r.status === "PENDING");
-  const history = recommendations.filter((r) => r.status !== "PENDING");
+  const history = recommendations
+    .filter((r) => r.status !== "PENDING")
+    .sort((a, b) => (a.id === focusId ? -1 : b.id === focusId ? 1 : 0));
 
-  const handleApprove = async (id: string) => {
-    await api.approveRecommendation(id);
+  const handleApprove = async (id: string, scenarioId?: ScenarioId) => {
+    await api.approveRecommendation(id, scenarioId);
+    await refresh();
+    setFocusId(id);
+    setTab("history");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleRefresh = async (id: string) => {
+    await api.refreshRecommendation(id);
     await refresh();
   };
 
@@ -80,10 +93,11 @@ export function Actions() {
       ) : (
         visible.map((rec) => (
           <RecommendationCard
-            key={rec.id}
+            key={`${rec.id}:${rec.status}:${rec.scenarios?.generatedAt ?? ""}:${rec.outboundEmails?.length ?? 0}`}
             recommendation={rec}
             fuelPriceEurPerT={fuelPriceEurPerT}
             onApprove={handleApprove}
+            onRefresh={handleRefresh}
             onReject={handleReject}
             onUndo={handleUndo}
           />

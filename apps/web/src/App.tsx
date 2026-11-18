@@ -9,6 +9,7 @@ import { Actions } from "./pages/Actions.js";
 import { Bunkering } from "./pages/Bunkering.js";
 import { Ask } from "./pages/Ask.js";
 import { Settings } from "./pages/Settings.js";
+import { Value } from "./pages/Value.js";
 import { api } from "./lib/api.js";
 
 const PENDING_POLL_MS = 5000;
@@ -20,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/actions": "Actions",
   "/bunkering": "Bunkering",
   "/ask": "Ask",
+  "/value": "Business value",
   "/settings": "Settings",
 };
 
@@ -78,6 +80,7 @@ export function App() {
         <Route path="/actions" element={<Actions />} />
         <Route path="/bunkering" element={<Bunkering />} />
         <Route path="/ask" element={<Ask />} />
+        <Route path="/value" element={<Value />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

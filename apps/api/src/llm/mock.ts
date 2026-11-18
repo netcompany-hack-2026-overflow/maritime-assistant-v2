@@ -2,6 +2,8 @@ import type { Answer, OfferLine, PortEventExtraction } from "@maritime/shared";
 import { portEventExtractionSchema } from "@maritime/shared";
 import type { BunkerComparisonFacts, CitableRow, RecommendationFacts } from "./types.js";
 
+export { mockDraftNotice, mockExtractCharterParty } from "./charterParty.js";
+
 const KNOWN_PORTS: Array<{ name: string; unlocode: string; aliases?: string[] }> = [
   { name: "Piraeus", unlocode: "GRPIR" },
   { name: "Rotterdam", unlocode: "NLRTM" },
@@ -416,15 +418,28 @@ export async function mockExplainBunkerComparison(facts: BunkerComparisonFacts):
 
 export async function mockExplainRecommendation(facts: RecommendationFacts): Promise<string> {
   if (facts.bunker) return explainBunker(facts, facts.bunker);
+  const how =
+    facts.scenarioLabel && facts.scenarioLabel.startsWith("C")
+      ? `Re-routing (${facts.scenarioDescription ?? "around the weather"}) at ${facts.recommendedSpeedKn.toFixed(1)} kn `
+      : `Slowing from ${facts.currentSpeedKn.toFixed(1)} kn to ${facts.recommendedSpeedKn.toFixed(1)} kn `;
   return (
     `${facts.portName} has reported ${facts.portEventType.toLowerCase().replace("_", " ")} ` +
     `affecting ${facts.vesselName} on its ${facts.originPortName} → ${facts.destPortName} voyage, ` +
     `pushing the berth time back by ${facts.delayHours.toFixed(0)} hours. ` +
-    `Slowing from ${facts.currentSpeedKn.toFixed(1)} kn to ${facts.recommendedSpeedKn.toFixed(1)} kn ` +
+    how +
     `lets the vessel arrive exactly when the berth is ready instead of rushing to wait at anchor, ` +
     `saving an estimated ${facts.fuelSavedT.toFixed(1)} t of fuel ` +
     `(€${Math.round(facts.costSavedEur).toLocaleString("en-US")}) and ` +
-    `${facts.co2SavedT.toFixed(1)} t of CO₂ emissions.`
+    `${facts.co2SavedT.toFixed(1)} t of CO₂ emissions` +
+    (facts.etsSavedEur && facts.etsSavedEur > 0
+      ? ` (€${Math.round(facts.etsSavedEur).toLocaleString("en-US")} of EU ETS allowances)`
+      : "") +
+    "." +
+    (facts.demurrageAvoided && facts.demurrageAvoided > 0
+      ? ` It also keeps discharge within laytime, avoiding about ${facts.currency ?? "USD"} ` +
+        `${Math.round(facts.demurrageAvoided).toLocaleString("en-US")} of demurrage.`
+      : "") +
+    (facts.jitNote ? ` Charter party: ${facts.jitNote}` : "")
   );
 }
 

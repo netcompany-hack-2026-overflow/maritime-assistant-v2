@@ -4,10 +4,13 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { routeBetweenPorts } from "../services/seaRoute.js";
 import { calculateVoyageCII } from "../services/cii.js";
+import { charterPartyRouter } from "./charter-parties.js";
 
 export const voyagesRouter = Router();
 
-const include = { vessel: true, originPort: true, destPort: true } as const;
+voyagesRouter.use("/:voyageId/charter-party", charterPartyRouter);
+
+const include = { vessel: true, originPort: true, destPort: true, charterParty: { select: { id: true, sourceName: true } } } as const;
 
 type VoyageWithRelations = Prisma.VoyageGetPayload<{ include: typeof include }>;
 
@@ -29,6 +32,7 @@ function serializeVoyage(v: VoyageWithRelations) {
     plannedEta: v.plannedEta.toISOString(),
     berthTime: v.berthTime ? v.berthTime.toISOString() : null,
     routeNm: v.routeNm,
+    charterParty: v.charterParty,
     status: v.status,
     ciiAttained: v.ciiAttained,
     ciiRating: v.ciiRating,
