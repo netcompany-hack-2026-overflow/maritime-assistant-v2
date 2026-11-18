@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: "/voyages", label: "Voyages", end: false },
   { to: "/inbox", label: "Inbox", end: false },
   { to: "/actions", label: "Actions", end: false },
+  { to: "/bunkering", label: "Bunkering", end: false },
   { to: "/ask", label: "Ask", end: false },
   { to: "/settings", label: "Settings", end: false },
 ];

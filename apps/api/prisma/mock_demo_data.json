@@ -1,0 +1,113 @@
+{
+  "description": "Four supplier quotes for MV Aegean Star (IMO 9000001, Piraeus -> Rotterdam, passing Gibraltar), written the way bunker traders write. 'Simulate supplier quotes' on the Bunkering page drops all four into the inbox at once (received now, so the quote-validity countdowns are live) and runs them through the pipeline. 'expected' is what the parser must extract; apps/api/src/llm/__tests__/demoQuotes.test.ts checks it.",
+  "vessel": { "name": "MV Aegean Star", "imo": "9000001" },
+  "emails": [
+    {
+      "id": "trap-lowball",
+      "title": "The trap: lowest price per tonne",
+      "whatItTests": "Cheapest on paper (USD 526/mt), but barging is USD 4,500 extra and the barge comes 12 h after arrival, from a supplier with a weak record. Should rank last on total cost.",
+      "fromAddr": "trading@rockmarine-fuels.example",
+      "subject": "MV AEGEAN STAR / GIB / VLSFO OFFER",
+      "body": "Gd day,\n\nRef yr enq for MV Aegean Star (IMO 9000001) - ETA Gib on passage to Rotterdam.\n\nPls find our best offer, subj stem:\n\nVLSFO 0.5% (ISO 8217:2017 RMG380) 750-1,000 mt @ USD 526/mt ex-barge\nBarging: USD 4,500 l/s for Buyers acct\nDelivery: b/d ETA+12 hrs subj barge avail\nPmt: 30 days from b/d\nFirm 60 mins.\n\nBrgds,\nRock Marine Fuels",
+      "expected": {
+        "eventType": "BUNKER_OFFER",
+        "portUnlocode": "GIGIB",
+        "vesselNameMentioned": "MV Aegean Star",
+        "vesselImo": "9000001",
+        "fuelGrade": "VLSFO",
+        "priceUsdPerT": 526,
+        "qtyMinT": 750,
+        "qtyMaxT": 1000,
+        "bargingType": "LUMP_SUM",
+        "bargingUsd": 4500,
+        "otherFeesUsd": null,
+        "paymentDays": 30,
+        "deliveryDelayHours": 12,
+        "quoteValidityMinutes": 60,
+        "supplier": "Rock Marine Fuels",
+        "offerLines": [{ "fuelGrade": "VLSFO", "priceUsdPerT": 526, "qtyMinT": 750, "qtyMaxT": 1000 }]
+      }
+    },
+    {
+      "id": "balanced",
+      "title": "The balanced offer: all-in, prompt, reliable",
+      "whatItTests": "USD 5/mt dearer than the trap, but delivered (barging included), barge on arrival, 30 days credit and a supplier we trust. Should come out best on total cost.",
+      "fromAddr": "trading@strait-bunkering.example",
+      "subject": "RE: ENQ MV AEGEAN STAR - ALGECIRAS - VLSFO",
+      "body": "Dear Sirs,\n\nTks for the enq. For MV Aegean Star (IMO 9000001) we offer firm, subj stem:\n\nVLSFO 0.5% ISO 8217:2017, 750-1,000 mt @ USD 531/mt delivered Algeciras (ESALG), barging incl.\nDelivery prompt, barge alongside on vsl's arrival.\nPmt 30 days net from b/d.\nOffer firm 2 hrs.\n\nBest regards,\nStrait Bunkering Ltd",
+      "expected": {
+        "eventType": "BUNKER_OFFER",
+        "portUnlocode": "ESALG",
+        "vesselNameMentioned": "MV Aegean Star",
+        "vesselImo": "9000001",
+        "fuelGrade": "VLSFO",
+        "priceUsdPerT": 531,
+        "qtyMinT": 750,
+        "qtyMaxT": 1000,
+        "bargingType": "INCLUDED",
+        "bargingUsd": null,
+        "otherFeesUsd": null,
+        "paymentDays": 30,
+        "deliveryDelayHours": 0,
+        "quoteValidityMinutes": 120,
+        "supplier": "Strait Bunkering Ltd",
+        "offerLines": [{ "fuelGrade": "VLSFO", "priceUsdPerT": 531, "qtyMinT": 750, "qtyMaxT": 1000 }]
+      }
+    },
+    {
+      "id": "urgent-expiring",
+      "title": "The urgent one: good price, firm for 10 minutes",
+      "whatItTests": "USD 527/mt delivered, but only firm for 10 minutes (the UI counts down and warns) and on 15 days credit instead of 30, with a 2 h barge wait.",
+      "fromAddr": "desk@ceuta-oil.example",
+      "subject": "URGENT // MV AEGEAN STAR // VLSFO CEUTA - FIRM 10 MINS",
+      "body": "Hi team,\n\nCan do VLSFO 0.5% for MV Aegean Star at Ceuta, 800-1,000 mt @ USD 527/mt delivered, barging incl.\nb/d ETA+2 hrs.\nPmt 15 days from b/d (not 30).\nPrice firm 10 mins only, after that subj reconfirmation - mkt moving fast.\n\nRgds,\nCeuta Oil Trading",
+      "expected": {
+        "eventType": "BUNKER_OFFER",
+        "portUnlocode": "ESCEU",
+        "vesselNameMentioned": "MV Aegean Star",
+        "vesselImo": null,
+        "fuelGrade": "VLSFO",
+        "priceUsdPerT": 527,
+        "qtyMinT": 800,
+        "qtyMaxT": 1000,
+        "bargingType": "INCLUDED",
+        "bargingUsd": null,
+        "otherFeesUsd": null,
+        "paymentDays": 15,
+        "deliveryDelayHours": 2,
+        "quoteValidityMinutes": 10,
+        "supplier": "Ceuta Oil Trading",
+        "offerLines": [{ "fuelGrade": "VLSFO", "priceUsdPerT": 527, "qtyMinT": 800, "qtyMaxT": 1000 }]
+      }
+    },
+    {
+      "id": "messy-two-grades",
+      "title": "The messy one: two grades in one line",
+      "whatItTests": "Lower-case, no ship prefix, 'pmt' meaning both 'per metric ton' and 'payment', and VLSFO + LSMGO quoted in the same line. The parser must keep the two grades apart and pick up the overtime charge.",
+      "fromAddr": "ops@medbunker-brokers.example",
+      "subject": "fw: offers aegean star",
+      "body": "hi - as discussed,,, aegean star imo 9000001 gib\nvlsfo 0.5pct 800/1000mt usd 529 pmt / lsmgo 0.1% 80-100 mt usd 735 pmt\nboth delivered, barging incl. overtime usd 1,200 if outside office hrs\ndel ETA+4hrs subj prompt barge\npmt 30 days\nvalid 30 mins\npls revert asap\nrgds Med Bunker Brokers",
+      "expected": {
+        "eventType": "BUNKER_OFFER",
+        "portUnlocode": "GIGIB",
+        "vesselNameMentioned": null,
+        "vesselImo": "9000001",
+        "fuelGrade": "VLSFO",
+        "priceUsdPerT": 529,
+        "qtyMinT": 800,
+        "qtyMaxT": 1000,
+        "bargingType": "INCLUDED",
+        "bargingUsd": null,
+        "otherFeesUsd": 1200,
+        "paymentDays": 30,
+        "deliveryDelayHours": 4,
+        "quoteValidityMinutes": 30,
+        "supplier": "Med Bunker Brokers",
+        "offerLines": [
+          { "fuelGrade": "VLSFO", "priceUsdPerT": 529, "qtyMinT": 800, "qtyMaxT": 1000 },
+          { "fuelGrade": "LSMGO", "priceUsdPerT": 735, "qtyMinT": 80, "qtyMaxT": 100 }
+        ]
+      }
+    }
+  ]
+}

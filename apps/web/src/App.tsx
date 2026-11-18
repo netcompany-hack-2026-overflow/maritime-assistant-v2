@@ -6,6 +6,7 @@ import { Fleet } from "./pages/Fleet.js";
 import { Voyages } from "./pages/Voyages.js";
 import { Inbox } from "./pages/Inbox.js";
 import { Actions } from "./pages/Actions.js";
+import { Bunkering } from "./pages/Bunkering.js";
 import { Ask } from "./pages/Ask.js";
 import { Settings } from "./pages/Settings.js";
 import { api } from "./lib/api.js";
@@ -17,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/voyages": "Voyages",
   "/inbox": "Inbox",
   "/actions": "Actions",
+  "/bunkering": "Bunkering",
   "/ask": "Ask",
   "/settings": "Settings",
 };
@@ -74,6 +76,7 @@ export function App() {
         <Route path="/voyages" element={<Voyages />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/actions" element={<Actions />} />
+        <Route path="/bunkering" element={<Bunkering />} />
         <Route path="/ask" element={<Ask />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

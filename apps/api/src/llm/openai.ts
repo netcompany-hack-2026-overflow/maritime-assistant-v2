@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { answerSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
 import { EXTRACTION_SYSTEM_PROMPT, parseExtraction } from "./extraction.js";
-import type { CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
-import { mockExplainRecommendation } from "./mock.js";
+import type { BunkerComparisonFacts, CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+import { mockExplainBunkerComparison, mockExplainRecommendation } from "./mock.js";
+import { BUNKER_COMPARISON_SYSTEM } from "./anthropic.js";
 
 const MAX_JSON_TOKENS = 4000;
 const MAX_TEXT_TOKENS = 2000;
@@ -78,6 +79,19 @@ export class OpenAiProvider implements LlmProvider {
     // Never show an empty rationale (e.g. the token cap was spent on reasoning):
     // fall back to the deterministic template built from the same numbers.
     return text.length > 0 ? text : mockExplainRecommendation(facts);
+  }
+
+  async explainBunkerComparison(facts: BunkerComparisonFacts): Promise<string> {
+    const response = await this.client.chat.completions.create({
+      model: this.model,
+      max_completion_tokens: MAX_TEXT_TOKENS,
+      messages: [
+        { role: "system", content: BUNKER_COMPARISON_SYSTEM },
+        { role: "user", content: JSON.stringify(facts) },
+      ],
+    });
+    const text = (response.choices[0]?.message?.content ?? "").trim();
+    return text.length > 0 ? text : mockExplainBunkerComparison(facts);
   }
 
   async answerQuestion(question: string, rows: CitableRow[]): Promise<Answer> {

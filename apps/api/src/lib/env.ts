@@ -25,6 +25,35 @@ export function resolveLlmModel(provider: LlmProviderName, override: string | un
 
 const llmProvider = (process.env.LLM_PROVIDER || "mock") as LlmProviderName;
 
+/** "true"/"1"/"yes" -> true; anything else (or unset) -> the fallback. */
+export function envFlag(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+
+/**
+ * Outgoing email (SMTP) for sending the bunker-offer replies. Any SMTP
+ * provider works: Gmail/Google Workspace, Outlook/Microsoft 365, SendGrid,
+ * Mailgun, Amazon SES, Brevo... See .env.example.
+ */
+export const mailEnv = {
+  host: process.env.SMTP_HOST?.trim() ?? "",
+  port: smtpPort,
+  /** TLS from the first byte (port 465). Port 587 uses STARTTLS with secure=false. */
+  secure: envFlag(process.env.SMTP_SECURE, smtpPort === 465),
+  user: process.env.SMTP_USER?.trim() ?? "",
+  pass: process.env.SMTP_PASS ?? "",
+  from: process.env.MAIL_FROM?.trim() ?? "",
+  fromName: process.env.MAIL_FROM_NAME?.trim() || "Tidewise Operations",
+  replyTo: process.env.MAIL_REPLY_TO?.trim() ?? "",
+  /** Every sent reply is also BCC'd here (e.g. the ops mailbox), if set. */
+  bcc: process.env.MAIL_BCC?.trim() ?? "",
+  /** For testing: send everything here instead of to the supplier. */
+  redirectTo: process.env.MAIL_REDIRECT_TO?.trim() ?? "",
+};
+
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   llmProvider,

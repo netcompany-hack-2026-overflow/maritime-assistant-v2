@@ -11,7 +11,9 @@ import { recommendationsRouter } from "./routes/recommendations.js";
 import { recordsRouter } from "./routes/records.js";
 import { askRouter } from "./routes/ask.js";
 import { settingsRouter } from "./routes/settings.js";
+import { bunkerOffersRouter, emailDraftsRouter } from "./routes/bunker-offers.js";
 import { getSettings } from "./lib/settings.js";
+import { mailerStatus } from "./services/mailer.js";
 
 const app = express();
 app.use(cors());
@@ -29,6 +31,7 @@ app.get("/api/meta", async (_req, res, next) => {
       simSpeed: env.simSpeed,
       fuelPriceEurPerT: settings.fuelPriceEurPerT,
       co2Factor: settings.co2Factor,
+      emailProvider: mailerStatus(),
     });
   } catch (err) {
     next(err);
@@ -44,6 +47,8 @@ app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/records", recordsRouter);
 app.use("/api/ask", askRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/bunker-offers", bunkerOffersRouter);
+app.use("/api/email-drafts", emailDraftsRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);

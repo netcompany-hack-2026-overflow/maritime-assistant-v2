@@ -127,7 +127,7 @@ export async function undoApproval(id: string) {
 
   if (recommendation.actionType === "BUNKER_DETOUR") {
     const [updatedRecommendation] = await prisma.$transaction([
-      prisma.recommendation.update({ where: { id }, data: { status: "PENDING", decidedAt: null } }),
+      prisma.recommendation.update({ where: { id }, data: { status: "PENDING", decidedAt: null, chosenOption: null } }),
       prisma.auditLog.create({
         data: { entity: "recommendation", entityId: id, action: "APPROVAL_UNDONE", payload: { actionType: "BUNKER_DETOUR" } },
       }),

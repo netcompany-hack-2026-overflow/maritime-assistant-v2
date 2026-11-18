@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { Link } from "react-router-dom";
 import { bunkerVerdictReason, type BunkerCalc } from "@maritime/shared";
 import { api, type RecommendationRecord, type RecordResponse } from "../lib/api.js";
 import "./RecommendationCard.css";
@@ -181,6 +182,11 @@ export function RecommendationCard({
       </div>
 
       <p className="recommendation-card__rationale">{recommendation.rationale}</p>
+      {bunker && (
+        <Link className="recommendation-card__toggle" to={`/bunkering?offer=${recommendation.id}`}>
+          Compare offers, route options and replies →
+        </Link>
+      )}
 
       <button
         className="recommendation-card__toggle"

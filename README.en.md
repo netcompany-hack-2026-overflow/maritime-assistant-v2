@@ -45,9 +45,11 @@ until 23 Nov"*. Cheaper fuel only pays if the detour doesn't eat the saving. Tid
 reads the offer, finds the ship whose remaining route passes nearest the port, and
 compares two plans that both end at the berth time:
 
-- **Stay on route** at the current speed (waiting out any slack at anchor).
-- **Bunker**: sail out to the port and back, spend 8 h alongside, and speed up only as
-  much as needed to still make the berth (cube-law fuel again).
+- **Stay on route**, slowing down to arrive exactly at the berth time: the best the ship
+  can do without bunkering, so slow-steaming savings aren't credited to the offer.
+- **Bunker**: sail out to the port and back, spend as long alongside as the stem needs
+  (8 h for 800 t, ±1 h per 250 t) plus any wait for the barge, and sail at the speed
+  that arrives exactly at the berth time (cube-law fuel again).
 
 ```
 net € = qty × (our price − offer price × USD→EUR) − extra fuel × our price − port costs
@@ -55,15 +57,56 @@ net € = qty × (our price − offer price × USD→EUR) − extra fuel × our 
 
 It's only **worth it** if the net is positive, the ship still makes its berth at or
 below design speed, and the offer is still valid when the ship gets there. With the
-seeded demo, Algeciras (≈10 nm off the route) comes out **worth it, net ≈ +€110k**
-once the berth delay has given the ship slack. Genoa (≈580 nm off the route) is
-**not worth it**: the detour burns more than the cheaper fuel saves, and the ship
-would miss its berth. Every offer waits on Actions for a person to decide; not-worth-it
+seeded demo, Algeciras (≈10 nm off the route) comes out **worth it, net ≈ +€54k** for
+800 t once the berth delay has given the ship slack. Genoa (≈580 nm off the route)
+**stops at the time check**: it needs ≈90 h and the ship has 24 h to spare, so it isn't
+analysed any further (see below). Every offer waits on Actions for a person to decide; not-worth-it
 ones are marked in red with the reason, and you can ask *"why didn't we take the Genoa
 offer?"*. The
 calculation is a pure, unit-tested function
 ([packages/shared/src/bunker.ts](packages/shared/src/bunker.ts)) and every step is
 stored with the recommendation (its `calc` field) for the UI to show.
+
+### Third scenario: comparing offers and drafting the replies (Bunkering)
+
+When a fuel offer arrives, the agent:
+
+1. **Reads the terms**, trader shorthand included: grade (several per email, e.g.
+   VLSFO + LSMGO), price, quantity, IMO, barging (included / lump sum / per tonne),
+   other fees (overtime, agency), payment terms, delivery window (`b/d ETA+12 hrs`,
+   `prompt`) and how long the price is firm (`firm 10 mins`, with a live countdown).
+2. **Finds the ship** (IMO, name, or the one passing closest), its position, where it
+   would leave its route, the distance to the bunker port, likely delays (the supplier's
+   window; congestion or closure reported for that port in the last 7 days) and the
+   berth time it must still make.
+3. **Checks time before anything else.** If *time alongside + barge wait + detour*
+   exceeds the ship's slack before its berth (at design speed) by more than **30 min**
+   (`bunkerSlackToleranceMin` in Settings), it stops there: no options, **no model call**,
+   just a polite decline. Same if the ship can't reach the port before the offer expires.
+4. For offers that pass, **at most two options**, each with the reshaped route (ship →
+   turn-off → port → back on route → destination, with times), a **proposed speed** and
+   the net saving: *ECO* (slow down, arrive exactly at the berth) and *KEEP_SPEED*
+   (current speed, arrive early with time in hand), the latter only if it really differs.
+5. **Compares all the ship's offers side by side** on total cost, not price per tonne:
+   ```
+   total = fuel + barging + other fees + port call
+         + extra fuel for detour & speed
+         + delay risk (hours × charter rate × urgency 25/50/100%)
+         + cost of credit (8%/yr vs 30 days) + supplier risk (0.3% per point below 10/10)
+         + EU ETS on the extra CO₂ (optional)
+   ```
+   The sliders (charter rate, stem, urgency, ETS) re-run the same pure calculation in the
+   browser instantly, no tokens. The plain-English recommendation is built from the
+   numbers; "Ask the AI" makes **one** model call, only when asked.
+6. **Drafts the replies** (an acceptance per option, a counter-offer when the price doesn't
+   work, a decline) from templates, so figures are exact and cost no tokens. You read,
+   edit and send **one**: acceptance approves the offer with that option, decline rejects
+   it, counter leaves it pending. The others close. Nothing is sent without pressing Send.
+
+Code: [bunkerPlan.ts](packages/shared/src/bunkerPlan.ts) (time check, options, route),
+[bunkerTco.ts](packages/shared/src/bunkerTco.ts) (comparison, explanation),
+[bunkerEmails.ts](packages/shared/src/bunkerEmails.ts) (replies), all pure and unit-tested.
+The four demo emails are in [apps/api/prisma/mock_demo_data.json](apps/api/prisma/mock_demo_data.json).
 
 ## The 90-second demo path
 
@@ -79,8 +122,11 @@ stored with the recommendation (its `calc` field) for the UI to show.
 4. **Fleet** — MV Aegean Star is now visibly slower on the globe, and its ETA has
    moved to match the new berth time exactly.
 5. **Bunker offers** — back in Inbox, simulate and process the next two emails. On
-   Actions, both wait for a decision: Algeciras is marked worth it (net ≈ +€110k),
-   Genoa is marked in red as not worth it, with the reason. Reject Genoa.
+   Actions, both wait for a decision: Algeciras is marked worth it (net ≈ +€54k),
+   Genoa is marked in red as not worth it, with the reason. Reject Genoa. "Compare
+   offers, route options and replies →" opens the Bunkering page.
+5b. **Bunkering**: "Simulate supplier quotes" brings in four quotes for MV Aegean Star
+   and compares them (see the pitch below).
 6. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
    from approved recommendations?" and get an answer with a citation back to the
    recommendation record.
@@ -88,6 +134,30 @@ stored with the recommendation (its `calc` field) for the UI to show.
    `apps/web/public/samples/algeciras-berth-notice.pdf` (also downloadable from the
    Inbox page). The PDF's text runs through the same pipeline and produces a
    recommendation for MV Ionian Trader.
+
+## 60-second pitch: Bunkering co-pilot
+
+**Once, before the pitch:**
+
+```bash
+docker compose up --build            # or see "Local dev without Docker"
+# To send email: fill in SMTP_* and MAIL_FROM in .env, and for the demo
+# MAIL_REDIRECT_TO=<your address> (the demo suppliers use fake *.example addresses).
+docker compose up -d --build api     # after changing .env
+```
+
+Open http://localhost:8080 → **Inbox** → "Simulate incoming email" → **Process** (the 24 h
+Rotterdam delay gives the ship time to bunker; without it every offer, correctly, stops at
+the time check).
+
+| Time | Show | Say |
+|---|---|---|
+| 0–10 s | **Bunkering** → "Simulate supplier quotes" | "Four suppliers, four emails in trader shorthand, like every day." |
+| 10–20 s | The table: Rock Marine at **$526/t** is cheapest… and ranks **#4** | "Cheapest per tonne is dearest overall: $4,500 barging on top, barge 12 hours after arrival, reliability 5/10." |
+| 20–30 s | The recommendation: "Strait Bunkering is $5.00/t dearer on paper… but ≈$33k cheaper overall" | "Making up 12 hours means sailing faster: ≈$27k of extra fuel no quote shows." |
+| 30–40 s | Ceuta's countdown (**firm 10 mins**, amber) · sliders: charter $40k, urgency High, ETS on | "The ranking re-computes instantly, no model call." |
+| 40–50 s | Click the Strait Bunkering column → route sketch, ECO 12.5 kn vs 14 kn, times per waypoint | "It also planned the new route and the speed that arrives exactly at the berth." |
+| 50–60 s | "Accept · eco speed" → tweak the text → **Send** | "A person decides and sends. The model only reads; nobody makes the numbers up, and offers that don't fit the schedule are cut before we spend a token." |
 
 ## Pages
 
@@ -267,6 +337,15 @@ pages' polling. A timeout shows "The language model took too long to answer".
 - Type: Inter for UI, Instrument Serif italic for accents (both self-hosted via
   `@fontsource`, no external font requests). Hero photo by Austin Neill on Unsplash.
 
+### Sending email (optional)
+
+Supplier replies go out over SMTP, so any provider works (Gmail, Microsoft 365,
+SendGrid, Mailgun, Brevo, Amazon SES). Set at least `SMTP_HOST` and `MAIL_FROM` in `.env`
+(plus `SMTP_USER`/`SMTP_PASS` if the server needs a login); `.env.example` lists the
+settings per provider. `MAIL_REDIRECT_TO` sends everything to your own address for
+testing. Without it configured the replies are still written and can be copied; only
+Send is disabled.
+
 ## Local dev without Docker
 
 Requires Node 20+ and a local PostgreSQL instance.
@@ -343,6 +422,11 @@ Full per-field, per-email results are written to
 | POST | `/api/ask` | natural-language Q&A with validated citations |
 | GET | `/api/settings` | current fuel price, CO₂ factor, USD→EUR rate and bunker assumptions |
 | PUT | `/api/settings` | set `fuelPriceEurPerT` (0–5000) and/or `usdEurRate` (0.5–2); re-prices pending recommendations |
+| GET | `/api/bunker-offers` | every fuel offer with terms, supplier, time check, options, route and reply drafts |
+| POST | `/api/bunker-offers/simulate` | brings in and processes the four demo quotes (`mock_demo_data.json`) |
+| POST | `/api/bunker-offers/explain` | one LLM call: explains a voyage's comparison under the given assumptions |
+| PATCH | `/api/email-drafts/:id` | save edits to a draft (`toAddr`, `subject`, `body`) |
+| POST | `/api/email-drafts/:id/send` | send over SMTP; records the decision on the offer |
 
 ## Assumptions
 
@@ -366,8 +450,16 @@ Full per-field, per-email results are written to
   call a marine-weather API instead.
 - Bunker offers: prices are in USD/t and converted with a USD→EUR rate (default 0.92,
   set with `PUT /api/settings`; changing it re-prices pending offers). A bunker call is
-  assumed to take 8 h alongside and cost €5,000 in port and agency fees. An offer with
-  no quantity is assumed to be 800 t. The detour is measured as a straight line out to
+  assumed to take 8 h alongside for 800 t (±1 h per 250 t, pump rate
+  `bunkerPumpRateTPerH`) and cost €5,000 in port and agency fees. The quantity is the
+  ship's stem (800 t), clamped to the supplier's range. A supplier's delivery window
+  (`ETA+12 hrs`) counts at its worst case; with congestion as well, the larger of the
+  two counts, not the sum.
+- Offer comparison (TCO): a charter rate per vessel (e.g. $18,000/day for MV Aegean
+  Star), cost of money 8%/yr against 30 days' credit, supplier risk 0.3% of the bill per
+  reliability point below 10 (history in the `Supplier` table; unknown = 6/10), EUA
+  €75/t. Barging not stated is treated as included and flagged. The first grade in each
+  email (e.g. VLSFO) is compared; other grades are shown separately. The detour is measured as a straight line out to
   the port and back from the closest point on the ship's remaining route whose line to
   the port doesn't cross land (Natural Earth 110m coastlines). The sea-route network is
   too coarse for this at short range. The bunker calculation uses calm water.
@@ -390,10 +482,15 @@ Full per-field, per-email results are written to
 - Voyage creation does not check for a duplicate route/vessel combination beyond
   "vessel already has an active voyage" — nothing stops two voyages on the same route
   for different vessels.
-- Approving a bunker offer records the decision; it does not yet re-route the ship
-  through the bunker port on the globe or change its speed.
-- The bunker and slow-steaming recommendations are each priced on their own. Approving
-  both on one voyage doesn't re-run the other's numbers against the combined plan.
+- Approving a bunker offer (or sending its acceptance) records the decision and the
+  option; it does not yet re-route the ship through the bunker port on the globe or
+  change its speed.
+- Bunker options are compared with slow steaming without bunkering, but approving both
+  recommendations on one voyage doesn't re-run them against the combined plan.
+- Offers come in through the Inbox (simulate, paste, PDF). A real mailbox (IMAP) isn't
+  read yet; `.env` only configures sending.
+- The time check and options are worked out when the offer is processed; if the ship
+  has moved on a lot, process the offer again. Bunker calculations assume calm water.
 - There is no authentication; this is a single-tenant demo app.
 - PDF upload reads the text layer only; scanned (image-only) PDFs are rejected with a
   clear message rather than OCR'd.

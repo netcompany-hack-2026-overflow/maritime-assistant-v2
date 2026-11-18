@@ -25,6 +25,18 @@ const PORTS: PortSeed[] = [
   { unlocode: "AEJEA", name: "Jebel Ali", country: "United Arab Emirates", lat: 25.0118, lon: 55.0618 },
   { unlocode: "BRSSZ", name: "Santos", country: "Brazil", lat: -23.9608, lon: -46.3339 },
   { unlocode: "USHOU", name: "Houston", country: "United States", lat: 29.7355, lon: -95.0086 },
+  // Strait of Gibraltar bunker hubs, used by the demo supplier quotes (prisma/mock_demo_data.json).
+  { unlocode: "GIGIB", name: "Gibraltar", country: "Gibraltar", lat: 36.1408, lon: -5.3536 },
+  { unlocode: "ESCEU", name: "Ceuta", country: "Spain", lat: 35.8894, lon: -5.3166 },
+];
+
+/** Bunker suppliers we have history with; reliability 1-10 feeds the offer comparison. */
+const SUPPLIERS = [
+  { name: "Strait Bunkering Ltd", emailDomain: "strait-bunkering.example", reliabilityScore: 9 },
+  { name: "Ligurian Fuels S.p.A.", emailDomain: "ligurian-fuels.example", reliabilityScore: 7 },
+  { name: "Rock Marine Fuels", emailDomain: "rockmarine-fuels.example", reliabilityScore: 5 },
+  { name: "Ceuta Oil Trading", emailDomain: "ceuta-oil.example", reliabilityScore: 7 },
+  { name: "Med Bunker Brokers", emailDomain: "medbunker-brokers.example", reliabilityScore: 8 },
 ];
 
 interface VesselSeed {
@@ -36,17 +48,19 @@ interface VesselSeed {
   minSpeedKn: number;
   fuelTPerDayAtDesign: number;
   auxFuelTPerDay: number;
+  /** Indicative time-charter rate, prices delays in the bunker-offer comparison. */
+  charterRateUsdPerDay: number;
 }
 
 const VESSELS: VesselSeed[] = [
-  { imo: "9000001", name: "MV Aegean Star", type: "Container", dwt: 45000, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3 },
-  { imo: "9000002", name: "MV Cycladic Wind", type: "Bulk Carrier", dwt: 38000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 32, auxFuelTPerDay: 2.5 },
-  { imo: "9000003", name: "MV Ionian Trader", type: "Container", dwt: 52000, designSpeedKn: 15, minSpeedKn: 10, fuelTPerDayAtDesign: 45, auxFuelTPerDay: 3.5 },
-  { imo: "9000004", name: "MV Hellenic Pioneer", type: "Tanker", dwt: 60000, designSpeedKn: 14.5, minSpeedKn: 9.5, fuelTPerDayAtDesign: 42, auxFuelTPerDay: 3 },
-  { imo: "9000005", name: "MV Aegean Breeze", type: "Bulk Carrier", dwt: 41000, designSpeedKn: 13.5, minSpeedKn: 9, fuelTPerDayAtDesign: 35, auxFuelTPerDay: 2.8 },
-  { imo: "9000006", name: "MV Poseidon Glory", type: "Container", dwt: 48000, designSpeedKn: 16, minSpeedKn: 10, fuelTPerDayAtDesign: 48, auxFuelTPerDay: 4 },
-  { imo: "9000007", name: "MV Marathon Spirit", type: "General Cargo", dwt: 30000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 28, auxFuelTPerDay: 2 },
-  { imo: "9000008", name: "MV Olympic Horizon", type: "Tanker", dwt: 65000, designSpeedKn: 14, minSpeedKn: 9.5, fuelTPerDayAtDesign: 44, auxFuelTPerDay: 3.2 },
+  { imo: "9000001", name: "MV Aegean Star", type: "Container", dwt: 45000, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3, charterRateUsdPerDay: 18000 },
+  { imo: "9000002", name: "MV Cycladic Wind", type: "Bulk Carrier", dwt: 38000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 32, auxFuelTPerDay: 2.5, charterRateUsdPerDay: 14000 },
+  { imo: "9000003", name: "MV Ionian Trader", type: "Container", dwt: 52000, designSpeedKn: 15, minSpeedKn: 10, fuelTPerDayAtDesign: 45, auxFuelTPerDay: 3.5, charterRateUsdPerDay: 21000 },
+  { imo: "9000004", name: "MV Hellenic Pioneer", type: "Tanker", dwt: 60000, designSpeedKn: 14.5, minSpeedKn: 9.5, fuelTPerDayAtDesign: 42, auxFuelTPerDay: 3, charterRateUsdPerDay: 26000 },
+  { imo: "9000005", name: "MV Aegean Breeze", type: "Bulk Carrier", dwt: 41000, designSpeedKn: 13.5, minSpeedKn: 9, fuelTPerDayAtDesign: 35, auxFuelTPerDay: 2.8, charterRateUsdPerDay: 15000 },
+  { imo: "9000006", name: "MV Poseidon Glory", type: "Container", dwt: 48000, designSpeedKn: 16, minSpeedKn: 10, fuelTPerDayAtDesign: 48, auxFuelTPerDay: 4, charterRateUsdPerDay: 22000 },
+  { imo: "9000007", name: "MV Marathon Spirit", type: "General Cargo", dwt: 30000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 28, auxFuelTPerDay: 2, charterRateUsdPerDay: 12000 },
+  { imo: "9000008", name: "MV Olympic Horizon", type: "Tanker", dwt: 65000, designSpeedKn: 14, minSpeedKn: 9.5, fuelTPerDayAtDesign: 44, auxFuelTPerDay: 3.2, charterRateUsdPerDay: 27000 },
 ];
 
 interface VoyageSeed {
@@ -135,6 +149,10 @@ async function main() {
       update: { ...v },
       create: v,
     });
+  }
+
+  for (const s of SUPPLIERS) {
+    await prisma.supplier.upsert({ where: { name: s.name }, update: s, create: s });
   }
 
   const voyageCount = await prisma.voyage.count();

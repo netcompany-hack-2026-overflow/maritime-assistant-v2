@@ -8,6 +8,7 @@ export const recommendationsRouter = Router();
 const include = {
   voyage: { include: { vessel: true, originPort: true, destPort: true } },
   portEvent: { include: { email: true, port: true } },
+  emailDrafts: { orderBy: { createdAt: "asc" } },
 } as const;
 
 recommendationsRouter.get(

@@ -14,6 +14,18 @@ export function routeAhead(coords: LatLon[], remainingNm: number): LatLon[] {
   return [position, ...coords.slice(nextIndex)];
 }
 
+/**
+ * Split a route at `alongNm` from its start: the part before the turn-off
+ * point and the part after it (both include the split point), so the detour
+ * can be drawn between them.
+ */
+export function splitRouteAt(coords: LatLon[], alongNm: number): { before: LatLon[]; after: LatLon[] } {
+  const total = polylineLengthNm(coords);
+  if (coords.length < 2 || total <= 0) return { before: coords.slice(0, 1), after: coords.slice() };
+  const { position, nextIndex } = interpolateAlongPolyline(coords, Math.max(0, Math.min(1, alongNm / total)));
+  return { before: [...coords.slice(0, nextIndex), position], after: [position, ...coords.slice(nextIndex)] };
+}
+
 export interface NearestOnRoute {
   /** Closest point on the route to p. */
   point: LatLon;
@@ -104,6 +116,30 @@ export interface BunkerInput {
   /** Quantity assumed when the offer gives none, t. */
   defaultQtyT: number;
   co2Factor: number;
+
+  // Optional knobs used by planBunkerOptions. Leaving them all out gives the
+  // original single-plan check (keep speed, catch up only if needed).
+
+  /** Lowest speed the ship may sail at; needed for the "JIT" strategies. */
+  minSpeedKn?: number;
+  /**
+   * The no-bunker plan to compare against. "KEEP" (default): current speed,
+   * then wait at anchor. "JIT": the slowest speed (≥ minSpeedKn, ≤ current)
+   * that still makes the deadline, the best the ship can do without bunkering.
+   */
+  stayPlan?: "KEEP" | "JIT";
+  /**
+   * Speed on the bunker plan. "CATCH_UP" (default): current speed, faster only
+   * if needed. "JIT": the slowest speed ≥ minSpeedKn that still makes the
+   * deadline; faster on the leg to the bunker port if the offer would expire.
+   */
+  bunkerSpeed?: "CATCH_UP" | "JIT";
+  /** Overrides the quantity taken from the offer, t. */
+  qtyT?: number;
+  /** Extra hours at the bunker port on top of portHours (waiting for the barge, congestion). */
+  delayHours?: number;
+  /** Arriving up to this many hours after the deadline still counts as on time. */
+  lateToleranceHours?: number;
 }
 
 function dailyFuel(speedKn: number, designSpeedKn: number, fuelTPerDayAtDesign: number): number {
@@ -163,37 +199,65 @@ export function calculateBunker(input: BunkerInput): BunkerCalc {
     portFeeEur,
     defaultQtyT,
     co2Factor,
+    stayPlan = "KEEP",
+    bunkerSpeed = "CATCH_UP",
+    delayHours = 0,
+    lateToleranceHours = 0,
   } = input;
+  // Never "slow down" to a floor above the current speed.
+  const floorKn = Math.min(input.minSpeedKn ?? v0, v0);
 
   const detourNm = 2 * offRouteNm;
   const hoursToDeadline = (deadline.getTime() - now.getTime()) / 3_600_000;
+  const stopHours = portHours + delayHours;
 
   // Stay on route.
-  const sailHoursStay = remainingNm / v0;
+  const speedStayKn =
+    stayPlan === "JIT" && hoursToDeadline > 0
+      ? Math.min(v0, Math.max(floorKn, remainingNm / hoursToDeadline))
+      : v0;
+  const sailHoursStay = remainingNm / speedStayKn;
   const waitHoursStay = Math.max(0, hoursToDeadline - sailHoursStay);
   const fuelStayT =
-    (dailyFuel(v0, designSpeedKn, fuelTPerDayAtDesign) * sailHoursStay) / 24 +
+    (dailyFuel(speedStayKn, designSpeedKn, fuelTPerDayAtDesign) * sailHoursStay) / 24 +
     (auxFuelTPerDay * waitHoursStay) / 24;
 
-  // Bunker detour.
+  // Bunker detour: leg 1 to the bunker port, leg 2 back to the route and on to the destination.
   const sailNmBunker = remainingNm + detourNm;
-  const sailHoursAvailable = hoursToDeadline - portHours;
+  const legToNm = alongNm + offRouteNm;
+  const legAfterNm = sailNmBunker - legToNm;
+  const sailHoursAvailable = hoursToDeadline - stopHours;
   const requiredSpeedKn = sailHoursAvailable > 0 ? sailNmBunker / sailHoursAvailable : Infinity;
-  const arrivalOk = requiredSpeedKn <= designSpeedKn;
-  const speedBunkerKn = Math.min(designSpeedKn, Math.max(v0, requiredSpeedKn));
-  const sailHoursBunker = sailNmBunker / speedBunkerKn;
-  const waitHoursBunker = Math.max(0, hoursToDeadline - portHours - sailHoursBunker);
-  const lateHours = Math.max(0, sailHoursBunker + portHours - hoursToDeadline);
+  const lowestKn = bunkerSpeed === "JIT" ? floorKn : v0;
+  let speedBunkerKn = Math.min(designSpeedKn, Math.max(lowestKn, requiredSpeedKn));
+  let speedAfterBunkerKn = speedBunkerKn;
+  if (bunkerSpeed === "JIT" && offer.validUntil) {
+    // The slow single speed may reach the port after the offer expires: hurry
+    // on leg 1 only, then use what's left of the time on leg 2.
+    const hoursToExpiry = (offer.validUntil.getTime() - now.getTime()) / 3_600_000;
+    if (hoursToExpiry > 0 && legToNm / speedBunkerKn > hoursToExpiry) {
+      speedBunkerKn = Math.min(designSpeedKn, legToNm / hoursToExpiry);
+      const hoursLeft = hoursToDeadline - legToNm / speedBunkerKn - stopHours;
+      speedAfterBunkerKn =
+        hoursLeft > 0 ? Math.min(designSpeedKn, Math.max(floorKn, legAfterNm / hoursLeft)) : designSpeedKn;
+    }
+  }
+  const sailHoursBunker = legToNm / speedBunkerKn + legAfterNm / speedAfterBunkerKn;
+  const waitHoursBunker = Math.max(0, hoursToDeadline - stopHours - sailHoursBunker);
+  const lateHours = Math.max(0, sailHoursBunker + stopHours - hoursToDeadline);
+  // Same test as before when there's no tolerance; the epsilon only absorbs float noise.
+  const arrivalOk = lateToleranceHours > 0 ? lateHours <= lateToleranceHours + 1e-9 : requiredSpeedKn <= designSpeedKn;
   const fuelBunkerT =
-    (dailyFuel(speedBunkerKn, designSpeedKn, fuelTPerDayAtDesign) * sailHoursBunker) / 24 +
-    (auxFuelTPerDay * (portHours + waitHoursBunker)) / 24;
+    (dailyFuel(speedBunkerKn, designSpeedKn, fuelTPerDayAtDesign) * (legToNm / speedBunkerKn)) / 24 +
+    (dailyFuel(speedAfterBunkerKn, designSpeedKn, fuelTPerDayAtDesign) * (legAfterNm / speedAfterBunkerKn)) / 24 +
+    (auxFuelTPerDay * (stopHours + waitHoursBunker)) / 24;
 
   const extraFuelT = fuelBunkerT - fuelStayT;
-  const extraHours = sailHoursBunker + portHours - sailHoursStay;
+  const extraHours = sailHoursBunker + stopHours - sailHoursStay;
 
-  const etaAtBunker = new Date(now.getTime() + ((alongNm + offRouteNm) / speedBunkerKn) * 3_600_000);
+  const etaAtBunker = new Date(now.getTime() + (legToNm / speedBunkerKn) * 3_600_000);
   const offerValidAtArrival = offer.validUntil === null || etaAtBunker <= offer.validUntil;
-  const qtyT = offer.qtyMaxT ?? offer.qtyMinT ?? defaultQtyT;
+  const qtyT = input.qtyT ?? offer.qtyMaxT ?? offer.qtyMinT ?? defaultQtyT;
 
   const base = {
     remainingNm,
@@ -220,11 +284,17 @@ export function calculateBunker(input: BunkerInput): BunkerCalc {
     co2Factor,
     priceUsdPerT: offer.priceUsdPerT,
     qtyT,
-    qtyAssumed: offer.qtyMaxT === null && offer.qtyMinT === null,
+    qtyAssumed: input.qtyT === undefined && offer.qtyMaxT === null && offer.qtyMinT === null,
     etaAtBunker: etaAtBunker.toISOString(),
     validUntil: offer.validUntil ? offer.validUntil.toISOString() : null,
     offerValidAtArrival,
     arrivalOk,
+    stayPlan,
+    bunkerSpeed,
+    speedStayKn,
+    speedAfterBunkerKn,
+    delayHours,
+    lateToleranceHours,
   };
   return { ...base, ...priceSide(base, refPriceEurPerT, usdEurRate) };
 }

@@ -1,13 +1,16 @@
 import type { Prisma } from "@prisma/client";
 import {
   repriceBunker,
+  repriceBunkerPlan,
   repriceJit,
   type BunkerCalc,
+  type BunkerPlan,
   type JitCalc,
   type SettingsDTO,
 } from "@maritime/shared";
 import { prisma } from "./prisma.js";
 import { env } from "./env.js";
+import { syncBunkerDrafts } from "../services/bunkerDrafts.js";
 
 const SETTINGS_ID = 1;
 
@@ -17,6 +20,8 @@ const BUNKER_DEFAULTS = {
   bunkerPortHours: 8,
   bunkerPortFeeEur: 5000,
   bunkerDefaultQtyT: 800,
+  bunkerPumpRateTPerH: 250,
+  bunkerSlackToleranceMin: 30,
 };
 
 type SettingsRow = {
@@ -26,6 +31,8 @@ type SettingsRow = {
   bunkerPortHours?: number;
   bunkerPortFeeEur?: number;
   bunkerDefaultQtyT?: number;
+  bunkerPumpRateTPerH?: number;
+  bunkerSlackToleranceMin?: number;
   updatedAt: Date;
 };
 
@@ -37,6 +44,8 @@ function toDTO(s: SettingsRow): SettingsDTO {
     bunkerPortHours: s.bunkerPortHours ?? BUNKER_DEFAULTS.bunkerPortHours,
     bunkerPortFeeEur: s.bunkerPortFeeEur ?? BUNKER_DEFAULTS.bunkerPortFeeEur,
     bunkerDefaultQtyT: s.bunkerDefaultQtyT ?? BUNKER_DEFAULTS.bunkerDefaultQtyT,
+    bunkerPumpRateTPerH: s.bunkerPumpRateTPerH ?? BUNKER_DEFAULTS.bunkerPumpRateTPerH,
+    bunkerSlackToleranceMin: s.bunkerSlackToleranceMin ?? BUNKER_DEFAULTS.bunkerSlackToleranceMin,
     updatedAt: s.updatedAt.toISOString(),
   };
 }
@@ -80,7 +89,24 @@ export async function updatePriceSettings(
     if (fuelChanged || rateChanged) {
       const pending = await tx.recommendation.findMany({ where: { status: "PENDING" } });
       for (const rec of pending) {
-        if (rec.actionType === "BUNKER_DETOUR") {
+        const storedPlan = rec.bunkerPlan as unknown as BunkerPlan | null | undefined;
+        if (rec.actionType === "BUNKER_DETOUR" && storedPlan && storedPlan.options.length > 0) {
+          // Re-price every option; the best one may change, and so may the counter-offer price.
+          const plan = repriceBunkerPlan(storedPlan, fuelPriceEurPerT, usdEurRate);
+          const best = plan.options[0].calc;
+          await tx.recommendation.update({
+            where: { id: rec.id },
+            data: {
+              recommendedSpeedKn: best.speedBunkerKn,
+              fuelSavedT: -best.extraFuelT,
+              costSavedEur: best.netEur,
+              co2SavedT: -best.extraCo2T,
+              calc: best as unknown as Prisma.InputJsonValue,
+              bunkerPlan: plan as unknown as Prisma.InputJsonValue,
+            },
+          });
+          await syncBunkerDrafts(tx, rec.id, plan);
+        } else if (rec.actionType === "BUNKER_DETOUR") {
           const calc = repriceBunker(rec.calc as unknown as BunkerCalc, fuelPriceEurPerT, usdEurRate);
           await tx.recommendation.update({
             where: { id: rec.id },

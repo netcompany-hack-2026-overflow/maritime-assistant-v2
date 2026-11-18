@@ -1,4 +1,10 @@
 import type {
+  BunkerOfferDTO,
+  BunkerPlan,
+  EmailDraftDTO,
+  EmailProviderStatus,
+  TcoAssumptions,
+  TcoExplanation,
   PortDTO,
   PortEventType,
   RecommendationStatus,
@@ -13,6 +19,8 @@ export interface MetaResponse {
   simSpeed: number;
   fuelPriceEurPerT: number;
   co2Factor: number;
+  /** Outgoing email (SMTP) status; older APIs leave it out. */
+  emailProvider?: EmailProviderStatus;
 }
 
 export interface VesselListItem {
@@ -105,6 +113,9 @@ export interface RecommendationRecord {
   costSavedEur: number;
   co2SavedT: number;
   calc: Record<string, number | boolean>;
+  bunkerPlan?: BunkerPlan | null;
+  chosenOption?: string | null;
+  emailDrafts?: EmailDraftDTO[];
   rationale: string;
   status: RecommendationStatus;
   rejectReason: string | null;
@@ -218,6 +229,21 @@ export const api = {
       body: JSON.stringify({ reason }),
     }),
   getRecord: (table: string, id: string) => request<RecordResponse>(`/records/${table}/${id}`),
+  getBunkerOffers: () => request<BunkerOfferDTO[]>("/bunker-offers"),
+  simulateBunkerQuotes: () =>
+    request<Array<{ demoId: string; emailId: string; recommendationId: string | null; matchedVoyageId: string | null }>>(
+      "/bunker-offers/simulate",
+      { method: "POST" }
+    ),
+  explainBunkerOffers: (voyageId: string, assumptions: TcoAssumptions) =>
+    request<{ text: string; draft: TcoExplanation }>("/bunker-offers/explain", {
+      method: "POST",
+      body: JSON.stringify({ voyageId, ...assumptions }),
+    }),
+  updateEmailDraft: (id: string, edit: { toAddr?: string; subject?: string; body?: string }) =>
+    request<EmailDraftDTO>(`/email-drafts/${id}`, { method: "PATCH", body: JSON.stringify(edit) }),
+  sendEmailDraft: (id: string) =>
+    request<{ draft: EmailDraftDTO; deliveredTo: string }>(`/email-drafts/${id}/send`, { method: "POST" }),
   askQuestion: (question: string) =>
     request<AskResponse>("/ask", { method: "POST", body: JSON.stringify({ question }) }),
 };

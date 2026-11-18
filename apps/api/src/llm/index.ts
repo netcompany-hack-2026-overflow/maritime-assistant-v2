@@ -1,15 +1,16 @@
 import { env } from "../lib/env.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { OpenAiProvider } from "./openai.js";
-import { mockExplainRecommendation, mockExtractEmail, mockAnswerQuestion } from "./mock.js";
+import { mockExplainRecommendation, mockExtractEmail, mockAnswerQuestion, mockExplainBunkerComparison } from "./mock.js";
 import type { LlmProvider } from "./types.js";
 
-export type { CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+export type { BunkerComparisonFacts, CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
 
 class MockProvider implements LlmProvider {
   extractEmail = mockExtractEmail;
   explainRecommendation = mockExplainRecommendation;
   answerQuestion = mockAnswerQuestion;
+  explainBunkerComparison = mockExplainBunkerComparison;
 }
 
 let cached: LlmProvider | null = null;

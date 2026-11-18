@@ -33,6 +33,18 @@ enum RecommendationStatus {
   REJECTED
 }
 
+enum EmailDraftKind {
+  ACCEPT
+  COUNTER
+  DECLINE
+}
+
+enum EmailDraftStatus {
+  DRAFT
+  SENT
+  SUPERSEDED
+}
+
 enum CiiRating {
   A
   B
@@ -63,6 +75,8 @@ model Vessel {
   minSpeedKn           Float
   fuelTPerDayAtDesign Float
   auxFuelTPerDay      Float
+  /// Time-charter (or demurrage) rate, used to price delays when comparing bunker offers.
+  charterRateUsdPerDay Float   @default(15000)
   voyages             Voyage[]
 }
 
@@ -124,6 +138,8 @@ model PortEvent {
   qtyMaxT        Float?
   validUntil     DateTime?
   supplier       String?
+  /// Bunker-offer commercial terms (barging, payment, delivery window, quote validity, grade lines): OfferTerms in @maritime/shared.
+  offerTerms     Json?
   rawExtraction  Json
   sourceSpans    Json
   confidence     Float
@@ -145,11 +161,49 @@ model Recommendation {
   costSavedEur       Float
   co2SavedT          Float
   calc               Json
+  /// Bunker offers: time check, options and reshaped route (BunkerPlan in @maritime/shared).
+  bunkerPlan         Json?
+  /// Bunker option (ECO / KEEP_SPEED) chosen by sending its acceptance email.
+  chosenOption       String?
   rationale          String
   status             RecommendationStatus     @default(PENDING)
   rejectReason       String?
   decidedAt          DateTime?
   createdAt          DateTime                 @default(now())
+
+  emailDrafts EmailDraft[]
+}
+
+/// A reply the agent wrote for a bunker offer; a person edits it and sends one.
+model EmailDraft {
+  id               String           @id @default(cuid())
+  recommendation   Recommendation   @relation(fields: [recommendationId], references: [id])
+  recommendationId String
+  kind             EmailDraftKind
+  /// The bunker option an ACCEPT or COUNTER is for (ECO / KEEP_SPEED).
+  optionKey        String?
+  toAddr           String
+  subject          String
+  body             String
+  status           EmailDraftStatus @default(DRAFT)
+  /// Set once a person changes the text; edited drafts are never regenerated.
+  edited           Boolean          @default(false)
+  sentAt           DateTime?
+  messageId        String?
+  lastError        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([recommendationId])
+}
+
+/// Bunker suppliers we have history with. Matched to offers by sender domain, then name.
+model Supplier {
+  id               String @id @default(cuid())
+  name             String @unique
+  emailDomain      String @unique
+  /// Historical reliability, 1 (poor) to 10 (excellent).
+  reliabilityScore Float
 }
 
 model AuditLog {
@@ -171,5 +225,9 @@ model Settings {
   bunkerPortHours   Float    @default(8)
   bunkerPortFeeEur  Float    @default(5000)
   bunkerDefaultQtyT Float    @default(800)
+  /// Barge pumping rate; scales time alongside with the stem, t/h.
+  bunkerPumpRateTPerH     Float @default(250)
+  /// A bunker call needing more than the ship's slack plus this isn't analysed further, minutes.
+  bunkerSlackToleranceMin Float @default(30)
   updatedAt        DateTime @updatedAt
 }

@@ -1,7 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { answerSchema, type Answer, type PortEventExtraction } from "@maritime/shared";
 import { EXTRACTION_SYSTEM_PROMPT, parseExtraction } from "./extraction.js";
-import type { CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+import type { BunkerComparisonFacts, CitableRow, LlmProvider, RecommendationFacts } from "./types.js";
+import { mockExplainBunkerComparison } from "./mock.js";
+
+export const BUNKER_COMPARISON_SYSTEM =
+  "You advise a ship operator choosing between bunker (fuel) offers. Using ONLY the numbers in the JSON, " +
+  "write at most 4 short sentences of plain English: which offer to take, why it beats the others (name the " +
+  "cheapest-on-paper offer if it is not the best), and anything urgent (an expiring quote, an offer that " +
+  "doesn't fit the schedule). Never invent or recalculate numbers; reuse the ones given, rounded as given. " +
+  "The 'draft' field is a correct explanation you may reword.";
 
 function stripCodeFence(text: string): string {
   const trimmed = text.trim();
@@ -68,6 +76,21 @@ export class AnthropicProvider implements LlmProvider {
       .map((block) => block.text)
       .join("")
       .trim();
+  }
+
+  async explainBunkerComparison(facts: BunkerComparisonFacts): Promise<string> {
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: 300,
+      system: BUNKER_COMPARISON_SYSTEM,
+      messages: [{ role: "user", content: JSON.stringify(facts) }],
+    });
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
+    return text.length > 0 ? text : mockExplainBunkerComparison(facts);
   }
 
   async answerQuestion(question: string, rows: CitableRow[]): Promise<Answer> {
