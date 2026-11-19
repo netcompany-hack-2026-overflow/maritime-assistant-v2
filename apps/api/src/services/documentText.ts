@@ -14,14 +14,16 @@ export function looksLikePdf(buf: Buffer): boolean {
  * Scanned/image-only PDFs have no text layer and are rejected with a clear message.
  */
 export async function pdfToText(buf: Buffer): Promise<string> {
-  if (!looksLikePdf(buf)) throw new DocumentError("File is not a PDF.");
+  if (!looksLikePdf(buf)) throw new DocumentError("Το αρχείο δεν είναι PDF.");
   let text: string;
   try {
     const pdf = await getDocumentProxy(new Uint8Array(buf));
-    const result = await extractText(pdf, { mergePages: true });
-    text = result.text;
+    // Per page, not mergePages: merging collapses every newline, and charter
+    // parties are read clause by clause.
+    const result = await extractText(pdf, { mergePages: false });
+    text = (Array.isArray(result.text) ? result.text : [result.text]).join("\n\n");
   } catch {
-    throw new DocumentError("Could not read the PDF. Is it password-protected or damaged?");
+    throw new DocumentError("Το PDF δεν διαβάστηκε. Μήπως έχει κωδικό ή είναι κατεστραμμένο;");
   }
   const cleaned = text
     .replace(/\r/g, "")
@@ -29,7 +31,7 @@ export async function pdfToText(buf: Buffer): Promise<string> {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   if (cleaned.length === 0) {
-    throw new DocumentError("The PDF has no text layer (scanned image?). Upload a text-based PDF.");
+    throw new DocumentError("Το PDF δεν έχει κείμενο (σαρωμένη εικόνα;). Ανεβάστε PDF με κείμενο.");
   }
   return cleaned;
 }

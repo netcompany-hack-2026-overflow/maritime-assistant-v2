@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { TopBar } from "./components/TopBar.js";
 import { Landing } from "./pages/Landing.js";
 import { Fleet } from "./pages/Fleet.js";
@@ -8,18 +8,26 @@ import { Inbox } from "./pages/Inbox.js";
 import { Actions } from "./pages/Actions.js";
 import { Ask } from "./pages/Ask.js";
 import { Settings } from "./pages/Settings.js";
+import { Value } from "./pages/Value.js";
 import { api } from "./lib/api.js";
 
 const PENDING_POLL_MS = 5000;
 
 const PAGE_TITLES: Record<string, string> = {
-  "/fleet": "Fleet",
-  "/voyages": "Voyages",
-  "/inbox": "Inbox",
-  "/actions": "Actions",
-  "/ask": "Ask",
-  "/settings": "Settings",
+  "/fleet": "Στόλος",
+  "/voyages": "Ταξίδια",
+  "/inbox": "Εισερχόμενα",
+  "/actions": "Ενέργειες",
+  "/ask": "Ερωτήσεις",
+  "/value": "Επιχειρηματική αξία",
+  "/settings": "Ρυθμίσεις",
 };
+
+/** The fuel offers now live in Actions, grouped by ship; old links keep working. */
+function BunkeringRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/actions${search}`} replace />;
+}
 
 /** Shell for the operational pages: top bar + scrollable main region. */
 function ConsoleLayout() {
@@ -54,7 +62,7 @@ function ConsoleLayout() {
   return (
     <div className="console">
       <a className="skip-link" href="#main">
-        Skip to content
+        Μετάβαση στο περιεχόμενο
       </a>
       <TopBar pendingActionCount={pendingActionCount} />
       <main id="main" className="console__main" tabIndex={-1}>
@@ -74,7 +82,9 @@ export function App() {
         <Route path="/voyages" element={<Voyages />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/actions" element={<Actions />} />
+        <Route path="/bunkering" element={<BunkeringRedirect />} />
         <Route path="/ask" element={<Ask />} />
+        <Route path="/value" element={<Value />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

@@ -1,25 +1,54 @@
 import type { Prisma } from "@prisma/client";
-import { calculateBunker, calculateJit, nearestPointOnRoute } from "@maritime/shared";
+import {
+  etsVoyageScope,
+  formatUtc,
+  nearestPointOnRoute,
+  planBunkerOptions,
+  screenedOutCalc,
+  splitRouteAt,
+  type BunkerDelaySource,
+  type BunkerPlan,
+  type BunkerPlanInput,
+  type BunkerScreen,
+  type OfferTerms,
+  type PortEventExtraction,
+} from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import { getSettings } from "../lib/settings.js";
+import { mailEnv } from "../lib/env.js";
 import { getLlmProvider } from "../llm/index.js";
-import { mockWeatherFor } from "../sim/weather.js";
 import { voyageProgressNow } from "./voyagePosition.js";
 import { crossesLand } from "./land.js";
+import { syncBunkerDrafts } from "./bunkerDrafts.js";
+import { isAtSea } from "./atSea.js";
+import { computeScenarios, rationaleFor, voyageInclude, type VoyageForScenarios } from "./scenarios.js";
+import { recommendationFields } from "./scenarioFields.js";
 
 type VoyageWithPorts = Prisma.VoyageGetPayload<{ include: { vessel: true; originPort: true; destPort: true } }>;
 type PortRow = { id: string; name: string; lat: number; lon: number };
 
+/** "MV Marathon Spirit" = "Marathon Spirit" = "M/V MARATHON SPIRIT": models don't always keep the prefix. */
+export function sameShipName(a: string, b: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/^m\s*[/.]?\s*v\.?\s+/, "").replace(/\s+/g, " ");
+  return norm(a) === norm(b);
+}
+
 /** Offers further off a ship's remaining route than this aren't matched to it. */
 const BUNKER_MATCH_MAX_OFF_ROUTE_NM = 500;
 
+/** Congestion or closure reported at the bunker port within this window counts as a likely delay. */
+const PORT_CONDITION_WINDOW_MS = 7 * 24 * 3_600_000;
+
 /**
- * Pick the voyage a bunker offer is for: the ship it names, otherwise the
- * underway ship whose remaining route passes closest to the supply port.
+ * Pick the voyage a bunker offer is for: the ship its IMO number or name
+ * points to, otherwise the underway ship whose remaining route passes closest
+ * to the supply port.
  */
-function matchBunkerVoyage(candidates: VoyageWithPorts[], port: PortRow, vesselName: string | null) {
+function matchBunkerVoyage(candidates: VoyageWithPorts[], port: PortRow, vesselName: string | null, vesselImo: string | null) {
+  const byImo = vesselImo ? candidates.find((c) => c.vessel.imo === vesselImo) : undefined;
+  if (byImo) return byImo;
   const named = vesselName
-    ? candidates.find((c) => c.vessel.name.toLowerCase() === vesselName.toLowerCase())
+    ? candidates.find((c) => sameShipName(c.vessel.name, vesselName))
     : undefined;
   if (named) return named;
   let best: { voyage: VoyageWithPorts; offRouteNm: number } | null = null;
@@ -36,17 +65,106 @@ function matchBunkerVoyage(candidates: VoyageWithPorts[], port: PortRow, vesselN
   return best?.voyage ?? null;
 }
 
+/** The offer's commercial terms as stored on the port event. */
+function offerTermsFrom(extraction: PortEventExtraction, receivedAt: Date): OfferTerms {
+  const minutes = extraction.quoteValidityMinutes ?? null;
+  return {
+    vesselImo: extraction.vesselImo ?? null,
+    vesselEta: extraction.vesselEta ?? null,
+    bargingType: extraction.bargingType ?? null,
+    bargingUsd: extraction.bargingUsd ?? null,
+    otherFeesUsd: extraction.otherFeesUsd ?? null,
+    paymentTerms: extraction.paymentTerms ?? null,
+    paymentDays: extraction.paymentDays ?? null,
+    deliveryDelayHours: extraction.deliveryDelayHours ?? null,
+    deliveryEarliest: extraction.deliveryEarliest ?? null,
+    quoteValidityMinutes: minutes,
+    quoteFirmUntil: minutes !== null ? new Date(receivedAt.getTime() + minutes * 60_000).toISOString() : null,
+    lines: extraction.offerLines ?? [],
+  };
+}
+
+/**
+ * Why the ship might wait at the bunker port: the supplier's own delivery
+ * window, and congestion/closure recently reported for that port.
+ */
+async function bunkerPortDelays(
+  port: PortRow,
+  terms: OfferTerms | null,
+  etaAtPortAtCurrentSpeed: Date,
+  now: Date
+): Promise<BunkerDelaySource[]> {
+  const delays: BunkerDelaySource[] = [];
+  if (terms?.deliveryDelayHours) {
+    delays.push({
+      source: "SUPPLIER_WINDOW",
+      hours: terms.deliveryDelayHours,
+      note: `barge ${terms.deliveryDelayHours} h μετά την άφιξη (παράθυρο του προμηθευτή)`,
+    });
+  }
+  if (terms?.deliveryEarliest) {
+    const hours = (new Date(terms.deliveryEarliest).getTime() - etaAtPortAtCurrentSpeed.getTime()) / 3_600_000;
+    if (hours > 0) {
+      delays.push({
+        source: "SUPPLIER_WINDOW",
+        hours,
+        note: `νωρίτερη παράδοση ${formatUtc(terms.deliveryEarliest)}, ${hours.toFixed(1)} h αφού φτάσει το πλοίο`,
+      });
+    }
+  }
+  const reported = await prisma.portEvent.findMany({
+    where: {
+      portId: port.id,
+      eventType: { in: ["CONGESTION", "CLOSURE"] },
+      delayHours: { not: null },
+      createdAt: { gte: new Date(now.getTime() - PORT_CONDITION_WINDOW_MS) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 1,
+  });
+  const latest = reported[0];
+  if (latest?.delayHours) {
+    delays.push({
+      source: latest.eventType === "CLOSURE" ? "PORT_CLOSURE" : "PORT_CONGESTION",
+      hours: latest.delayHours,
+      note: `αναφέρθηκε ${latest.eventType === "CLOSURE" ? "κλείσιμο" : "συμφόρηση"} στο ${port.name}: +${latest.delayHours} h`,
+    });
+  }
+  return delays;
+}
+
+/** Plain words for an offer the time check stopped; written without a model call. */
+function screenedOutRationale(screen: BunkerScreen, vesselName: string, portName: string, destPortName: string): string {
+  if (screen.stoppedBecause === "EXPIRED") {
+    return (
+      `Δεν αναλύθηκε περαιτέρω: ακόμα και με πλήρη ταχύτητα το ${vesselName} θα έφτανε στο ${portName} ` +
+      `${formatUtc(screen.earliestEtaAtBunker)}, μετά τη λήξη της προσφοράς (${formatUtc(screen.validUntil!)}).`
+    );
+  }
+  const parts = [`${screen.bunkeringHours.toFixed(1)} h ανεφοδιασμός`];
+  if (screen.delayHours > 0) parts.push(`${screen.delayHours.toFixed(1)} h αναμονή για το barge`);
+  parts.push(`${screen.detourHours.toFixed(1)} h παράκαμψη`);
+  return (
+    `Δεν αναλύθηκε περαιτέρω: η προσέγγιση στο ${portName} χρειάζεται περίπου ${screen.neededHours.toFixed(1)} h ` +
+    `(${parts.join(" + ")}), αλλά το ${vesselName} έχει περιθώριο μόνο ${Math.max(0, screen.slackHours).toFixed(1)} h ` +
+    `ως την πρόσδεση στο ${destPortName} (ανοχή ${Math.round(screen.toleranceHours * 60)} min).`
+  );
+}
+
 async function createBunkerRecommendation(
   voyage: VoyageWithPorts,
   portEvent: {
     id: string;
-    port: PortRow | null;
+    port: PortRow & { unlocode?: string };
     fuelGrade: string | null;
     priceUsdPerT: number | null;
     qtyMinT: number | null;
     qtyMaxT: number | null;
     validUntil: Date | null;
-  }
+    supplier: string | null;
+    offerTerms: unknown;
+  },
+  email: { fromAddr: string; subject: string }
 ) {
   const port = portEvent.port;
   if (!port || portEvent.priceUsdPerT === null) return null;
@@ -67,60 +185,100 @@ async function createBunkerRecommendation(
   const deadline = voyage.berthTime ?? latestBerthEvent?.newBerthTime ?? voyage.plannedEta;
 
   const settings = await getSettings();
-  const calc = calculateBunker({
+  const terms = (portEvent.offerTerms as OfferTerms | null) ?? null;
+  const etaAtCurrentSpeed = new Date(now.getTime() + ((nearest.alongNm + nearest.offRouteNm) / voyage.speedKn) * 3_600_000);
+  const input: BunkerPlanInput = {
+    now: now.toISOString(),
+    deadline: deadline.toISOString(),
     remainingNm,
     offRouteNm: nearest.offRouteNm,
     alongNm: nearest.alongNm,
-    speedKn: voyage.speedKn,
-    designSpeedKn: voyage.vessel.designSpeedKn,
-    fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
-    auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
-    now,
-    deadline,
+    shipPosition: ahead[0],
+    turnOff: nearest.point,
+    bunkerPort: { lat: port.lat, lon: port.lon },
+    destination: { lat: voyage.destPort.lat, lon: voyage.destPort.lon },
+    vessel: {
+      speedKn: voyage.speedKn,
+      designSpeedKn: voyage.vessel.designSpeedKn,
+      minSpeedKn: voyage.vessel.minSpeedKn,
+      fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
+      auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
+    },
     offer: {
       priceUsdPerT: portEvent.priceUsdPerT,
       qtyMinT: portEvent.qtyMinT,
       qtyMaxT: portEvent.qtyMaxT,
-      validUntil: portEvent.validUntil,
+      validUntil: portEvent.validUntil ? portEvent.validUntil.toISOString() : null,
     },
+    stemQtyT: settings.bunkerDefaultQtyT,
     refPriceEurPerT: settings.fuelPriceEurPerT,
     usdEurRate: settings.usdEurRate,
-    portHours: settings.bunkerPortHours,
+    stdPortHours: settings.bunkerPortHours,
+    stdQtyT: settings.bunkerDefaultQtyT,
+    pumpRateTPerH: settings.bunkerPumpRateTPerH,
     portFeeEur: settings.bunkerPortFeeEur,
-    defaultQtyT: settings.bunkerDefaultQtyT,
     co2Factor: settings.co2Factor,
-  });
+    delays: await bunkerPortDelays(port, terms, etaAtCurrentSpeed, now),
+    toleranceHours: settings.bunkerSlackToleranceMin / 60,
+    etsScope: etsVoyageScope(voyage.originPort.country, voyage.destPort.country),
+  };
 
-  const rationale = await getLlmProvider().explainRecommendation({
-    vesselName: voyage.vessel.name,
-    originPortName: voyage.originPort.name,
-    destPortName: voyage.destPort.name,
-    portEventType: "BUNKER_OFFER",
-    portName: port.name,
-    delayHours: 0,
-    currentSpeedKn: voyage.speedKn,
-    recommendedSpeedKn: calc.speedBunkerKn,
-    fuelSavedT: -calc.extraFuelT,
-    costSavedEur: calc.netEur,
-    co2SavedT: -calc.extraCo2T,
-    bunker: {
-      bunkerPortName: port.name,
+  // Cheap time check first; options (and the model call) only for offers that pass.
+  const { screen, options } = planBunkerOptions(input);
+  const plan: BunkerPlan = {
+    version: 1,
+    input,
+    screen,
+    options,
+    route: splitRouteAt(ahead, nearest.alongNm),
+    context: {
+      supplierName: portEvent.supplier,
+      supplierAddr: email.fromAddr,
+      offerSubject: email.subject,
+      vesselName: voyage.vessel.name,
+      vesselImo: voyage.vessel.imo,
+      portName: port.name,
+      portUnlocode: port.unlocode ?? "",
       fuelGrade: portEvent.fuelGrade,
       priceUsdPerT: portEvent.priceUsdPerT,
-      qtyT: calc.qtyT,
-      detourNm: calc.detourNm,
-      extraHours: calc.extraHours,
-      extraFuelT: calc.extraFuelT,
-      priceSavingEur: calc.priceSavingEur,
-      netEur: calc.netEur,
-      stillMakesBerth: calc.arrivalOk,
-      offerValidAtArrival: calc.offerValidAtArrival,
-      verdict: calc.verdict,
+      validUntil: input.offer.validUntil,
+      senderName: mailEnv.fromName,
     },
-  });
+  };
+  const calc = options[0]?.calc ?? screenedOutCalc(input);
+
+  const rationale = !screen.passed
+    ? screenedOutRationale(screen, voyage.vessel.name, port.name, voyage.destPort.name)
+    : await getLlmProvider().explainRecommendation({
+        vesselName: voyage.vessel.name,
+        originPortName: voyage.originPort.name,
+        destPortName: voyage.destPort.name,
+        portEventType: "BUNKER_OFFER",
+        portName: port.name,
+        delayHours: 0,
+        currentSpeedKn: voyage.speedKn,
+        recommendedSpeedKn: calc.speedBunkerKn,
+        fuelSavedT: -calc.extraFuelT,
+        costSavedEur: calc.netEur,
+        co2SavedT: -calc.extraCo2T,
+        bunker: {
+          bunkerPortName: port.name,
+          fuelGrade: portEvent.fuelGrade,
+          priceUsdPerT: portEvent.priceUsdPerT,
+          qtyT: calc.qtyT,
+          detourNm: calc.detourNm,
+          extraHours: calc.extraHours,
+          extraFuelT: calc.extraFuelT,
+          priceSavingEur: calc.priceSavingEur,
+          netEur: calc.netEur,
+          stillMakesBerth: calc.arrivalOk,
+          offerValidAtArrival: calc.offerValidAtArrival,
+          verdict: calc.verdict,
+        },
+      });
 
   // Every offer waits for a human, worth it or not; the card says which, and why.
-  return prisma.recommendation.create({
+  const recommendation = await prisma.recommendation.create({
     data: {
       voyageId: voyage.id,
       portEventId: portEvent.id,
@@ -132,14 +290,17 @@ async function createBunkerRecommendation(
       costSavedEur: calc.netEur,
       co2SavedT: -calc.extraCo2T,
       calc: calc as unknown as Prisma.InputJsonValue,
+      bunkerPlan: plan as unknown as Prisma.InputJsonValue,
       rationale,
       status: "PENDING",
     },
   });
+  await syncBunkerDrafts(prisma, recommendation.id, plan);
+  return recommendation;
 }
 
 async function createRecommendationForPortEvent(
-  voyage: Prisma.VoyageGetPayload<{ include: { vessel: true; originPort: true; destPort: true } }>,
+  voyage: VoyageForScenarios,
   portEvent: { id: string; eventType: string; delayHours: number | null; newBerthTime: Date | null }
 ) {
   if (portEvent.delayHours === null) return null;
@@ -149,44 +310,15 @@ async function createRecommendationForPortEvent(
     portEvent.newBerthTime ??
     new Date(voyage.plannedEta.getTime() + portEvent.delayHours * 3_600_000);
 
-  const now = new Date();
-  const distanceNm = Math.max(
-    0,
-    (voyage.speedKn * (voyage.plannedEta.getTime() - now.getTime())) / 3_600_000
-  );
-  if (distanceNm <= 0) return null;
+  const result = await computeScenarios(voyage, newBerthTime);
+  if (!result) return null;
+  const { set, calc } = result;
+  // Nothing beats carrying on as planned: no action to recommend.
+  if (set.recommendedId === "A") return null;
+  const fields = recommendationFields(set);
+  if (fields.fuelSavedT <= 0 && fields.etsSavedEur <= 0) return null;
 
-  const settings = await getSettings();
-  const calc = calculateJit({
-    distanceNm,
-    currentSpeedKn: voyage.speedKn,
-    currentEta: voyage.plannedEta,
-    newBerthTime,
-    now,
-    designSpeedKn: voyage.vessel.designSpeedKn,
-    fuelTPerDayAtDesign: voyage.vessel.fuelTPerDayAtDesign,
-    minSpeedKn: voyage.vessel.minSpeedKn,
-    auxFuelTPerDay: voyage.vessel.auxFuelTPerDay,
-    fuelPriceEurPerT: settings.fuelPriceEurPerT,
-    co2Factor: settings.co2Factor,
-    weather: mockWeatherFor(voyage.destPort.unlocode, newBerthTime),
-  });
-
-  if (calc.fuelSavedT <= 0) return null;
-
-  const rationale = await getLlmProvider().explainRecommendation({
-    vesselName: voyage.vessel.name,
-    originPortName: voyage.originPort.name,
-    destPortName: voyage.destPort.name,
-    portEventType: portEvent.eventType,
-    portName: voyage.destPort.name,
-    delayHours: portEvent.delayHours,
-    currentSpeedKn: voyage.speedKn,
-    recommendedSpeedKn: calc.v1,
-    fuelSavedT: calc.fuelSavedT,
-    costSavedEur: calc.costSavedEur,
-    co2SavedT: calc.co2SavedT,
-  });
+  const rationale = await rationaleFor(voyage, portEvent, set);
 
   return prisma.recommendation.create({
     data: {
@@ -194,11 +326,9 @@ async function createRecommendationForPortEvent(
       portEventId: portEvent.id,
       actionType: "ADJUST_SPEED",
       currentSpeedKn: voyage.speedKn,
-      recommendedSpeedKn: calc.v1,
-      fuelSavedT: calc.fuelSavedT,
-      costSavedEur: calc.costSavedEur,
-      co2SavedT: calc.co2SavedT,
+      ...fields,
       calc: calc as unknown as Prisma.InputJsonValue,
+      scenarios: set as unknown as Prisma.InputJsonValue,
       rationale,
       status: "PENDING",
     },
@@ -208,7 +338,7 @@ async function createRecommendationForPortEvent(
 export async function processEmail(emailId: string) {
   const email = await prisma.email.findUnique({ where: { id: emailId } });
   if (!email) {
-    const err = new Error("Email not found") as Error & { status?: number };
+    const err = new Error("Το email δεν βρέθηκε") as Error & { status?: number };
     err.status = 404;
     throw err;
   }
@@ -246,28 +376,31 @@ export async function processEmail(emailId: string) {
     });
   }
 
-  let matchedVoyage: Prisma.VoyageGetPayload<{
-    include: { vessel: true; originPort: true; destPort: true };
-  }> | null = null;
+  let matchedVoyage: VoyageForScenarios | null = null;
 
   if (port && extraction.eventType === "BUNKER_OFFER") {
-    const candidates = await prisma.voyage.findMany({
-      where: { status: "UNDERWAY" },
-      include: { vessel: true, originPort: true, destPort: true },
-    });
-    matchedVoyage = matchBunkerVoyage(candidates, port, extraction.vesselNameMentioned);
+    // Only ships actually at sea: an offer for a ship that has arrived goes nowhere.
+    const candidates = (
+      await prisma.voyage.findMany({
+        where: { status: "UNDERWAY" },
+        include: voyageInclude,
+      })
+    ).filter((v) => isAtSea(v));
+    matchedVoyage = matchBunkerVoyage(candidates, port, extraction.vesselNameMentioned, extraction.vesselImo ?? null) as VoyageForScenarios | null;
   } else if (port && extraction.eventType !== "NONE") {
-    const candidates = await prisma.voyage.findMany({
-      where: { destPortId: port.id, status: "UNDERWAY" },
-      include: { vessel: true, originPort: true, destPort: true },
-    });
+    const candidates = (
+      await prisma.voyage.findMany({
+        where: { destPortId: port.id, status: "UNDERWAY" },
+        include: voyageInclude,
+      })
+    ).filter((v) => isAtSea(v));
     if (candidates.length === 1) {
       matchedVoyage = candidates[0];
     } else if (candidates.length > 1) {
       matchedVoyage =
         (extraction.vesselNameMentioned &&
           candidates.find(
-            (c) => c.vessel.name.toLowerCase() === extraction.vesselNameMentioned!.toLowerCase()
+            (c) => sameShipName(c.vessel.name, extraction.vesselNameMentioned!)
           )) ||
         candidates[0];
     }
@@ -292,6 +425,9 @@ export async function processEmail(emailId: string) {
       qtyMaxT: extraction.qtyMaxT ?? null,
       validUntil: extraction.validUntil ? new Date(extraction.validUntil) : null,
       supplier: extraction.supplier ?? null,
+      ...(extraction.eventType === "BUNKER_OFFER"
+        ? { offerTerms: offerTermsFrom(extraction, email.receivedAt) as unknown as Prisma.InputJsonValue }
+        : {}),
       rawExtraction: extraction as unknown as Prisma.InputJsonValue,
       sourceSpans: extraction.sourceSpans as unknown as Prisma.InputJsonValue,
       confidence: extraction.confidence,
@@ -304,7 +440,9 @@ export async function processEmail(emailId: string) {
   const recommendation = !matchedVoyage
     ? null
     : portEvent.eventType === "BUNKER_OFFER"
-      ? await createBunkerRecommendation(matchedVoyage, portEvent)
+      ? portEvent.port
+        ? await createBunkerRecommendation(matchedVoyage, { ...portEvent, port: portEvent.port }, email)
+        : null
       : await createRecommendationForPortEvent(matchedVoyage, portEvent);
 
   return { portEvent, matchedVoyage, recommendation, alreadyProcessed: false };

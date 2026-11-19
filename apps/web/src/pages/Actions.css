@@ -1,5 +1,52 @@
 .page--actions {
-  max-width: 820px;
+  max-width: 1200px;
+}
+
+.actions-head__side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.actions-notice {
+  font-size: var(--text-sm);
+  color: var(--success);
+  margin: 0 0 var(--space-4);
+}
+
+/* One ship's open options (speed change, fuel offers) together: one decision per ship. */
+.ship-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 12px;
+  background: var(--bg);
+  scroll-margin-top: var(--space-5);
+}
+
+.ship-group .recommendation-card {
+  margin-bottom: 0;
+}
+
+.ship-group__head p {
+  margin: 0;
+}
+
+.ship-group__route {
+  font-size: var(--text-lg, 1.125rem);
+  color: var(--navy);
+  margin-top: var(--space-1) !important;
+}
+
+.ship-group__rule {
+  margin-top: var(--space-2) !important;
+  font-size: var(--text-sm);
+  color: var(--text);
 }
 
 .actions-tabs {
@@ -25,4 +72,29 @@
 .actions-tab--active {
   color: var(--text);
   border-bottom-color: var(--blue);
+}
+
+/* Tabs and the approved-impact pill on one row. */
+.actions-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.actions-head .actions-tabs {
+  margin-bottom: 0;
+}
+
+.actions-impact {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
 }

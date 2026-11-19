@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { FileUp } from "lucide-react";
+import { FileUp, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, type EmailListItem, type ProcessEmailResult } from "../lib/api.js";
 import { highlightSourceSpans } from "../lib/highlight.js";
+import { EVENT_LABEL } from "../lib/labels.js";
 import "./Inbox.css";
 
 export function Inbox() {
@@ -48,6 +49,26 @@ export function Inbox() {
     }
   };
 
+  const handleDeleteEmail = async (e: React.MouseEvent, emailId: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Διαγραφή του email; Θα διαγραφούν και οι συστάσεις σε αναμονή που προέκυψαν από αυτό.")) return;
+    try {
+      // Removed from the list only once the server has really deleted it.
+      await api.deleteEmail(emailId);
+      setEmails((prev) => prev.filter((item) => item.id !== emailId));
+      setResults((prev) => {
+        const copy = { ...prev };
+        delete copy[emailId];
+        return copy;
+      });
+
+      if (selectedId === emailId) {
+        setSelectedId(null);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
     setSimulateError(null);
@@ -110,10 +131,10 @@ export function Inbox() {
       <div className="inbox-layout">
         <div className="inbox-layout__list">
           <div className="inbox-toolbar">
-            <p className="label">Inbox</p>
+            <p className="label">Εισερχόμενα</p>
             <div className="inbox-toolbar__actions">
               <button className="btn" onClick={() => setShowCustomForm((v) => !v)}>
-                Paste email
+                Επικόλληση email
               </button>
               <button
                 className="btn"
@@ -121,7 +142,7 @@ export function Inbox() {
                 disabled={uploading}
               >
                 <FileUp size={14} aria-hidden="true" />
-                {uploading ? "Reading PDF…" : "Upload PDF"}
+                {uploading ? "Ανάγνωση PDF…" : "Ανέβασμα PDF"}
               </button>
               <input
                 ref={fileInputRef}
@@ -129,17 +150,17 @@ export function Inbox() {
                 accept="application/pdf,.pdf"
                 className="visually-hidden"
                 tabIndex={-1}
-                aria-label="Upload a PDF document"
+                aria-label="Ανέβασμα εγγράφου PDF"
                 onChange={(e) => void handleUpload(e.target.files?.[0])}
               />
               <button className="btn btn-primary" onClick={handleSimulate}>
-                Simulate incoming email
+                Προσομοίωση εισερχόμενου email
               </button>
             </div>
             <p className="inbox-toolbar__hint">
-              Port notices and quotes as PDF work too.{" "}
+              Δουλεύουν και ειδοποιήσεις λιμένα ή προσφορές σε PDF.{" "}
               <a href="/samples/algeciras-berth-notice.pdf" download>
-                Download a sample
+                Κατεβάστε ένα δείγμα
               </a>
             </p>
           </div>
@@ -148,49 +169,49 @@ export function Inbox() {
           {showCustomForm && (
             <form className="custom-email-form" onSubmit={handleCustomSubmit}>
               <input
-                placeholder="From address"
-                aria-label="From address"
+                placeholder="Αποστολέας"
+                aria-label="Αποστολέας"
                 type="email"
                 value={customForm.fromAddr}
                 onChange={(e) => setCustomForm({ ...customForm, fromAddr: e.target.value })}
                 required
               />
               <input
-                placeholder="Subject"
-                aria-label="Subject"
+                placeholder="Θέμα"
+                aria-label="Θέμα"
                 value={customForm.subject}
                 onChange={(e) => setCustomForm({ ...customForm, subject: e.target.value })}
                 required
               />
               <textarea
-                placeholder="Body"
-                aria-label="Email body"
+                placeholder="Κείμενο"
+                aria-label="Κείμενο email"
                 rows={4}
                 value={customForm.body}
                 onChange={(e) => setCustomForm({ ...customForm, body: e.target.value })}
                 required
               />
               <button className="btn btn-primary" type="submit" disabled={submittingCustom}>
-                {submittingCustom ? "Adding…" : "Add to inbox"}
+                {submittingCustom ? "Προσθήκη…" : "Προσθήκη στα εισερχόμενα"}
               </button>
             </form>
           )}
 
           {loading ? (
-            <div className="loading-state" role="status">Loading inbox…</div>
+            <div className="loading-state" role="status">Φόρτωση εισερχομένων…</div>
           ) : error ? (
             <div className="error-state" role="alert">{error}</div>
           ) : emails.length === 0 ? (
             <div className="empty-state">
-              <p>No emails yet.</p>
+              <p>Δεν υπάρχουν ακόμα emails.</p>
               <button className="btn btn-primary" onClick={handleSimulate}>
-                Simulate incoming email
+                Προσομοίωση εισερχόμενου email
               </button>
             </div>
           ) : (
             <ul className="email-list">
               {emails.map((email) => (
-                <li key={email.id}>
+                <li key={email.id} className="email-list__item-container">
                   <button
                     className={
                       email.id === selectedId
@@ -210,9 +231,17 @@ export function Inbox() {
                     <span className="email-list__text">
                       <span className="email-list__subject">{email.subject}</span>
                       <span className="email-list__meta">
-                        {email.fromAddr} · {new Date(email.receivedAt).toLocaleString()}
+                        {email.fromAddr} · {new Date(email.receivedAt).toLocaleString("el-GR")}
                       </span>
                     </span>
+                  </button>
+                  <button
+                    className="email-list__delete"
+                    title="Διαγραφή email"
+                    aria-label="Διαγραφή email"
+                    onClick={(e) => void handleDeleteEmail(e, email.id)}
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </li>
               ))}
@@ -222,14 +251,14 @@ export function Inbox() {
 
         <div className="inbox-layout__detail">
           {!selectedEmail ? (
-            <div className="empty-state">Select an email to view it.</div>
+            <div className="empty-state">Επιλέξτε ένα email για να το δείτε.</div>
           ) : (
             <>
               <div className="email-detail__header">
                 <h2>{selectedEmail.subject}</h2>
                 <p className="label">
-                  From {selectedEmail.fromAddr} ·{" "}
-                  {new Date(selectedEmail.receivedAt).toLocaleString()}
+                  Από {selectedEmail.fromAddr} ·{" "}
+                  {new Date(selectedEmail.receivedAt).toLocaleString("el-GR")}
                 </p>
                 {!selectedEmail.processed && (
                   <button
@@ -237,7 +266,7 @@ export function Inbox() {
                     onClick={() => handleProcess(selectedEmail.id)}
                     disabled={processingId === selectedEmail.id}
                   >
-                    {processingId === selectedEmail.id ? "Processing…" : "Process"}
+                    {processingId === selectedEmail.id ? "Επεξεργασία…" : "Επεξεργασία"}
                   </button>
                 )}
               </div>
@@ -255,22 +284,22 @@ export function Inbox() {
 
               {selectedResult?.portEvent && (
                 <div className="extraction-card">
-                  <p className="label">Extraction</p>
+                  <p className="label">Στοιχεία που διαβάστηκαν</p>
                   {selectedResult.portEvent.eventType === "NONE" ? (
-                    <p className="extraction-card__none">No port event found.</p>
+                    <p className="extraction-card__none">Δεν βρέθηκε συμβάν λιμανιού.</p>
                   ) : (
                     <>
                       <dl className="extraction-card__fields">
                         <div>
-                          <dt>Event type</dt>
-                          <dd>{selectedResult.portEvent.eventType}</dd>
+                          <dt>Τύπος συμβάντος</dt>
+                          <dd>{EVENT_LABEL[selectedResult.portEvent.eventType] ?? selectedResult.portEvent.eventType}</dd>
                         </div>
                         <div>
-                          <dt>Port</dt>
+                          <dt>Λιμάνι</dt>
                           <dd>{selectedResult.portEvent.port?.name ?? "—"}</dd>
                         </div>
                         <div>
-                          <dt>Delay</dt>
+                          <dt>Καθυστέρηση</dt>
                           <dd>
                             {selectedResult.portEvent.delayHours != null
                               ? `${selectedResult.portEvent.delayHours} h`
@@ -278,34 +307,34 @@ export function Inbox() {
                           </dd>
                         </div>
                         <div>
-                          <dt>New berth time</dt>
+                          <dt>Νέα ώρα πρόσδεσης</dt>
                           <dd>
                             {selectedResult.portEvent.newBerthTime
-                              ? new Date(selectedResult.portEvent.newBerthTime).toLocaleString()
+                              ? new Date(selectedResult.portEvent.newBerthTime).toLocaleString("el-GR")
                               : "—"}
                           </dd>
                         </div>
                         <div>
-                          <dt>Confidence</dt>
+                          <dt>Βεβαιότητα</dt>
                           <dd>{Math.round(selectedResult.portEvent.confidence * 100)}%</dd>
                         </div>
                       </dl>
 
                       {selectedResult.matchedVoyage ? (
                         <p className="extraction-card__match">
-                          Affected: {selectedResult.matchedVoyage.vessel?.name} (
+                          Αφορά: {selectedResult.matchedVoyage.vessel?.name} (
                           {selectedResult.matchedVoyage.originPort?.name} →{" "}
                           {selectedResult.matchedVoyage.destPort?.name})
                         </p>
                       ) : (
                         <p className="extraction-card__match extraction-card__match--none">
-                          No matching underway voyage found.
+                          Δεν βρέθηκε ταξίδι σε εξέλιξη που να ταιριάζει.
                         </p>
                       )}
 
                       {selectedResult.recommendation && (
                         <Link className="extraction-card__action-link" to="/actions">
-                          View action →
+                          Προβολή ενέργειας →
                         </Link>
                       )}
                     </>

@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({
   settings: null as null | { id: number; fuelPriceEurPerT: number; co2Factor: number; updatedAt: Date },
   recs: [] as Array<{ id: string; status: string; fuelSavedT: number; costSavedEur: number; calc: Record<string, number> }>,
   audit: [] as unknown[],
+  drafts: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("../prisma.js", () => {
@@ -28,13 +29,23 @@ vi.mock("../prisma.js", () => {
       },
     },
     auditLog: { create: async ({ data }: { data: unknown }) => db.audit.push(data) },
+    emailDraft: {
+      findMany: async ({ where }: { where: { recommendationId: string } }) =>
+        db.drafts.filter((d) => d.recommendationId === where.recommendationId),
+      deleteMany: async ({ where }: { where: { recommendationId: string } }) => {
+        db.drafts = db.drafts.filter((d) => !(d.recommendationId === where.recommendationId && d.status === "DRAFT" && !d.edited));
+      },
+      createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => {
+        for (const d of data) db.drafts.push({ ...d, status: "DRAFT", edited: false });
+      },
+    },
     $transaction: async (fn: (tx: unknown) => unknown) => fn(client),
   };
   return { prisma: client };
 });
 
 const { updateFuelPrice, updatePriceSettings } = await import("../settings.js");
-const { calculateBunker } = await import("@maritime/shared");
+const { calculateBunker, planBunkerOptions } = await import("@maritime/shared");
 
 const rec = (id: string, status: string, fuelSavedT: number) => ({
   id,
@@ -108,3 +119,47 @@ describe("updatePriceSettings with bunker recommendations", () => {
     expect(res.repricedRecommendations).toBe(2);
   });
 });
+
+describe("updatePriceSettings with bunker options", () => {
+  const now = new Date("2026-11-20T00:00:00Z");
+  const input = {
+    now: now.toISOString(),
+    deadline: new Date(now.getTime() + (1700 / 14 + 24) * 3_600_000).toISOString(),
+    remainingNm: 1700, offRouteNm: 10, alongNm: 320,
+    shipPosition: { lat: 37, lon: 0 }, turnOff: { lat: 36, lon: -5.3 }, bunkerPort: { lat: 36.1, lon: -5.4 }, destination: { lat: 52, lon: 4 },
+    vessel: { speedKn: 14, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3 },
+    offer: { priceUsdPerT: 640, qtyMinT: null, qtyMaxT: null, validUntil: null },
+    stemQtyT: 800, refPriceEurPerT: 600, usdEurRate: 0.92, stdPortHours: 8, stdQtyT: 800, pumpRateTPerH: 250,
+    portFeeEur: 5000, co2Factor: 3.114, delays: [], toleranceHours: 0.5,
+  };
+  const context = {
+    supplierName: "Strait Bunkering Ltd", supplierAddr: "s@x.example", offerSubject: "Offer", vesselName: "MV Aegean Star",
+    vesselImo: "9000001", portName: "Algeciras", portUnlocode: "ESALG", fuelGrade: "VLSFO", priceUsdPerT: 640, validUntil: null, senderName: "Ops",
+  };
+
+  beforeEach(() => {
+    db.settings = { id: 1, fuelPriceEurPerT: 600, co2Factor: 3.114, updatedAt: new Date() };
+    const plan = { version: 1, input, ...planBunkerOptions(input), route: { before: [], after: [] }, context };
+    const best = plan.options[0].calc;
+    db.recs = [{ id: "b1", status: "PENDING", actionType: "BUNKER_DETOUR", fuelSavedT: -best.extraFuelT, costSavedEur: best.netEur, calc: best, bunkerPlan: plan } as never];
+    db.drafts = [
+      { recommendationId: "b1", kind: "COUNTER", optionKey: "ECO", status: "DRAFT", edited: false, body: "old counter" },
+      { recommendationId: "b1", kind: "DECLINE", optionKey: null, status: "DRAFT", edited: true, body: "my own words" },
+    ];
+    db.audit = [];
+  });
+
+  it("re-prices every option and rewrites untouched drafts, keeping edited ones", async () => {
+    const before = (db.recs[0] as unknown as { costSavedEur: number }).costSavedEur;
+    expect(before).toBeLessThan(0); // USD 640/t is dearer than our €600/t
+    await updatePriceSettings({ fuelPriceEurPerT: 700 });
+    const b1 = db.recs[0] as unknown as { costSavedEur: number; calc: { netEur: number }; bunkerPlan: { options: Array<{ calc: { netEur: number; refPriceEurPerT: number } }> } };
+    expect(b1.bunkerPlan.options.every((o) => o.calc.refPriceEurPerT === 700)).toBe(true);
+    expect(b1.costSavedEur).toBe(b1.bunkerPlan.options[0].calc.netEur);
+    expect(b1.costSavedEur).toBeGreaterThan(0);
+    // Now worth it: acceptances instead of a counter; the edited decline is kept as written.
+    expect(db.drafts.map((d) => `${d.kind}:${d.edited ? "edited" : "new"}`).sort()).toEqual(["ACCEPT:new", "ACCEPT:new", "DECLINE:edited"]);
+    expect(db.drafts.find((d) => d.kind === "DECLINE")!.body).toBe("my own words");
+  });
+});
+

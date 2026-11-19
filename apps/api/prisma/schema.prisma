@@ -33,6 +33,26 @@ enum RecommendationStatus {
   REJECTED
 }
 
+enum EmailDraftKind {
+  ACCEPT
+  COUNTER
+  DECLINE
+}
+
+enum EmailDraftStatus {
+  DRAFT
+  SENT
+  SUPERSEDED
+}
+
+enum CiiRating {
+  A
+  B
+  C
+  D
+  E
+}
+
 model Port {
   id            String      @id @default(cuid())
   unlocode      String      @unique
@@ -55,6 +75,19 @@ model Vessel {
   minSpeedKn           Float
   fuelTPerDayAtDesign Float
   auxFuelTPerDay      Float
+  /// Year-to-date CO2 (t) and distance (nm), for the annual CII projection.
+  ytdCo2T             Float?
+  ytdDistanceNm       Float?
+  /// Maritime Mobile Service Identity; links the vessel to live AIS (aisstream.io).
+  mmsi                String?  @unique
+  /// Latest AIS fix.
+  aisLat              Float?
+  aisLon              Float?
+  aisSogKn            Float?
+  aisCogDeg           Float?
+  aisAt               DateTime?
+  /// Time-charter (or demurrage) rate, used to price delays when comparing bunker offers.
+  charterRateUsdPerDay Float   @default(15000)
   voyages             Voyage[]
 }
 
@@ -77,10 +110,28 @@ model Voyage {
   /// Length of routeCoords in nautical miles.
   routeNm          Float?
   status           VoyageStatus @default(UNDERWAY)
+  ciiAttained      Float?    
+  ciiRating        CiiRating?
   createdAt        DateTime     @default(now())
 
   portEvents      PortEvent[] @relation("VoyagePortEvents")
   recommendations Recommendation[]
+  charterParty    CharterParty?
+}
+
+/// Voyage charter party: the source text and the terms read from it.
+model CharterParty {
+  id               String   @id @default(cuid())
+  voyage           Voyage   @relation(fields: [voyageId], references: [id])
+  voyageId         String   @unique
+  sourceName       String
+  text             String
+  /// CharterPartyTerms (packages/shared/src/charterParty.ts)
+  terms            Json
+  /// Expected cargo-operations hours at the discharge berth (operator input).
+  expectedOpsHours Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model Email {
@@ -114,6 +165,8 @@ model PortEvent {
   qtyMaxT        Float?
   validUntil     DateTime?
   supplier       String?
+  /// Bunker-offer commercial terms (barging, payment, delivery window, quote validity, grade lines): OfferTerms in @maritime/shared.
+  offerTerms     Json?
   rawExtraction  Json
   sourceSpans    Json
   confidence     Float
@@ -135,11 +188,77 @@ model Recommendation {
   costSavedEur       Float
   co2SavedT          Float
   calc               Json
+  /// ScenarioSet A/B/C (packages/shared/src/scenarios.ts)
+  scenarios          Json?
+  /// Scenario approved ("B" or "C"); null while pending/rejected.
+  chosenScenario     String?
+  etsSavedEur        Float                    @default(0)
+  /// Demurrage avoided vs baseline, in the charter party's currency.
+  demurrageAvoided   Float?
+  /// Bunker offers: time check, options and reshaped route (BunkerPlan in @maritime/shared).
+  bunkerPlan         Json?
+  /// Bunker option (ECO / KEEP_SPEED) chosen by sending its acceptance email.
+  chosenOption       String?
   rationale          String
   status             RecommendationStatus     @default(PENDING)
   rejectReason       String?
   decidedAt          DateTime?
   createdAt          DateTime                 @default(now())
+  outboundEmails     OutboundEmail[]
+  emailDrafts        EmailDraft[]
+}
+
+enum OutboundEmailStatus {
+  DRAFT
+  SENT
+  WITHDRAWN
+}
+
+/// Notice to charterers and agent, drafted automatically on approval.
+model OutboundEmail {
+  id               String              @id @default(cuid())
+  recommendation   Recommendation      @relation(fields: [recommendationId], references: [id])
+  recommendationId String
+  toAddrs          String
+  ccAddrs          String
+  subject          String
+  body             String
+  status           OutboundEmailStatus @default(DRAFT)
+  sentAt           DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+/// A reply the agent wrote for a bunker offer; a person edits it and sends one.
+model EmailDraft {
+  id               String           @id @default(cuid())
+  recommendation   Recommendation   @relation(fields: [recommendationId], references: [id])
+  recommendationId String
+  kind             EmailDraftKind
+  /// The bunker option an ACCEPT or COUNTER is for (ECO / KEEP_SPEED).
+  optionKey        String?
+  toAddr           String
+  subject          String
+  body             String
+  status           EmailDraftStatus @default(DRAFT)
+  /// Set once a person changes the text; edited drafts are never regenerated.
+  edited           Boolean          @default(false)
+  sentAt           DateTime?
+  messageId        String?
+  lastError        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([recommendationId])
+}
+
+/// Bunker suppliers we have history with. Matched to offers by sender domain, then name.
+model Supplier {
+  id               String @id @default(cuid())
+  name             String @unique
+  emailDomain      String @unique
+  /// Historical reliability, 1 (poor) to 10 (excellent).
+  reliabilityScore Float
 }
 
 model AuditLog {
@@ -155,11 +274,16 @@ model AuditLog {
 model Settings {
   id               Int      @id @default(1)
   fuelPriceEurPerT Float
+  euaPriceEurPerT  Float    @default(90)
   co2Factor        Float
   /// Bunker offers are quoted in USD/t.
   usdEurRate        Float    @default(0.92)
   bunkerPortHours   Float    @default(8)
   bunkerPortFeeEur  Float    @default(5000)
   bunkerDefaultQtyT Float    @default(800)
+  /// Barge pumping rate; scales time alongside with the stem, t/h.
+  bunkerPumpRateTPerH     Float @default(250)
+  /// A bunker call needing more than the ship's slack plus this isn't analysed further, minutes.
+  bunkerSlackToleranceMin Float @default(30)
   updatedAt        DateTime @updatedAt
 }

@@ -1,8 +1,10 @@
-import type { Answer, PortEventExtraction } from "@maritime/shared";
+import type { Answer, OfferLine, PortEventExtraction } from "@maritime/shared";
 import { portEventExtractionSchema } from "@maritime/shared";
-import type { CitableRow, RecommendationFacts } from "./types.js";
+import type { BunkerComparisonFacts, CitableRow, RecommendationFacts } from "./types.js";
 
-const KNOWN_PORTS: Array<{ name: string; unlocode: string }> = [
+export { mockDraftNotice, mockExtractCharterParty } from "./charterParty.js";
+
+const KNOWN_PORTS: Array<{ name: string; unlocode: string; aliases?: string[] }> = [
   { name: "Piraeus", unlocode: "GRPIR" },
   { name: "Rotterdam", unlocode: "NLRTM" },
   { name: "Hamburg", unlocode: "DEHAM" },
@@ -15,6 +17,8 @@ const KNOWN_PORTS: Array<{ name: string; unlocode: string }> = [
   { name: "Jebel Ali", unlocode: "AEJEA" },
   { name: "Santos", unlocode: "BRSSZ" },
   { name: "Houston", unlocode: "USHOU" },
+  { name: "Gibraltar", unlocode: "GIGIB", aliases: ["Gib"] },
+  { name: "Ceuta", unlocode: "ESCEU" },
 ];
 
 const CLOSURE_KEYWORDS = ["closure", "closed", "suspended operations", "κλειστό"];
@@ -74,9 +78,16 @@ function detectVessel(text: string): { name: string | null; span: string | null 
   // immediately following a vessel name at the end of a subject line).
   const match = text.match(/\bMV[^\S\n]+[A-Z][\p{L}]+(?:[^\S\n]+[A-Z][\p{L}]+)*/u);
   if (match) {
-    return { name: match[0], span: match[0] };
+    return { name: titleCaseShipName(match[0]), span: match[0] };
   }
   return { name: null, span: null };
+}
+
+/** "MV AEGEAN STAR" (subject-line capitals) -> "MV Aegean Star"; mixed case is left alone. */
+function titleCaseShipName(name: string): string {
+  const rest = name.replace(/^MV\s+/, "");
+  if (rest !== rest.toUpperCase()) return name;
+  return `MV ${rest.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, sp: string, c: string) => sp + c.toUpperCase())}`;
 }
 
 function detectDelayHours(text: string): { hours: number | null; span: string | null } {
@@ -104,36 +115,116 @@ function detectNewBerthTime(text: string): { iso: string | null; span: string | 
 }
 
 const FUEL_GRADE = /\b(VLSFO|LSMGO|ULSFO|HSFO|MGO)\b/i;
-const OFFER_WORDS = /\b(offer|offering|quote|quotation|firm price)\b|προσφορά/i;
+const OFFER_WORDS = /\b(offers?|offering|quote|quotation|firm price|firm|can do)\b|προσφορά/i;
 const PRICE_PATTERNS = [
   /(?:USD|US\$|\$)\s*(\d+(?:\.\d+)?)\s*(?:\/|per\s+)\s*(?:mt|t|tons?|tonnes?|metric\s+tons?)\b/i,
   /(\d+(?:\.\d+)?)\s*(?:USD|US\$|\$|δολάρια)\s*(?:\/|per\s+|ανά\s+)\s*(?:mt|t|tons?|tonnes?|τόνο)/i,
+  // "usd 529 pmt": pmt = per metric tonne
+  /(?:USD|US\$|\$)\s*(\d+(?:\.\d+)?)\s*(?:pmt|p\/mt)\b/i,
 ];
-const QTY_RANGE = /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:–|-|to|έως)\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:mt|t|tonnes|metric\s+tons|τόνοι|τόνων)(?![\p{L}\d])/iu;
+const QTY_RANGE = /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:–|-|to|έως|\/)\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:mt|t|tonnes|metric\s+tons|τόνοι|τόνων)(?![\p{L}\d])/iu;
 const QTY_SINGLE = /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:mt|tonnes|metric\s+tons|τόνοι|τόνων)(?![\p{L}\d])/iu;
 const VALID_UNTIL =
   /(?:valid\s+(?:until|till|through|to)|expires?(?:\s+on)?|ισχύει\s+(?:έως|μέχρι))\s+(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)(?:\s*UTC)?/i;
-const SIGN_OFF = /(?:regards|best|sincerely|εκτίμηση|χαιρετισμούς),?\s*\n\s*([^\n]+)/i;
+const SIGN_OFF = /(?:regards|b?rgds|best|sincerely|εκτίμηση|χαιρετισμούς),?\s*\n\s*([^\n]+)/i;
+/** "rgds Med Bunker Brokers" on one line. */
+const SIGN_OFF_INLINE = /\b(?:b?rgds|regards)[^\S\n]+([A-Z][^\n]+)$/im;
+
+// Commercial terms. Each is null when the email doesn't say.
+const IMO = /\bIMO[\s:#]*(\d{7})\b/i;
+const BARGING_PER_MT = /\bbarging\s*:?\s*(?:USD|US\$|\$)\s*(\d+(?:\.\d+)?)\s*(?:\/|per\s*|p)\s*mt\b/i;
+const BARGING_LUMP = /\bbarging\s*:?\s*(?:USD|US\$|\$)\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)/i;
+const BARGING_INCL = /\bbarging\s*:?\s*incl|\bincl(?:uding|\.)?\s+barging|\ball[- ]in\b|\bdelivered\b|\bex[- ](?:pipe|pipeline|wharf)\b/i;
+const OTHER_FEES = /\b(?:overtime|o\/t|agency\s+fee|port\s+dues|mooring)\b[^\n$]*?(?:USD|US\$|\$)\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)/gi;
+const PAYMENT_DAYS = /\b(?:pmt|payment|paymt)\s*:?\s*(\d{1,3})\s*(?:days|dd|d)\b[^\n.(]*/i;
+const PAYMENT_CIA = /\b(?:cash in advance|CIA|prepayment|pre-payment)\b/i;
+const DELIVERY_ETA_PLUS = /ETA\s*\+\s*(\d+(?:\.\d+)?)\s*(?:hrs?|hours?|h)\b/i;
+const DELIVERY_WITHIN = /within\s+(\d+(?:\.\d+)?)\s*(?:hrs?|hours?|h)\s+of\s+(?:the\s+)?(?:vsl'?s?\s+|vessel'?s?\s+)?arrival|εντός\s+(\d+)\s+ωρών/i;
+const DELIVERY_PROMPT = /\bprompt\b|\bon\s+(?:the\s+)?(?:vsl'?s?\s+|vessel'?s?\s+)?arrival\b/i;
+const QUOTE_VALIDITY = /\b(?:firm|valid(?:ity)?)\s*(?:for\s*)?(\d+(?:\.\d+)?)\s*(mins?|minutes|m|hrs?|hours?|h)\b/i;
 
 const toNumber = (v: string) => Number(v.replace(/,/g, ""));
 
-/** The supply port: the known port named right after "at"/"in"/"ex", else the first one mentioned. */
+const portByName = (word: string) =>
+  KNOWN_PORTS.find((p) => [p.name, ...(p.aliases ?? [])].some((n) => n.toLowerCase() === word.toLowerCase()))!;
+
+/** The supply port: the known port named right after "at"/"in"/"ex", else the first one mentioned ("Gib" counts as Gibraltar). */
 function detectBunkerPort(text: string) {
-  const names = KNOWN_PORTS.map((p) => p.name).join("|");
+  const names = KNOWN_PORTS.flatMap((p) => [p.name, ...(p.aliases ?? [])]).join("|");
   const at = text.match(new RegExp(`(?:\\b(?:at|in|ex|off)|στο|στην)\\s+(?:the\\s+)?(?:port\\s+of\\s+)?(${names})\\b`, "i"));
   if (at) {
-    const known = KNOWN_PORTS.find((p) => p.name.toLowerCase() === at[1].toLowerCase())!;
+    const known = portByName(at[1]);
     return { name: known.name, unlocode: known.unlocode, span: at[1] };
   }
-  let best: { name: string; unlocode: string; span: string; index: number } | null = null;
-  const lower = text.toLowerCase();
-  for (const port of KNOWN_PORTS) {
-    const idx = lower.indexOf(port.name.toLowerCase());
-    if (idx !== -1 && (!best || idx < best.index)) {
-      best = { ...port, span: text.slice(idx, idx + port.name.length), index: idx };
-    }
-  }
-  return best;
+  const first = new RegExp(`\\b(${names})\\b`, "i").exec(text);
+  if (!first) return null;
+  const known = portByName(first[1]);
+  return { name: known.name, unlocode: known.unlocode, span: first[1] };
+}
+
+const GRADE_ANYWHERE = new RegExp(FUEL_GRADE.source, "gi");
+
+/**
+ * One line per fuel grade: each grade's price and quantity are read from the
+ * text between it and the next grade on the same line, so "vlsfo ... usd 529
+ * pmt / lsmgo ... usd 735 pmt" stays two separate lines.
+ */
+function extractOfferLines(text: string): OfferLine[] {
+  const hits = [...text.matchAll(GRADE_ANYWHERE)];
+  const lines: OfferLine[] = [];
+  hits.forEach((hit, i) => {
+    const start = hit.index!;
+    const lineEnd = text.indexOf("\n", start);
+    const nextGrade = i + 1 < hits.length ? hits[i + 1].index! : text.length;
+    const segment = text.slice(start, Math.min(nextGrade, lineEnd === -1 ? text.length : lineEnd));
+    const price = PRICE_PATTERNS.map((re) => segment.match(re)).find((m) => m !== null);
+    const grade = hit[1].toUpperCase();
+    if (!price || lines.some((l) => l.fuelGrade === grade)) return;
+    const range = segment.match(QTY_RANGE);
+    const single = range ? null : segment.match(QTY_SINGLE);
+    lines.push({
+      fuelGrade: grade,
+      priceUsdPerT: Number(price[1]),
+      qtyMinT: range ? toNumber(range[1]) : single ? toNumber(single[1]) : null,
+      qtyMaxT: range ? toNumber(range[2]) : single ? toNumber(single[1]) : null,
+    });
+  });
+  return lines;
+}
+
+/** Barging, fees, credit, delivery window and how long the price is firm. */
+function extractOfferTerms(text: string) {
+  const imo = text.match(IMO);
+  const perMt = text.match(BARGING_PER_MT);
+  const lump = perMt ? null : text.match(BARGING_LUMP);
+  const incl = text.match(BARGING_INCL);
+  const bargingType: "PER_MT" | "LUMP_SUM" | "INCLUDED" | null = perMt ? "PER_MT" : lump ? "LUMP_SUM" : incl ? "INCLUDED" : null;
+  const fees = [...text.matchAll(OTHER_FEES)].reduce((sum, m) => sum + toNumber(m[1]), 0);
+  const days = text.match(PAYMENT_DAYS);
+  const cia = days ? null : text.match(PAYMENT_CIA);
+  const etaPlus = text.match(DELIVERY_ETA_PLUS);
+  const within = etaPlus ? null : text.match(DELIVERY_WITHIN);
+  const prompt = etaPlus || within ? null : text.match(DELIVERY_PROMPT);
+  const delivery = etaPlus ? Number(etaPlus[1]) : within ? Number(within[1] ?? within[2]) : prompt ? 0 : null;
+  const validity = text.match(QUOTE_VALIDITY);
+  const validityMinutes = validity ? Number(validity[1]) * (/^h/i.test(validity[2]) ? 60 : 1) : null;
+  return {
+    vesselImo: imo ? imo[1] : null,
+    bargingType,
+    bargingUsd: perMt ? Number(perMt[1]) : lump ? toNumber(lump[1]) : null,
+    otherFeesUsd: fees > 0 ? fees : null,
+    paymentTerms: days ? days[0].trim() : cia ? cia[0] : null,
+    paymentDays: days ? Number(days[1]) : cia ? 0 : null,
+    deliveryDelayHours: delivery,
+    quoteValidityMinutes: validityMinutes,
+    spans: {
+      vesselImo: imo?.[0],
+      bargingType: (perMt ?? lump ?? incl)?.[0],
+      paymentDays: (days ?? cia)?.[0],
+      deliveryDelayHours: (etaPlus ?? within ?? prompt)?.[0],
+      quoteValidityMinutes: validity?.[0],
+    },
+  };
 }
 
 /** A specific fuel offer: grade + price + offer wording. Price lists and newsletters don't qualify. */
@@ -150,9 +241,11 @@ function extractBunkerOffer(text: string): PortEventExtraction | null {
   const valid = text.match(VALID_UNTIL);
   const detected = detectVessel(text);
   // "MV Aegean Star VLSFO at ..." – a fuel grade right after the name isn't part of it.
-  const vesselName = detected.name?.replace(/(?:\s+(?:VLSFO|LSMGO|ULSFO|HSFO|MGO))+$/, "") ?? null;
-  const vessel = { name: vesselName, span: vesselName };
-  const signOff = text.match(SIGN_OFF);
+  const vesselName = detected.name?.replace(/(?:\s+(?:VLSFO|LSMGO|ULSFO|HSFO|MGO))+$/i, "") ?? null;
+  const vessel = { name: vesselName, span: detected.span?.replace(/(?:\s+(?:VLSFO|LSMGO|ULSFO|HSFO|MGO))+$/i, "") ?? null };
+  const signOff = text.match(SIGN_OFF) ?? text.match(SIGN_OFF_INLINE);
+  const terms = extractOfferTerms(text);
+  const lines = extractOfferLines(text);
 
   const sourceSpans: SourceSpan[] = [
     { field: "eventType", text: offerWord[0] },
@@ -164,6 +257,9 @@ function extractBunkerOffer(text: string): PortEventExtraction | null {
   if (single) sourceSpans.push({ field: "qtyMaxT", text: single[0] });
   if (valid) sourceSpans.push({ field: "validUntil", text: valid[0] });
   if (vessel.span) sourceSpans.push({ field: "vesselNameMentioned", text: vessel.span });
+  for (const [field, span] of Object.entries(terms.spans)) {
+    if (span) sourceSpans.push({ field, text: span });
+  }
 
   const qtyMin = range ? toNumber(range[1]) : single ? toNumber(single[1]) : null;
   const qtyMax = range ? toNumber(range[2]) : single ? toNumber(single[1]) : null;
@@ -184,7 +280,21 @@ function extractBunkerOffer(text: string): PortEventExtraction | null {
     qtyMaxT: qtyMax,
     validUntil: validIso,
     supplier: signOff ? signOff[1].trim() : null,
-    confidence: qtyMax !== null && valid ? 0.9 : 0.7,
+    vesselImo: terms.vesselImo,
+    vesselEta: null,
+    bargingType: terms.bargingType,
+    bargingUsd: terms.bargingUsd,
+    otherFeesUsd: terms.otherFeesUsd,
+    paymentTerms: terms.paymentTerms,
+    paymentDays: terms.paymentDays,
+    deliveryDelayHours: terms.deliveryDelayHours,
+    deliveryEarliest: null,
+    quoteValidityMinutes: terms.quoteValidityMinutes,
+    offerLines:
+      lines.length > 0
+        ? lines
+        : [{ fuelGrade: grade[1].toUpperCase(), priceUsdPerT: Number(price[1]), qtyMinT: qtyMin, qtyMaxT: qtyMax }],
+    confidence: qtyMax !== null && (valid || terms.quoteValidityMinutes !== null) ? 0.9 : 0.7,
     sourceSpans,
   });
 }
@@ -196,6 +306,17 @@ const NO_OFFER = {
   qtyMaxT: null,
   validUntil: null,
   supplier: null,
+  vesselImo: null,
+  vesselEta: null,
+  bargingType: null,
+  bargingUsd: null,
+  otherFeesUsd: null,
+  paymentTerms: null,
+  paymentDays: null,
+  deliveryDelayHours: null,
+  deliveryEarliest: null,
+  quoteValidityMinutes: null,
+  offerLines: null,
 };
 
 /**
@@ -260,45 +381,75 @@ export async function mockExtractEmail(text: string): Promise<PortEventExtractio
 
 const eur = (v: number) => `€${Math.round(Math.abs(v)).toLocaleString("en-US")}`;
 
+/** ["α", "β", "γ"] -> "α, β και γ" */
+function joinKai(parts: string[]): string {
+  return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} και ${parts[parts.length - 1]}`;
+}
+
 function explainBunker(facts: RecommendationFacts, b: NonNullable<RecommendationFacts["bunker"]>): string {
-  const grade = b.fuelGrade ?? "fuel";
+  const grade = b.fuelGrade ?? "καυσίμου";
   const offer =
-    `${b.bunkerPortName} offers ${b.qtyT.toLocaleString("en-US")} t of ${grade} at $${b.priceUsdPerT}/t, ` +
-    `${b.priceSavingEur >= 0 ? "saving" : "costing"} ${eur(b.priceSavingEur)} against our reference price. `;
+    `Το ${b.bunkerPortName} προσφέρει ${b.qtyT.toLocaleString("en-US")} t ${grade} στα $${b.priceUsdPerT}/t, ` +
+    `${b.priceSavingEur >= 0 ? "γλιτώνοντας" : "με επιπλέον κόστος"} ${eur(b.priceSavingEur)} σε σχέση με την τιμή αναφοράς μας. `;
   const detour =
-    `For ${facts.vesselName} (${facts.originPortName} → ${facts.destPortName}) the call is a ` +
-    `${b.detourNm.toFixed(0)} nm detour and about ${b.extraHours.toFixed(0)} h extra, burning ` +
-    `${b.extraFuelT.toFixed(1)} t more fuel. `;
+    `Για το ${facts.vesselName} (${facts.originPortName} → ${facts.destPortName}) η προσέγγιση σημαίνει ` +
+    `παράκαμψη ${b.detourNm.toFixed(0)} nm και περίπου ${b.extraHours.toFixed(0)} h επιπλέον, με ` +
+    `${b.extraFuelT.toFixed(1)} t επιπλέον καύσιμο. `;
   if (b.verdict === "WORTH_IT") {
     return (
       offer + detour +
-      `It still makes the ${facts.destPortName} berth` +
+      `Το πλοίο προλαβαίνει ακόμα την πρόσδεση στο ${facts.destPortName}` +
       (facts.recommendedSpeedKn > facts.currentSpeedKn + 0.05
-        ? ` by sailing at ${facts.recommendedSpeedKn.toFixed(1)} kn instead of ${facts.currentSpeedKn.toFixed(1)} kn`
+        ? ` πλέοντας με ${facts.recommendedSpeedKn.toFixed(1)} kn αντί για ${facts.currentSpeedKn.toFixed(1)} kn`
         : "") +
-      `, so the net result is ${eur(b.netEur)} saved.`
+      `, οπότε το καθαρό όφελος είναι ${eur(b.netEur)}.`
     );
   }
   const why = [
-    b.netEur <= 0 ? `the detour costs ${eur(b.netEur)} more than the cheaper fuel saves` : null,
-    !b.stillMakesBerth ? `the ship would miss the ${facts.destPortName} berth even at full speed` : null,
-    !b.offerValidAtArrival ? "the offer expires before the ship could get there" : null,
+    b.netEur <= 0 ? `η παράκαμψη κοστίζει ${eur(b.netEur)} περισσότερα απ' όσα γλιτώνει το φθηνότερο καύσιμο` : null,
+    !b.stillMakesBerth ? `το πλοίο θα έχανε την πρόσδεση στο ${facts.destPortName} ακόμα και με πλήρη ταχύτητα` : null,
+    !b.offerValidAtArrival ? "η προσφορά λήγει πριν προλάβει να φτάσει το πλοίο" : null,
   ].filter((x): x is string => x !== null);
-  const list = why.length <= 1 ? (why[0] ?? "") : `${why.slice(0, -1).join(", ")} and ${why[why.length - 1]}`;
-  return offer + detour + `Not worth it: ${list}.`;
+  return offer + detour + `Δεν αξίζει: ${joinKai(why)}.`;
 }
+
+/** Offline: the deterministic explanation, as one paragraph. */
+export async function mockExplainBunkerComparison(facts: BunkerComparisonFacts): Promise<string> {
+  const { headline, reasons, warnings } = facts.draft;
+  const why = reasons.length > 0 ? ` Γιατί: ${reasons.join("· ")}.` : "";
+  return `${headline}${why}${warnings.length > 0 ? ` ${warnings.join(" ")}` : ""}`;
+}
+
+const EVENT_WORDS: Record<string, string> = {
+  BERTH_DELAY: "καθυστέρηση πρόσδεσης",
+  CONGESTION: "συμφόρηση",
+  CLOSURE: "κλείσιμο λιμανιού",
+};
 
 export async function mockExplainRecommendation(facts: RecommendationFacts): Promise<string> {
   if (facts.bunker) return explainBunker(facts, facts.bunker);
+  const how =
+    facts.scenarioLabel && facts.scenarioLabel.startsWith("C")
+      ? `Η αλλαγή διαδρομής (${facts.scenarioDescription ?? "γύρω από τον καιρό"}) με ${facts.recommendedSpeedKn.toFixed(1)} kn `
+      : `Η μείωση ταχύτητας από ${facts.currentSpeedKn.toFixed(1)} kn σε ${facts.recommendedSpeedKn.toFixed(1)} kn `;
   return (
-    `${facts.portName} has reported ${facts.portEventType.toLowerCase().replace("_", " ")} ` +
-    `affecting ${facts.vesselName} on its ${facts.originPortName} → ${facts.destPortName} voyage, ` +
-    `pushing the berth time back by ${facts.delayHours.toFixed(0)} hours. ` +
-    `Slowing from ${facts.currentSpeedKn.toFixed(1)} kn to ${facts.recommendedSpeedKn.toFixed(1)} kn ` +
-    `lets the vessel arrive exactly when the berth is ready instead of rushing to wait at anchor, ` +
-    `saving an estimated ${facts.fuelSavedT.toFixed(1)} t of fuel ` +
-    `(€${Math.round(facts.costSavedEur).toLocaleString("en-US")}) and ` +
-    `${facts.co2SavedT.toFixed(1)} t of CO₂ emissions.`
+    `Το ${facts.portName} ανέφερε ${EVENT_WORDS[facts.portEventType] ?? "συμβάν"} ` +
+    `που αφορά το ${facts.vesselName} στο ταξίδι ${facts.originPortName} → ${facts.destPortName}, ` +
+    `μεταθέτοντας την πρόσδεση κατά ${facts.delayHours.toFixed(0)} ώρες. ` +
+    how +
+    `επιτρέπει στο πλοίο να φτάσει ακριβώς όταν η θέση είναι έτοιμη, αντί να βιαστεί για να περιμένει στην άγκυρα, ` +
+    `γλιτώνοντας περίπου ${facts.fuelSavedT.toFixed(1)} t καυσίμου ` +
+    `(€${Math.round(facts.costSavedEur).toLocaleString("en-US")}) και ` +
+    `${facts.co2SavedT.toFixed(1)} t CO₂` +
+    (facts.etsSavedEur && facts.etsSavedEur > 0
+      ? ` (€${Math.round(facts.etsSavedEur).toLocaleString("en-US")} σε δικαιώματα EU ETS)`
+      : "") +
+    "." +
+    (facts.demurrageAvoided && facts.demurrageAvoided > 0
+      ? ` Επίσης κρατά την εκφόρτωση εντός laytime, αποφεύγοντας περίπου ${facts.currency ?? "USD"} ` +
+        `${Math.round(facts.demurrageAvoided).toLocaleString("en-US")} demurrage.`
+      : "") +
+    (facts.jitNote ? ` Ναυλοσύμφωνο: ${facts.jitNote}` : "")
   );
 }
 
@@ -307,44 +458,62 @@ function rowMatchesVesselName(row: CitableRow, name: string): boolean {
   return typeof vesselName === "string" && vesselName.toLowerCase() === name.toLowerCase();
 }
 
+/** Greek spellings people type for the demo ports, so «Γένοβα» finds Genoa. */
+const GREEK_PORT_NAMES: Record<string, string[]> = {
+  genoa: ["γένοβα"],
+  algeciras: ["αλχεθίρας", "αλγεθίρας", "αλγκεθίρας"],
+  gibraltar: ["γιβραλτάρ"],
+  ceuta: ["θέουτα", "σέουτα"],
+  rotterdam: ["ρότερνταμ"],
+  singapore: ["σιγκαπούρη"],
+  valencia: ["βαλένθια", "βαλένσια"],
+  "jebel ali": ["τζεμπέλ αλί"],
+};
+
+const has = (q: string, words: string[]) => words.some((w) => q.includes(w));
+
 export async function mockAnswerQuestion(question: string, rows: CitableRow[]): Promise<Answer> {
   const q = question.toLowerCase();
 
   const vesselMatch = question.match(/\bMV\s+[A-Z][\p{L}]+(?:\s+[A-Z][\p{L}]+)*/u);
 
-  if (q.includes("fuel") && (q.includes("saved") || q.includes("approved"))) {
+  if (has(q, ["fuel", "καύσιμ"]) && has(q, ["saved", "approved", "γλιτ", "εγκεκριμ", "εξοικον"])) {
     const approved = rows.filter(
       (r) => r.table === "recommendation" && r.data.status === "APPROVED"
     );
     const total = approved.reduce((sum, r) => sum + Number(r.data.fuelSavedT ?? 0), 0);
     if (approved.length === 0) {
       return {
-        answer: "No actions have been approved yet, so 0 t of fuel has been saved so far.",
+        answer: "Δεν έχει εγκριθεί ακόμα καμία ενέργεια, οπότε ως τώρα έχουν γλιτωθεί 0 t καυσίμου.",
         citations: [],
       };
     }
     return {
-      answer: `Approved actions have saved a total of ${total.toFixed(1)} t of fuel across ${
+      answer: `Οι εγκεκριμένες ενέργειες έχουν γλιτώσει συνολικά ${total.toFixed(1)} t καυσίμου από ${
         approved.length
-      } approved recommendation(s).`,
+      } εγκεκριμένες συστάσεις.`,
       citations: approved.map((r) => ({ table: r.table, id: r.id })),
     };
   }
 
-  if ((q.includes("offer") || q.includes("bunker")) && (q.includes("why") || q.includes("take"))) {
+  if (has(q, ["offer", "bunker", "προσφορ", "ανεφοδιασ"]) && has(q, ["why", "take", "γιατί", "γιατι", "πήραμε", "πάρουμε"])) {
     const offers = rows.filter((r) => r.table === "recommendation" && r.data.actionType === "BUNKER_DETOUR");
-    const named = offers.filter((r) => typeof r.data.portName === "string" && q.includes(r.data.portName.toLowerCase()));
+    const named = offers.filter((r) => {
+      if (typeof r.data.portName !== "string") return false;
+      const name = r.data.portName.toLowerCase();
+      return q.includes(name) || has(q, GREEK_PORT_NAMES[name] ?? []);
+    });
     const picked = named.length > 0 ? named : offers;
     if (picked.length > 0) {
       const lines = picked.map((r) => {
-        const where = `${r.data.portName} offer for ${r.data.vesselName}`;
-        const net = `net €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}`;
-        const flagged = r.data.verdict === "NOT_WORTH_IT" ? ` It was flagged not worth it: ${r.data.notWorthItBecause}.` : "";
+        const where = `προσφορά του ${r.data.portName} για το ${r.data.vesselName}`;
+        const net = `καθαρό €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}`;
+        const flagged = r.data.verdict === "NOT_WORTH_IT" ? ` Είχε σημειωθεί ότι δεν αξίζει: ${r.data.notWorthItBecause}.` : "";
         if (r.data.status === "REJECTED") {
-          return `The ${where} was declined${r.data.rejectReason ? ` (reason: ${r.data.rejectReason})` : ""}.${flagged}`;
+          return `Η ${where} απορρίφθηκε${r.data.rejectReason ? ` (αιτιολογία: ${r.data.rejectReason})` : ""}.${flagged}`;
         }
-        if (r.data.status === "APPROVED") return `The ${where} was approved (${net}).${flagged}`;
-        return `The ${where} is waiting for a decision (${net}).${flagged}`;
+        if (r.data.status === "APPROVED") return `Η ${where} εγκρίθηκε (${net}).${flagged}`;
+        return `Η ${where} περιμένει απόφαση (${net}).${flagged}`;
       });
       return { answer: lines.join(" "), citations: picked.map((r) => ({ table: r.table, id: r.id })) };
     }
@@ -356,13 +525,34 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     );
     if (voyageRow) {
       return {
-        answer: `${vesselMatch[0]}'s planned ETA is ${voyageRow.data.plannedEta}.`,
+        answer: `Το προγραμματισμένο ETA του ${vesselMatch[0]} είναι ${voyageRow.data.plannedEta}.`,
         citations: [{ table: voyageRow.table, id: voyageRow.id }],
       };
     }
   }
 
-  if (q.includes("affected") && (q.includes("delay") || q.includes("port"))) {
+  if (q.includes("cii")) {
+    const atSea = rows.filter((r) => r.table === "voyage" && r.data.status === "UNDERWAY" && typeof r.data.ciiRating === "string");
+    const poor = atSea.filter((r) => r.data.ciiRating === "D" || r.data.ciiRating === "E");
+    const fmt = (r: CitableRow) => `${r.data.vesselName} (${r.data.ciiRating}${typeof r.data.ciiAttained === "number" ? `, ${r.data.ciiAttained.toFixed(2)}` : ""})`;
+    if (poor.length > 0) {
+      return {
+        answer:
+          `Πλοία σε ταξίδι με βαθμό CII D ή E: ${poor.map(fmt).join(", ")}. ` +
+          "Η αργή πλεύση (σενάριο B) μειώνει την ένταση άνθρακα όταν υπάρχει περιθώριο ως την πρόσδεση.",
+        citations: poor.map((r) => ({ table: r.table, id: r.id })),
+      };
+    }
+    if (atSea.length > 0) {
+      const worst = [...atSea].sort((a, b) => String(b.data.ciiRating).localeCompare(String(a.data.ciiRating)))[0];
+      return {
+        answer: `Κανένα πλοίο σε ταξίδι δεν έχει βαθμό CII D ή E. Ο χαμηλότερος είναι του ${fmt(worst)}.`,
+        citations: [{ table: worst.table, id: worst.id }],
+      };
+    }
+  }
+
+  if (has(q, ["affected", "επηρε"]) && has(q, ["delay", "port", "καθυστ", "λιμ"])) {
     const affectedVoyageIds = new Set(
       rows
         .filter((r) => r.table === "portEvent" && r.data.eventType !== "NONE")
@@ -375,7 +565,7 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     if (affectedVoyages.length > 0) {
       const names = affectedVoyages.map((r) => r.data.vesselName).join(", ");
       return {
-        answer: `Vessels affected by reported port delays: ${names}.`,
+        answer: `Πλοία που επηρεάζονται από αναφερθείσες καθυστερήσεις λιμανιών: ${names}.`,
         citations: affectedVoyages.map((r) => ({ table: r.table, id: r.id })),
       };
     }
@@ -383,10 +573,10 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
 
   return {
     answer:
-      "Offline mode (no LLM API key configured): I can only answer a few fixed question types, " +
-      "e.g. fuel saved from approved recommendations, why a bunker offer was or wasn't taken, a named vessel's ETA (\"What's MV Aegean " +
-      "Star's ETA?\"), or which vessels are affected by port delays. Configure LLM_PROVIDER and " +
-      "an API key to ask anything about the fleet.",
+      "Offline λειτουργία (δεν έχει οριστεί κλειδί LLM): απαντώ μόνο σε λίγους τύπους ερωτήσεων, " +
+      "π.χ. πόσο καύσιμο γλιτώσαμε από εγκεκριμένες συστάσεις, γιατί πήραμε ή όχι μια προσφορά καυσίμου, το ETA ενός πλοίου " +
+      "(«Ποιο είναι το ETA του MV Aegean Star;») ή ποια πλοία επηρεάζονται από καθυστερήσεις λιμανιών. Ορίστε LLM_PROVIDER " +
+      "και κλειδί API για οποιαδήποτε ερώτηση για τον στόλο.",
     citations: [],
   };
 }

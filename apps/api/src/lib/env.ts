@@ -25,6 +25,35 @@ export function resolveLlmModel(provider: LlmProviderName, override: string | un
 
 const llmProvider = (process.env.LLM_PROVIDER || "mock") as LlmProviderName;
 
+/** "true"/"1"/"yes" -> true; anything else (or unset) -> the fallback. */
+export function envFlag(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+
+/**
+ * Outgoing email (SMTP) for sending the bunker-offer replies. Any SMTP
+ * provider works: Gmail/Google Workspace, Outlook/Microsoft 365, SendGrid,
+ * Mailgun, Amazon SES, Brevo... See .env.example.
+ */
+export const mailEnv = {
+  host: process.env.SMTP_HOST?.trim() ?? "",
+  port: smtpPort,
+  /** TLS from the first byte (port 465). Port 587 uses STARTTLS with secure=false. */
+  secure: envFlag(process.env.SMTP_SECURE, smtpPort === 465),
+  user: process.env.SMTP_USER?.trim() ?? "",
+  pass: process.env.SMTP_PASS ?? "",
+  from: process.env.MAIL_FROM?.trim() ?? "",
+  fromName: process.env.MAIL_FROM_NAME?.trim() || "Tidewise Operations",
+  replyTo: process.env.MAIL_REPLY_TO?.trim() ?? "",
+  /** Every sent reply is also BCC'd here (e.g. the ops mailbox), if set. */
+  bcc: process.env.MAIL_BCC?.trim() ?? "",
+  /** For testing: send everything here instead of to the supplier. */
+  redirectTo: process.env.MAIL_REDIRECT_TO?.trim() ?? "",
+};
+
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   llmProvider,
@@ -36,4 +65,13 @@ export const env = {
   simSpeed: Number(process.env.SIM_SPEED ?? 120),
   fuelPriceEurPerT: Number(process.env.FUEL_PRICE_EUR_PER_T ?? 600),
   co2Factor: Number(process.env.CO2_FACTOR ?? 3.114),
+  /** Default EU Allowance price (€/t CO2) until changed in Settings. */
+  euaPriceEurPerT: Number(process.env.EUA_PRICE_EUR_PER_T ?? 90),
+  /** "open-meteo" (real marine forecast, no key needed) or "mock" (offline, deterministic). */
+  weatherProvider: (process.env.WEATHER_PROVIDER || "open-meteo") as "open-meteo" | "mock",
+  weatherTimeoutMs: Number(process.env.WEATHER_TIMEOUT_MS || 6000),
+  /** aisstream.io API key. Empty = live AIS tracking off. Never logged or sent to the UI. */
+  aisApiKey: process.env.AISSTREAM_API_KEY ?? "",
+  /** Minimum minutes between automatic ETA/scenario recomputes for one AIS-tracked vessel. */
+  aisRecomputeMinutes: Number(process.env.AIS_RECOMPUTE_MINUTES || 10),
 };

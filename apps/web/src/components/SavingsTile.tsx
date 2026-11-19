@@ -48,18 +48,18 @@ export function SavingsTile() {
   return (
     <section className="savings-tile" aria-labelledby="savings-title">
       <h2 id="savings-title" className="label">
-        Saved to date
+        Εξοικονόμηση ως τώρα
       </h2>
       <dl className="savings-tile__grid">
         <div>
-          <dt>Fuel</dt>
+          <dt>Καύσιμο</dt>
           <dd>
             {totals.fuelT.toFixed(1)}
             <span> t</span>
           </dd>
         </div>
         <div>
-          <dt>Cost</dt>
+          <dt>Κόστος</dt>
           <dd>
             €{Math.round(totals.costEur).toLocaleString("en-US")}
           </dd>
@@ -74,11 +74,11 @@ export function SavingsTile() {
       </dl>
       <p className="savings-tile__foot">
         {totals.count === 0
-          ? "No approved actions yet."
-          : `From ${totals.count} approved action${totals.count === 1 ? "" : "s"}.`}{" "}
+          ? "Δεν υπάρχουν ακόμα εγκεκριμένες ενέργειες."
+          : `Από ${totals.count === 1 ? "μία εγκεκριμένη ενέργεια" : `${totals.count} εγκεκριμένες ενέργειες`}.`}{" "}
         {totals.pending > 0 && (
           <Link to="/actions">
-            {totals.pending} waiting for review →
+            {totals.pending} σε αναμονή για έλεγχο →
           </Link>
         )}
       </p>

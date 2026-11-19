@@ -16,7 +16,7 @@ describe("mockWeatherFor", () => {
         expect(w.headCurrentKn).toBeLessThanOrEqual(1.5);
         expect(w.seaStateFuelFactor).toBeGreaterThanOrEqual(1);
         expect(w.seaStateFuelFactor).toBeLessThanOrEqual(1.1);
-        expect(w.description).toMatch(/sea/);
+        expect(w.description).toMatch(/θάλασσα|κύμα|θαλασσοταραχή/);
       }
     }
   });

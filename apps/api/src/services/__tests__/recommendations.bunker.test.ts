@@ -13,6 +13,8 @@ vi.mock("../../lib/prisma.js", () => {
     recommendation: {
       findUnique: async () => db.rec,
       findFirst: async () => null,
+      findMany: async () => [],
+      updateMany: async () => ({ count: 0 }),
       update: async ({ data }: { data: object }) => Object.assign(db.rec!, data),
     },
     voyage: {
@@ -36,7 +38,15 @@ const { approveRecommendation, undoApproval } = await import("../recommendations
 
 beforeEach(() => {
   db.rec = { id: "r1", voyageId: "v1", portEventId: "ev1", actionType: "BUNKER_DETOUR", status: "PENDING", costSavedEur: 109_000, decidedAt: null };
-  db.voyage = { id: "v1", status: "UNDERWAY", speedKn: 12, plannedEta: new Date(), berthTime: null };
+  db.voyage = {
+    id: "v1",
+    status: "UNDERWAY",
+    speedKn: 12,
+    plannedEta: new Date(Date.now() + 48 * 3_600_000),
+    berthTime: null,
+    vessel: {},
+    destPort: { lat: 51.95, lon: 4.15 },
+  };
   db.voyageUpdates = 0;
   db.audit = [];
 });
@@ -59,6 +69,6 @@ describe("bunker offer approval", () => {
 
   it("can't approve twice", async () => {
     await approveRecommendation("r1");
-    await expect(approveRecommendation("r1")).rejects.toThrow(/already approved/);
+    await expect(approveRecommendation("r1")).rejects.toThrow(/έχει ήδη εγκριθεί/);
   });
 });

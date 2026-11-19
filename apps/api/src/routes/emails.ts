@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { body, param, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma.js";
 import { processEmail } from "../services/emailProcessing.js";
+import { deleteEmail } from "../services/emailDelete.js";
 import { DocumentError, pdfToText, subjectFromText } from "../services/documentText.js";
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024;
@@ -29,7 +30,7 @@ emailsRouter.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid email", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο email", details: errors.array() });
       }
       const { fromAddr, subject, body: emailBody } = req.body;
       const email = await prisma.email.create({
@@ -53,7 +54,7 @@ emailsRouter.post(
   async (req, res, next) => {
     try {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-        return res.status(400).json({ error: "Send the PDF as the request body with Content-Type: application/pdf." });
+        return res.status(400).json({ error: "Στείλτε το PDF ως σώμα του αιτήματος με Content-Type: application/pdf." });
       }
       const filename = String(req.query.filename ?? "document.pdf").slice(0, 200);
       const text = await pdfToText(req.body);
@@ -83,7 +84,7 @@ emailsRouter.post("/simulate", async (_req, res, next) => {
       orderBy: { createdAt: "asc" },
     });
     if (!next_) {
-      return res.status(409).json({ error: "No queued emails left to simulate." });
+      return res.status(409).json({ error: "Δεν υπάρχουν άλλα emails στην ουρά για προσομοίωση." });
     }
     const released = await prisma.email.update({
       where: { id: next_.id },
@@ -102,11 +103,11 @@ emailsRouter.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid request", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο αίτημα", details: errors.array() });
       }
       const id = req.params?.id;
       if (!id) {
-        return res.status(400).json({ error: "Invalid request", details: "Missing id" });
+        return res.status(400).json({ error: "Μη έγκυρο αίτημα", details: "Missing id" });
       }
       const result = await processEmail(id);
       res.json(result);
@@ -115,3 +116,15 @@ emailsRouter.post(
     }
   }
 );
+
+/** Delete an email and what was made from it; see services/emailDelete.ts for what is refused. */
+emailsRouter.delete("/:id", param("id").isString().trim().notEmpty(), async (req, res, next) => {
+  try {
+    const id = req.params?.id;
+    if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
+    await deleteEmail(id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
