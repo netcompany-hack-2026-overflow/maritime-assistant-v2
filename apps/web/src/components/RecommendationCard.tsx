@@ -387,12 +387,6 @@ export function RecommendationCard({
 
 
       <p className="recommendation-card__rationale">{recommendation.rationale}</p>
-      {bunker && (
-        <Link className="recommendation-card__toggle" to={`/bunkering?offer=${recommendation.id}`}>
-          Σύγκριση προσφορών, επιλογές διαδρομής και απαντήσεις →
-        </Link>
-      )}
-
       {set ? (
         <ScenarioComparison set={set} selected={shown} onSelect={isPending ? setSelected : null} />
       ) : bunker ? null : (

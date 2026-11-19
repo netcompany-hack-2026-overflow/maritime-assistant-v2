@@ -1,50 +1,82 @@
-.page--bunkering {
-  max-width: 1200px;
+/* The fuel offers for one ship, inside its group on the Actions page. */
+.bunker-panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: var(--space-5);
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(10, 42, 102, 0.04);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  min-width: 0;
 }
 
 .muted {
   color: var(--muted);
 }
 
-.bunkering-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.bunkering-head__title {
-  font-size: var(--text-xl);
+.bunker-panel__title {
+  font-size: var(--text-lg, 1.125rem);
   font-weight: 400;
   color: var(--navy);
   margin: var(--space-1) 0 0;
-}
-
-.bunkering-head__actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.bunkering-head__select select {
-  font: inherit;
-  font-size: var(--text-sm);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  max-width: 100%;
 }
 
 .provider {
   margin: calc(-1 * var(--space-3)) 0 0;
   font-size: var(--text-xs);
   color: var(--warning);
+}
+
+/* Approve / reject / undo for the offer shown in detail. */
+.offer-decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.offer-decision p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.offer-decision__rule {
+  color: var(--navy);
+}
+
+.offer-decision__buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.offer-decision__reject {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.offer-decision__reject textarea {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  resize: vertical;
+}
+
+.offer-decision__state {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.offer-decision__state--ok {
+  color: var(--success);
 }
 
 .provider--ok {

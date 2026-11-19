@@ -4,10 +4,10 @@
 
 > **The app's interface is in Greek.** This English README calls pages and buttons by their
 > English meaning. Pages: Fleet = Στόλος, Voyages = Ταξίδια, Inbox = Εισερχόμενα, Actions = Ενέργειες,
-> Bunkering = Ανεφοδιασμός, Ask = Ερωτήσεις, Value = Αξία, Settings = Ρυθμίσεις. Common buttons:
+> Ask = Ερωτήσεις, Value = Αξία, Settings = Ρυθμίσεις. Common buttons:
 > Approve = Έγκριση, Reject = Απόρριψη, Undo approval = Αναίρεση έγκρισης, Send = Αποστολή,
-> "Simulate incoming email" = «Προσομοίωση εισερχόμενου email», "Simulate supplier quotes" =
-> «Προσομοίωση προσφορών προμηθευτών». Emails to suppliers and charterers stay in English.
+> "Simulate incoming email" = «Προσομοίωση εισερχόμενου email», "Simulate fuel quotes" =
+> «Προσομοίωση προσφορών καυσίμου». Emails to suppliers and charterers stay in English.
 
 > 🇬🇷 Ελληνική έκδοση: [README.md](README.md)
 
@@ -74,7 +74,11 @@ calculation is a pure, unit-tested function
 ([packages/shared/src/bunker.ts](packages/shared/src/bunker.ts)) and every step is
 stored with the recommendation (its `calc` field) for the UI to show.
 
-### Third scenario: comparing offers and drafting the replies (Bunkering)
+### Third scenario: comparing offers and drafting the replies (on Actions)
+
+Fuel offers have no page of their own. On **Actions**, each ship with offers is one group: its speed change (if any)
+and all its offers together, because approving one closes the others (one decision per ship). The group stays under
+"Pending" while an offer is open and moves to "History" once all are decided.
 
 When a fuel offer arrives, the agent:
 
@@ -121,7 +125,7 @@ have had a reply since. A recommendation that arrives *after* the approval is a 
 **Emails only for ships at sea.** A ship counts as on its voyage when the voyage is underway **and** it still has
 distance to go (live AIS when available); the stored status alone stays "underway" after arrival. For a ship that has
 arrived or whose voyage was cancelled, emails are not matched to it, no replies are drafted, nothing can be approved and
-nothing is sent, not even a decline or a notice. The Bunkering page lists only ships at sea
+nothing is sent, not even a decline or a notice. The offer comparison on Actions lists only ships at sea
 ([atSea.ts](apps/api/src/services/atSea.ts)).
 
 Code: [bunkerPlan.ts](packages/shared/src/bunkerPlan.ts) (time check, options, route),
@@ -149,11 +153,10 @@ The four demo emails are in [apps/api/prisma/mock_demo_data.json](apps/api/prism
 5. **Fleet** — MV Aegean Star is now visibly slower (or on the new route if C was approved),
    and its ETA matches the new berth time exactly.
 6. **Bunker offers** — back in Inbox, simulate and process the next two emails. On
-   Actions, both wait for a decision: Algeciras is marked worth it (net ≈ +€54k),
-   Genoa is marked in red as not worth it, with the reason. Reject Genoa. "Compare
-   offers, route options and replies →" opens the Bunkering page.
-6b. **Bunkering** — "Simulate supplier quotes" brings in four quotes for MV Aegean Star
-   and compares them on total cost (see the pitch below).
+   Actions, they appear in MV Aegean Star's group next to the speed change: Algeciras is
+   marked worth it, Genoa as not analysed (it doesn't fit the slack), with the reason.
+6b. **Actions** — "Simulate fuel quotes" brings in four quotes for MV Aegean Star
+   and compares them on total cost in the same group (see the pitch below).
 7. **Voyages → Charter party** — upload `apps/web/public/samples/cycladic-wind-charter-party.pdf`
    to MV Cycladic Wind's voyage, then process the Singapore congestion email: that CP has
    **no** JIT clause, so scenario B is flagged "Not covered" (utmost despatch applies).
@@ -235,7 +238,7 @@ the time check).
 
 | Time | Show | Say |
 |---|---|---|
-| 0–10 s | **Bunkering** → "Simulate supplier quotes" | "Four suppliers, four emails in trader shorthand, like every day." |
+| 0–10 s | **Actions** → "Simulate fuel quotes" | "Four suppliers, four emails in trader shorthand, like every day." |
 | 10–20 s | The table: Rock Marine at **$526/t** is cheapest… and ranks **#4** | "Cheapest per tonne is dearest overall: $4,500 barging on top, barge 12 hours after arrival, reliability 5/10." |
 | 20–30 s | The recommendation: "Strait Bunkering is $5.00/t dearer on paper… but ≈$33k cheaper overall" | "Making up 12 hours means sailing faster: ≈$27k of extra fuel no quote shows." |
 | 30–40 s | Ceuta's countdown (**firm 10 mins**, amber) · sliders: charter $40k, urgency High, ETS on/off | "The ranking re-computes instantly, no model call." |

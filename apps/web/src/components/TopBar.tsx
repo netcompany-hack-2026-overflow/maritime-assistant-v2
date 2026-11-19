@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { to: "/voyages", label: "Ταξίδια", end: false },
   { to: "/inbox", label: "Εισερχόμενα", end: false },
   { to: "/actions", label: "Ενέργειες", end: false },
-  { to: "/bunkering", label: "Ανεφοδιασμός", end: false },
   { to: "/ask", label: "Ερωτήσεις", end: false },
   { to: "/value", label: "Αξία", end: false },
   { to: "/settings", label: "Ρυθμίσεις", end: false },
@@ -57,7 +56,7 @@ export function TopBar({ pendingActionCount }: TopBarProps) {
             {item.to === "/actions" && pendingActionCount > 0 && (
               <span className="top-bar__badge">
                 {pendingActionCount}
-                <span className="visually-hidden"> pending</span>
+                <span className="visually-hidden"> σε αναμονή</span>
               </span>
             )}
           </NavLink>
