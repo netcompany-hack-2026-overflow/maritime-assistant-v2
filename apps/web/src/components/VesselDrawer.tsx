@@ -48,16 +48,16 @@ function AisLink({ vessel }: { vessel: VesselListItem }) {
         <input
           aria-label="MMSI"
           inputMode="numeric"
-          placeholder="MMSI (9 digits)"
+          placeholder="MMSI (9 ψηφία)"
           value={mmsi}
           onChange={(e) => setMmsi(e.target.value.replace(/\D/g, "").slice(0, 9))}
         />
         <button className="btn" type="submit" disabled={busy || mmsi === (linked ?? "")}>
-          {linked ? "Change" : "Link"}
+          {linked ? "Αλλαγή" : "Σύνδεση"}
         </button>
         {linked && (
           <button className="btn" type="button" onClick={() => save(null)} disabled={busy}>
-            Unlink
+            Αποσύνδεση
           </button>
         )}
       </div>
@@ -65,8 +65,8 @@ function AisLink({ vessel }: { vessel: VesselListItem }) {
         {enabled === false
           ? "AIS is off: set AISSTREAM_API_KEY in .env and restart the API."
           : linked
-            ? "Position, speed and ETA come from AIS when a fix is under 2 h old; pending scenarios update automatically."
-            : "Link the ship's MMSI to track it live via aisstream.io."}
+            ? "Θέση, ταχύτητα και ETA έρχονται από το AIS όταν το στίγμα είναι νεότερο από 2 h· τα σενάρια σε αναμονή ενημερώνονται αυτόματα."
+            : "Συνδέστε το MMSI του πλοίου για live παρακολούθηση μέσω aisstream.io."}
       </p>
       {error && <div className="error-state" role="alert">{error}</div>}
     </form>
@@ -97,13 +97,13 @@ export function VesselDrawer({
   onClose,
 }: VesselDrawerProps) {
   return (
-    <aside className="vessel-drawer" aria-label={`${vessel.name} details`}>
+    <aside className="vessel-drawer" aria-label={`Στοιχεία ${vessel.name}`}>
       <div className="vessel-drawer__header">
         <div>
-          <p className="label">Vessel</p>
+          <p className="label">Πλοίο</p>
           <h2 className="vessel-drawer__title">{vessel.name}</h2>
         </div>
-        <button className="vessel-drawer__close" onClick={onClose} aria-label={`Close ${vessel.name} details`}>
+        <button className="vessel-drawer__close" onClick={onClose} aria-label={`Κλείσιμο στοιχείων ${vessel.name}`}>
           <X size={18} aria-hidden="true" />
         </button>
       </div>
@@ -116,24 +116,24 @@ export function VesselDrawer({
           <dd>{vessel.imo}</dd>
         </div>
         <div>
-          <dt>Type</dt>
+          <dt>Τύπος</dt>
           <dd>{vessel.type}</dd>
         </div>
         <div>
-          <dt>Speed</dt>
+          <dt>Ταχύτητα</dt>
           <dd>
             {position ? `${position.speedKn.toFixed(1)} kn` : "—"}
             {position?.source === "ais" && <span className="ais-live">LIVE AIS</span>}
           </dd>
         </div>
         <div>
-          <dt>Position</dt>
+          <dt>Θέση</dt>
           <dd>
             {position ? `${position.lat.toFixed(2)}, ${position.lon.toFixed(2)}` : "—"}
           </dd>
         </div>
         <div>
-          <dt>Route</dt>
+          <dt>Διαδρομή</dt>
           <dd>
             {vessel.originPort ?? "—"} → {vessel.destPort ?? "—"}
           </dd>
@@ -143,7 +143,7 @@ export function VesselDrawer({
           <dd>{formatDateTime(position?.source === "ais" ? position.etaSim : voyage?.plannedEta)}</dd>
         </div>
         <div>
-          <dt>Berth time</dt>
+          <dt>Ώρα πρόσδεσης</dt>
           <dd>{formatDateTime(voyage?.berthTime)}</dd>
         </div>
       </dl>
@@ -156,7 +156,7 @@ export function VesselDrawer({
 
       {hasPendingAction && (
         <Link className="vessel-drawer__action-link" to="/actions">
-          Pending action →
+          Ενέργεια σε αναμονή →
         </Link>
       )}
     </aside>

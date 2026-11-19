@@ -77,24 +77,24 @@ export function assessJitCoverage(
   speedReduced: boolean
 ): JitCoverage {
   if (!speedReduced) {
-    return { status: "NOT_APPLICABLE", note: "No speed reduction; the utmost-despatch obligation is met." };
+    return { status: "NOT_APPLICABLE", note: "Χωρίς μείωση ταχύτητας· η υποχρέωση utmost despatch τηρείται." };
   }
   if (!terms) {
-    return { status: "NO_CHARTER_PARTY", note: "No charter party on file: upload it to check the speed reduction against its terms." };
+    return { status: "NO_CHARTER_PARTY", note: "Δεν υπάρχει ναυλοσύμφωνο: ανεβάστε το για να ελεγχθεί η μείωση ταχύτητας με τους όρους του." };
   }
   const c = terms.jitClause;
-  const name = c.name ?? "the JIT clause";
+  const name = c.name ?? "τη ρήτρα JIT";
   if (!c.present || c.speedReductionPermitted === false) {
     return {
       status: "NOT_COVERED",
-      note: "No JIT clause: the utmost-despatch obligation applies. Get the charterers' written agreement before slowing down.",
+      note: "Χωρίς ρήτρα JIT: ισχύει η υποχρέωση utmost despatch. Πάρτε γραπτή συμφωνία των ναυλωτών πριν μειώσετε ταχύτητα.",
     };
   }
   if (c.requiresChartererInstruction) {
     return {
       status: "NEEDS_INSTRUCTION",
-      note: `Covered by ${name}, on the charterers' instruction. Send the notice and get their confirmation before the speed change.`,
+      note: `Καλύπτεται από ${name}, με εντολή των ναυλωτών. Στείλτε την ειδοποίηση και πάρτε επιβεβαίωση πριν αλλάξει η ταχύτητα.`,
     };
   }
-  return { status: "COVERED", note: `Covered by ${name}: the vessel may adjust speed to arrive at the berth time.` };
+  return { status: "COVERED", note: `Καλύπτεται από ${name}: το πλοίο μπορεί να προσαρμόσει την ταχύτητα για να φτάσει στην ώρα πρόσδεσης.` };
 }

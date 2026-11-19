@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { bunkerVerdictReason, savingsVsBaseline, type BunkerCalc, type ScenarioId } from "@maritime/shared";
 import { api, type OutboundEmail, type RecommendationRecord, type RecordResponse } from "../lib/api.js";
 import { eur, money } from "../lib/format.js";
+import { STATUS_LABEL } from "../lib/labels.js";
 import { ScenarioComparison } from "./ScenarioComparison.js";
 import { NoticePanel } from "./NoticePanel.js";
 import "./RecommendationCard.css";
@@ -20,30 +21,30 @@ interface RecommendationCardProps {
 }
 
 const EVENT_LABELS: Record<string, string> = {
-  BERTH_DELAY: "berth delay",
-  CONGESTION: "congestion",
-  CLOSURE: "closure",
-  BUNKER_OFFER: "fuel offer",
-  NONE: "event",
+  BERTH_DELAY: "καθυστέρηση πρόσδεσης",
+  CONGESTION: "συμφόρηση",
+  CLOSURE: "κλείσιμο λιμανιού",
+  BUNKER_OFFER: "προσφορά καυσίμου",
+  NONE: "συμβάν",
 };
 
 const CALC_ROWS: Array<{ key: string; label: string; unit?: string; digits?: number }> = [
-  { key: "distanceNm", label: "Remaining distance", unit: "nm" },
-  { key: "hoursAvailable", label: "Hours available until berth", unit: "h" },
-  { key: "headCurrentKn", label: "Head current along the route (+ = adverse)", unit: "kn", digits: 1 },
-  { key: "seaStateFuelFactor", label: "Sea-state fuel factor (waves)", unit: "×" },
-  { key: "v0", label: "Current speed (v₀)", unit: "kn" },
-  { key: "v1Raw", label: "Computed JIT speed (unclamped)", unit: "kn" },
-  { key: "v1", label: "Recommended speed (v₁)", unit: "kn" },
-  { key: "fAtV0", label: "Daily fuel at v₀", unit: "t/day" },
-  { key: "fAtV1", label: "Daily fuel at v₁", unit: "t/day" },
-  { key: "waitHoursPlanA", label: "Wait at anchor (Plan A)", unit: "h" },
-  { key: "fuelA", label: "Fuel burned — Plan A (rush & wait)", unit: "t" },
-  { key: "residualWaitHoursPlanB", label: "Residual wait (Plan B)", unit: "h" },
-  { key: "fuelB", label: "Fuel burned — Plan B (JIT)", unit: "t" },
-  { key: "fuelSavedT", label: "Fuel saved", unit: "t" },
-  { key: "costSavedEur", label: "Cost saved", unit: "€", digits: 0 },
-  { key: "co2SavedT", label: "CO₂ saved", unit: "t" },
+  { key: "distanceNm", label: "Υπόλοιπη απόσταση", unit: "nm" },
+  { key: "hoursAvailable", label: "Ώρες ως την πρόσδεση", unit: "h" },
+  { key: "headCurrentKn", label: "Ρεύμα κατά μήκος της διαδρομής (+ = αντίθετο)", unit: "kn", digits: 1 },
+  { key: "seaStateFuelFactor", label: "Συντελεστής καυσίμου κατάστασης θάλασσας (κύμα)", unit: "×" },
+  { key: "v0", label: "Τρέχουσα ταχύτητα (v₀)", unit: "kn" },
+  { key: "v1Raw", label: "Υπολογισμένη ταχύτητα JIT (χωρίς όρια)", unit: "kn" },
+  { key: "v1", label: "Προτεινόμενη ταχύτητα (v₁)", unit: "kn" },
+  { key: "fAtV0", label: "Ημερήσιο καύσιμο στα v₀", unit: "t/ημέρα" },
+  { key: "fAtV1", label: "Ημερήσιο καύσιμο στα v₁", unit: "t/ημέρα" },
+  { key: "waitHoursPlanA", label: "Αναμονή στην άγκυρα (Σχέδιο A)", unit: "h" },
+  { key: "fuelA", label: "Καύσιμο — Σχέδιο A (βιασύνη και αναμονή)", unit: "t" },
+  { key: "residualWaitHoursPlanB", label: "Υπόλοιπη αναμονή (Σχέδιο B)", unit: "h" },
+  { key: "fuelB", label: "Καύσιμο — Σχέδιο B (JIT)", unit: "t" },
+  { key: "fuelSavedT", label: "Καύσιμο που γλιτώνεται", unit: "t" },
+  { key: "costSavedEur", label: "Εξοικονόμηση κόστους", unit: "€", digits: 0 },
+  { key: "co2SavedT", label: "CO₂ που γλιτώνεται", unit: "t" },
 ];
 
 function FactRow({ table, id, label }: { table: string; id: string; label: string }) {
@@ -72,7 +73,7 @@ function FactRow({ table, id, label }: { table: string; id: string; label: strin
       </button>
       {expanded && (
         <pre className="fact-row__data">
-          {loading ? "Loading…" : JSON.stringify(record?.data, null, 2)}
+          {loading ? "Φόρτωση…" : JSON.stringify(record?.data, null, 2)}
         </pre>
       )}
     </div>
@@ -87,8 +88,8 @@ function CharterPartySummary({ recommendation }: { recommendation: Recommendatio
       <div className="cp-summary cp-summary--missing">
         <FileText size={14} aria-hidden="true" />
         <span>
-          No charter party on file, so laytime, demurrage and the JIT clause are not checked.{" "}
-          <Link to="/voyages">Upload it on Voyages</Link>.
+          Δεν υπάρχει ναυλοσύμφωνο, οπότε laytime, demurrage και ρήτρα JIT δεν ελέγχονται.{" "}
+          <Link to="/voyages">Ανεβάστε το στα Ταξίδια</Link>.
         </span>
       </div>
     );
@@ -97,9 +98,9 @@ function CharterPartySummary({ recommendation }: { recommendation: Recommendatio
   const facts = [
     t.laytimeHours != null && `Laytime ${t.laytimeHours} h${t.laytimeBasis ? ` ${t.laytimeBasis}` : ""}`,
     t.norNoticeHours != null && `NOR +${t.norNoticeHours} h`,
-    t.waitingTimeCounts === true ? "waiting counts (WIBON)" : t.waitingTimeCounts === false ? "waiting does not count" : null,
-    t.demurrageRatePerDay != null && `demurrage ${money(t.demurrageRatePerDay, t.currency)}/day`,
-    cp.expectedOpsHours != null && `cargo ops ${cp.expectedOpsHours} h (est.)`,
+    t.waitingTimeCounts === true ? "η αναμονή μετράει (WIBON)" : t.waitingTimeCounts === false ? "η αναμονή δεν μετράει" : null,
+    t.demurrageRatePerDay != null && `demurrage ${money(t.demurrageRatePerDay, t.currency)}/ημέρα`,
+    cp.expectedOpsHours != null && `φορτοεκφόρτωση ${cp.expectedOpsHours} h (εκτίμηση)`,
   ].filter(Boolean);
   return (
     <div className="cp-summary">
@@ -113,10 +114,10 @@ function CharterPartySummary({ recommendation }: { recommendation: Recommendatio
         {t.jitClause.present ? (
           <button className="recommendation-card__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
             {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {t.jitClause.name ?? "JIT clause"}
+            {t.jitClause.name ?? "Ρήτρα JIT"}
           </button>
         ) : (
-          <p className="cp-summary__nojit">No just-in-time arrival clause: utmost despatch applies.</p>
+          <p className="cp-summary__nojit">Χωρίς ρήτρα άφιξης just-in-time: ισχύει το utmost despatch.</p>
         )}
         {open && t.jitClause.text && <blockquote className="cp-summary__clause">{t.jitClause.text}</blockquote>}
       </div>
@@ -159,7 +160,7 @@ export function RecommendationCard({
     recommendation.actionType === "BUNKER_DETOUR" ? (recommendation.calc as unknown as BunkerCalc) : null;
   const notWorthIt = bunker?.verdict === "NOT_WORTH_IT";
   const notWorthItBecause =
-    bunker && notWorthIt ? bunkerVerdictReason(bunker, recommendation.voyage?.destPort?.name ?? "destination") : null;
+    bunker && notWorthIt ? bunkerVerdictReason(bunker, recommendation.voyage?.destPort?.name ?? "προορισμό") : null;
   const isPending = recommendation.status === "PENDING";
   const shown = isPending ? selected : recommendation.chosenScenario ?? selected;
   const scenario = set?.scenarios.find((s) => s.id === shown) ?? null;
@@ -220,13 +221,13 @@ export function RecommendationCard({
     <div className={notWorthIt ? "recommendation-card recommendation-card--not-worth-it" : "recommendation-card"}>
       {bunker && (
         <p className={notWorthIt ? "verdict verdict--no" : "verdict verdict--yes"}>
-          <strong>{notWorthIt ? "Not worth it" : "Worth it"}</strong>
+          <strong>{notWorthIt ? "Δεν αξίζει" : "Αξίζει"}</strong>
           {notWorthItBecause && <span>: {notWorthItBecause}.</span>}
         </p>
       )}
       <div className="recommendation-card__header">
         <div>
-          <p className="label">{vessel?.name ?? "Vessel"}</p>
+          <p className="label">{vessel?.name ?? "Πλοίο"}</p>
           <p className="recommendation-card__trigger">{trigger}</p>
         </div>
         <div className="recommendation-card__speed">
@@ -235,7 +236,7 @@ export function RecommendationCard({
           <span className="recommendation-card__speed--new">
             {(scenario?.speedKn ?? recommendation.recommendedSpeedKn).toFixed(1)} kn
           </span>
-          {shown && <span className="recommendation-card__scenario">scenario {shown}</span>}
+          {shown && <span className="recommendation-card__scenario">σενάριο {shown}</span>}
         </div>
       </div>
 
@@ -243,38 +244,38 @@ export function RecommendationCard({
         <>
       <div className="recommendation-card__kpis">
         <div className="kpi-tile">
-          <p className="label">Fuel saved</p>
+          <p className="label">Καύσιμο που γλιτώνεται</p>
           <p className="kpi">{(delta?.fuelT ?? recommendation.fuelSavedT).toFixed(1)} t</p>
           <p className="kpi-tile__assumption">CO₂ −{(delta?.co2T ?? recommendation.co2SavedT).toFixed(1)} t</p>
         </div>
         <div className="kpi-tile">
-          <p className="label">Cost saved</p>
+          <p className="label">Εξοικονόμηση κόστους</p>
           <p className="kpi">{eur(delta ? delta.totalCostEur : recommendation.costSavedEur)}</p>
           <p className="kpi-tile__assumption">
             {delta
-              ? `fuel ${eur(delta.fuelCostEur)} + EU ETS ${eur(delta.etsCostEur)}`
-              : `assumption: €${fuelPriceEurPerT}/t fuel`}
+              ? `καύσιμο ${eur(delta.fuelCostEur)} + EU ETS ${eur(delta.etsCostEur)}`
+              : `παραδοχή: €${fuelPriceEurPerT}/t καύσιμο`}
           </p>
         </div>
         <div className="kpi-tile">
-          <p className="label">Demurrage avoided</p>
+          <p className="label">Demurrage που αποφεύγεται</p>
           <p className="kpi">{delta?.demurrageAvoided != null ? money(delta.demurrageAvoided, currency) : "—"}</p>
           <p className="kpi-tile__assumption">
             {scenario?.contract.laytime
               ? scenario.contract.laytime.withinLaytime
-                ? "within laytime"
-                : `laytime exceeded by ${scenario.contract.laytime.demurrageHours.toFixed(0)} h`
-              : "needs a charter party"}
+                ? "εντός laytime"
+                : `υπέρβαση laytime κατά ${scenario.contract.laytime.demurrageHours.toFixed(0)} h`
+              : "χρειάζεται ναυλοσύμφωνο"}
           </p>
         </div>
         <div className="kpi-tile">
-          <p className="label">CII (year to date)</p>
+          <p className="label">CII (από αρχή έτους)</p>
           <p className="kpi">
             {scenario?.cii.annual ? scenario.cii.annual.rating : "—"}
           </p>
           <p className="kpi-tile__assumption">
             {scenario?.cii.annual && set
-              ? `ratio ${set.scenarios[0].cii.annual!.ratio.toFixed(3)} → ${scenario.cii.annual.ratio.toFixed(3)}`
+              ? `λόγος ${set.scenarios[0].cii.annual!.ratio.toFixed(3)} → ${scenario.cii.annual.ratio.toFixed(3)}`
               : ""}
           </p>
         </div>
@@ -284,16 +285,16 @@ export function RecommendationCard({
       ) : (
       <div className="recommendation-card__kpis recommendation-card__kpis--three">
         <div className="kpi-tile">
-          <p className="label">Fuel saved</p>
+          <p className="label">Καύσιμο που γλιτώνεται</p>
           <p className="kpi">{recommendation.fuelSavedT.toFixed(1)} t</p>
         </div>
         <div className="kpi-tile">
-          <p className="label">Cost saved</p>
+          <p className="label">Εξοικονόμηση κόστους</p>
           <p className="kpi">{eur(recommendation.costSavedEur)}</p>
-          <p className="kpi-tile__assumption">assumption: €{fuelPriceEurPerT}/t fuel</p>
+          <p className="kpi-tile__assumption">παραδοχή: €{fuelPriceEurPerT}/t καύσιμο</p>
         </div>
         <div className="kpi-tile">
-          <p className="label">CO₂ saved</p>
+          <p className="label">CO₂ που γλιτώνεται</p>
           <p className="kpi">{recommendation.co2SavedT.toFixed(1)} t</p>
         </div>
       </div>
@@ -303,14 +304,14 @@ export function RecommendationCard({
       <p className="recommendation-card__rationale">{recommendation.rationale}</p>
       {bunker && (
         <Link className="recommendation-card__toggle" to={`/bunkering?offer=${recommendation.id}`}>
-          Compare offers, route options and replies →
+          Σύγκριση προσφορών, επιλογές διαδρομής και απαντήσεις →
         </Link>
       )}
 
       {set ? (
         <ScenarioComparison set={set} selected={shown} onSelect={isPending ? setSelected : null} />
       ) : bunker ? null : (
-        <p className="muted">This recommendation predates scenario comparison.</p>
+        <p className="muted">Η σύσταση αυτή είναι παλαιότερη από τη σύγκριση σεναρίων.</p>
       )}
 
       <button
@@ -319,7 +320,7 @@ export function RecommendationCard({
         aria-expanded={showMath}
       >
         {showMath ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        Show the math{set ? " (scenario B)" : ""}
+        Δείτε τους υπολογισμούς{set ? " (σενάριο B)" : ""}
       </button>
 
       {showMath && (
@@ -343,15 +344,15 @@ export function RecommendationCard({
       )}
 
       <div className="recommendation-card__facts">
-        <p className="label">Facts used</p>
+        <p className="label">Στοιχεία που χρησιμοποιήθηκαν</p>
         {recommendation.portEvent?.email && (
-          <FactRow table="email" id={recommendation.portEvent.email.id} label="Source email" />
+          <FactRow table="email" id={recommendation.portEvent.email.id} label="Email προέλευσης" />
         )}
         {recommendation.portEvent && (
-          <FactRow table="portEvent" id={recommendation.portEvent.id} label="Port event" />
+          <FactRow table="portEvent" id={recommendation.portEvent.id} label="Συμβάν λιμανιού" />
         )}
         {recommendation.voyage && (
-          <FactRow table="voyage" id={recommendation.voyage.id} label="Voyage" />
+          <FactRow table="voyage" id={recommendation.voyage.id} label="Ταξίδι" />
         )}
       </div>
 
@@ -359,35 +360,35 @@ export function RecommendationCard({
 
       {recommendation.status === "PENDING" && alternatives > 0 && (
         <p className="recommendation-card__alternatives">
-          One decision per ship: approving this closes the other {alternatives} open option
-          {alternatives === 1 ? "" : "s"} for {recommendation.voyage?.vessel?.name ?? "this ship"}.
+          Μία απόφαση ανά πλοίο: η έγκριση κλείνει {alternatives === 1 ? "την άλλη ανοιχτή επιλογή" : `τις άλλες ${alternatives} ανοιχτές επιλογές`}{" "}
+          για το {recommendation.voyage?.vessel?.name ?? "πλοίο"}.
         </p>
       )}
       {recommendation.status === "PENDING" ? (
         <div className="recommendation-card__actions">
           <button className="btn btn-primary" onClick={handleApprove} disabled={busy}>
-            Approve{selected ? ` scenario ${selected}` : ""}
+            Έγκριση{selected ? ` σεναρίου ${selected}` : ""}
           </button>
           <button className="btn" onClick={() => setShowRejectModal(true)} disabled={busy}>
-            Reject
+            Απόρριψη
           </button>
           {set && (
-            <button className="btn recommendation-card__refresh" onClick={handleRefresh} disabled={busy} title="Recompute with the latest position, weather, prices and charter party">
-              <RefreshCw size={14} aria-hidden="true" /> Refresh
+            <button className="btn recommendation-card__refresh" onClick={handleRefresh} disabled={busy} title="Επανυπολογισμός με την τελευταία θέση, τον καιρό, τις τιμές και το ναυλοσύμφωνο">
+              <RefreshCw size={14} aria-hidden="true" /> Ανανέωση
             </button>
           )}
         </div>
       ) : (
         <div className="recommendation-card__decision">
           <p className="label">
-            {recommendation.status}
-            {recommendation.chosenScenario ? ` · scenario ${recommendation.chosenScenario}` : ""} ·{" "}
-            {recommendation.decidedAt && new Date(recommendation.decidedAt).toLocaleString()}
+            {STATUS_LABEL[recommendation.status] ?? recommendation.status}
+            {recommendation.chosenScenario ? ` · σενάριο ${recommendation.chosenScenario}` : ""} ·{" "}
+            {recommendation.decidedAt && new Date(recommendation.decidedAt).toLocaleString("el-GR")}
           </p>
-          {recommendation.rejectReason && <p>Reason: {recommendation.rejectReason}</p>}
+          {recommendation.rejectReason && <p>Αιτιολογία: {recommendation.rejectReason}</p>}
           {recommendation.status === "APPROVED" && (
             <button className="btn recommendation-card__undo" onClick={handleUndo} disabled={busy}>
-              Undo approval
+              Αναίρεση έγκρισης
             </button>
           )}
         </div>
@@ -413,26 +414,26 @@ export function RecommendationCard({
         >
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`reject-title-${recommendation.id}`}>
             <p className="label" id={`reject-title-${recommendation.id}`}>
-              Reject recommendation
+              Απόρριψη σύστασης
             </p>
             <textarea
-              aria-label="Reason for rejecting"
+              aria-label="Αιτιολογία απόρριψης"
               autoFocus
-              placeholder="Reason for rejecting…"
+              placeholder="Αιτιολογία απόρριψης…"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={3}
             />
             <div className="modal__actions">
               <button className="btn" onClick={() => setShowRejectModal(false)} disabled={busy}>
-                Cancel
+                Ακύρωση
               </button>
               <button
                 className="btn btn-primary"
                 onClick={handleRejectSubmit}
                 disabled={busy || rejectReason.trim().length === 0}
               >
-                Reject
+                Απόρριψη
               </button>
             </div>
           </div>

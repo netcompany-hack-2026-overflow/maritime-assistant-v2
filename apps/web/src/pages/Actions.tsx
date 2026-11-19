@@ -63,14 +63,14 @@ export function Actions() {
 
   return (
     <div className="page page--actions">
-      <div className="actions-tabs" role="tablist" aria-label="Recommendations">
+      <div className="actions-tabs" role="tablist" aria-label="Συστάσεις">
         <button
           className={tab === "pending" ? "actions-tab actions-tab--active" : "actions-tab"}
           onClick={() => setTab("pending")}
           role="tab"
           aria-selected={tab === "pending"}
         >
-          Pending{pending.length > 0 ? ` (${pending.length})` : ""}
+          Σε αναμονή{pending.length > 0 ? ` (${pending.length})` : ""}
         </button>
         <button
           className={tab === "history" ? "actions-tab actions-tab--active" : "actions-tab"}
@@ -78,19 +78,19 @@ export function Actions() {
           role="tab"
           aria-selected={tab === "history"}
         >
-          History
+          Ιστορικό
         </button>
       </div>
 
       {loading ? (
-        <div className="loading-state" role="status">Loading actions…</div>
+        <div className="loading-state" role="status">Φόρτωση ενεργειών…</div>
       ) : error ? (
         <div className="error-state" role="alert">{error}</div>
       ) : visible.length === 0 ? (
         <div className="empty-state">
           {tab === "pending"
-            ? "No pending recommendations. Process a delay email in the Inbox to generate one."
-            : "No decided recommendations yet."}
+            ? "Δεν υπάρχουν συστάσεις σε αναμονή. Επεξεργαστείτε ένα email καθυστέρησης στα Εισερχόμενα για να δημιουργηθεί μία."
+            : "Δεν υπάρχουν ακόμα αποφασισμένες συστάσεις."}
         </div>
       ) : (
         visible.map((rec) => (

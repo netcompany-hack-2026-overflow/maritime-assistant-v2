@@ -307,24 +307,24 @@ export function repriceBunker(calc: BunkerCalc, refPriceEurPerT: number, usdEurR
   return { ...calc, ...priceSide(calc, refPriceEurPerT, usdEurRate) };
 }
 
-/** ["a", "b", "c"] -> "a, b and c" */
+/** ["α", "β", "γ"] -> "α, β και γ" */
 function joinAnd(parts: string[]): string {
-  return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} και ${parts[parts.length - 1]}`;
 }
 
 /**
  * Why an offer isn't worth it, in plain words (null when it is), e.g.
- * "the ship would miss the Rotterdam berth by 9 h even at full speed".
+ * "το πλοίο θα έχανε την πρόσδεση στο Rotterdam κατά 9 h ακόμα και με πλήρη ταχύτητα".
  * Computed from the calc, so it stays right after re-pricing.
  */
 export function bunkerVerdictReason(calc: BunkerCalc, destPortName: string): string | null {
   if (calc.verdict === "WORTH_IT") return null;
   const eurK = `€${Math.round(Math.abs(calc.netEur) / 1000).toLocaleString("en-US")}k`;
   const parts: string[] = [];
-  if (calc.reasons.includes("NEGATIVE_NET")) parts.push(`the detour costs ${eurK} more than the cheaper fuel saves`);
+  if (calc.reasons.includes("NEGATIVE_NET")) parts.push(`η παράκαμψη κοστίζει ${eurK} περισσότερα απ' όσα γλιτώνει το φθηνότερο καύσιμο`);
   if (calc.reasons.includes("LATE")) {
-    parts.push(`the ship would miss the ${destPortName} berth by ${calc.lateHours.toFixed(0)} h even at full speed`);
+    parts.push(`το πλοίο θα έχανε την πρόσδεση στο ${destPortName} κατά ${calc.lateHours.toFixed(0)} h ακόμα και με πλήρη ταχύτητα`);
   }
-  if (calc.reasons.includes("EXPIRED")) parts.push("the offer expires before the ship gets there");
+  if (calc.reasons.includes("EXPIRED")) parts.push("η προσφορά λήγει πριν φτάσει το πλοίο");
   return joinAnd(parts);
 }

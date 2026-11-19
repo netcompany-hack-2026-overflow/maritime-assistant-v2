@@ -10,37 +10,37 @@ const H = 3_600_000;
 
 /** Indicative vessel profiles (laden service speed and consumption). Editable below. */
 const PROFILES = {
-  supramax: { label: "Supramax bulk carrier, 58,000 dwt", type: "Bulk Carrier", dwt: 58_000, speed: 13.5, minSpeed: 9, fuel: 29, aux: 2.5 },
-  panamax: { label: "Kamsarmax/Panamax bulk carrier, 82,000 dwt", type: "Bulk Carrier", dwt: 82_000, speed: 13.5, minSpeed: 9, fuel: 33, aux: 2.8 },
-  mr: { label: "MR product tanker, 50,000 dwt", type: "Tanker", dwt: 50_000, speed: 13.5, minSpeed: 9, fuel: 28, aux: 4 },
-  aframax: { label: "Aframax tanker, 115,000 dwt", type: "Tanker", dwt: 115_000, speed: 13.5, minSpeed: 9, fuel: 44, aux: 5 },
+  supramax: { label: "Supramax φορτηγό χύδην, 58.000 dwt", type: "Bulk Carrier", dwt: 58_000, speed: 13.5, minSpeed: 9, fuel: 29, aux: 2.5 },
+  panamax: { label: "Kamsarmax/Panamax φορτηγό χύδην, 82.000 dwt", type: "Bulk Carrier", dwt: 82_000, speed: 13.5, minSpeed: 9, fuel: 33, aux: 2.8 },
+  mr: { label: "MR δεξαμενόπλοιο προϊόντων, 50.000 dwt", type: "Tanker", dwt: 50_000, speed: 13.5, minSpeed: 9, fuel: 28, aux: 4 },
+  aframax: { label: "Aframax δεξαμενόπλοιο, 115.000 dwt", type: "Tanker", dwt: 115_000, speed: 13.5, minSpeed: 9, fuel: 44, aux: 5 },
 } as const;
 type ProfileKey = keyof typeof PROFILES;
 
 const SOURCES = [
   {
     id: "ets",
-    text: "European Commission — Reducing emissions from the shipping sector (EU ETS phase-in 40% / 70% / 100%; 50% of extra-EU voyages)",
+    text: "Ευρωπαϊκή Επιτροπή — Reducing emissions from the shipping sector (σταδιακή ένταξη στο EU ETS 40% / 70% / 100%· 50% για ταξίδια εκτός ΕΕ)",
     url: "https://climate.ec.europa.eu/eu-action/transport/reducing-emissions-shipping-sector_en",
   },
   {
     id: "eua",
-    text: "Reuters via TradingView — EU spot auction cleared at €89.43/t on 2 Nov 2026; GMK Center — EUA back above €90/t, 12–13 Nov 2026",
+    text: "Reuters μέσω TradingView — δημοπρασία EUA στα €89,43/t στις 2 Νοε 2026· GMK Center — EUA ξανά πάνω από €90/t, 12–13 Νοε 2026",
     url: "https://www.tradingview.com/news/reuters.com,2026-11-02:newsml_APNB56IHF:0-european-union-auctions-2-792-mln-spot-carbon-permits-at-89-43-eur-t/",
   },
   {
     id: "cii",
-    text: "DNV — IMO MEPC 83: CII reduction factors 13.625% (2027) to 21.5% (2030) vs 2019",
+    text: "DNV — IMO MEPC 83: συντελεστές μείωσης CII 13,625% (2027) ως 21,5% (2030) έναντι 2019",
     url: "https://www.dnv.com/news/imo-mepc-83-ghg-requirements-approved-taking-effect-from-2028/",
   },
   {
     id: "fuel",
-    text: "Ship & Bunker — Rotterdam VLSFO ≈ $734/t (17 Nov 2026)",
+    text: "Ship & Bunker — VLSFO Ρότερνταμ ≈ $734/t (17 Νοε 2026)",
     url: "https://shipandbunker.com/prices",
   },
   {
     id: "jit",
-    text: "IMO / Low Carbon GIA study — JIT arrivals cut containership fuel and CO₂ by up to 14% per voyage; ships spend 4.6% of their time at anchor from early arrival (~15 days a year)",
+    text: "Μελέτη IMO / Low Carbon GIA — οι αφίξεις JIT μειώνουν καύσιμο και CO₂ έως 14% ανά ταξίδι· τα πλοία περνούν το 4,6% του χρόνου τους στην άγκυρα λόγω πρόωρης άφιξης (~15 μέρες τον χρόνο)",
     url: "https://www.imo.org/en/MediaCentre/Pages/WhatsNew-1326.aspx",
   },
 ];
@@ -160,37 +160,37 @@ export function Value() {
 
   return (
     <div className="page page--value">
-      <p className="label">Business value</p>
+      <p className="label">Επιχειρηματική αξία</p>
       <h2 className="value-title">
-        Who it is for, what it saves, <em>why now.</em>
+        Για ποιον είναι, τι εξοικονομεί, <em>γιατί τώρα.</em>
       </h2>
 
       <section className="value-section" aria-labelledby="who">
         <h3 id="who" className="value-h">
-          <Building2 size={18} aria-hidden="true" /> The customer
+          <Building2 size={18} aria-hidden="true" /> Ο πελάτης
         </h3>
         <div className="value-cards">
           <div className="value-card">
-            <p className="value-card__k">Buyer</p>
+            <p className="value-card__k">Αγοραστής</p>
             <p>
-              Ship owner-operators with dry bulk or tanker fleets (10–60 ships) trading on voyage charters, where berth
-              delays, laytime and demurrage decide the margin of every call. Greek owners, who control the world’s largest
-              fleet by deadweight, are the first market.
+              Πλοιοκτήτριες-διαχειρίστριες εταιρείες με στόλους ξηρού φορτίου ή δεξαμενόπλοιων (10–60 πλοία) σε ναυλώσεις
+              ταξιδιού, όπου οι καθυστερήσεις πρόσδεσης, το laytime και το demurrage κρίνουν το περιθώριο κάθε προσέγγισης.
+              Οι Έλληνες πλοιοκτήτες, που ελέγχουν τον μεγαλύτερο στόλο παγκοσμίως σε deadweight, είναι η πρώτη αγορά.
             </p>
           </div>
           <div className="value-card">
-            <p className="value-card__k">Daily users</p>
+            <p className="value-card__k">Καθημερινοί χρήστες</p>
             <p>
-              <strong>Operations</strong> — voyage monitoring, ETA and berth coordination with agents.{" "}
-              <strong>Chartering</strong> — charter-party terms, demurrage claims, the notice to charterers.{" "}
-              <strong>Technical / ESG</strong> — CII rating and EU ETS allowances.
+              <strong>Operations</strong> — παρακολούθηση ταξιδιών, ETA και συντονισμός πρόσδεσης με πράκτορες.{" "}
+              <strong>Chartering</strong> — όροι ναυλοσυμφώνου, απαιτήσεις demurrage, ειδοποίηση ναυλωτών.{" "}
+              <strong>Τεχνική / ESG</strong> — βαθμός CII και δικαιώματα EU ETS.
             </p>
           </div>
           <div className="value-card">
-            <p className="value-card__k">The job it does</p>
+            <p className="value-card__k">Τι κάνει</p>
             <p>
-              Turns an agent’s “berth delayed 24 h” into a costed decision in minutes: A/B/C scenarios with fuel, ETS,
-              demurrage and CII, checked against the charter party, and the email to the charterer drafted.
+              Μετατρέπει το «berth delayed 24 h» του πράκτορα σε κοστολογημένη απόφαση μέσα σε λεπτά: σενάρια A/B/C με
+              καύσιμο, ETS, demurrage και CII, ελεγμένα με το ναυλοσύμφωνο, και έτοιμο το email προς τον ναυλωτή.
             </p>
           </div>
         </div>
@@ -198,17 +198,17 @@ export function Value() {
 
       <section className="value-section" aria-labelledby="saves">
         <h3 id="saves" className="value-h">
-          <Anchor size={18} aria-hidden="true" /> What it saves
+          <Anchor size={18} aria-hidden="true" /> Τι εξοικονομεί
         </h3>
         <p className="value-lede">
-          Same engine as the Actions page (scenario B vs A, cube-law fuel, calm water). Prices from Settings: fuel €{prices.fuel}/t,
-          EUA €{prices.eua}/t, {Math.round(etsPhaseInForYear(YEAR) * 100)}% ETS phase-in in {YEAR}. Change any assumption.
+          Ίδιος υπολογισμός με τη σελίδα Ενέργειες (σενάριο B έναντι A, κυβικός νόμος καυσίμου, ήρεμη θάλασσα). Τιμές από τις
+          Ρυθμίσεις: καύσιμο €{prices.fuel}/t, EUA €{prices.eua}/t, ETS {Math.round(etsPhaseInForYear(YEAR) * 100)}% για το {YEAR}. Αλλάξτε όποια παραδοχή θέλετε.
         </p>
 
         <div className="value-calc">
           <div className="value-inputs">
             <label className="value-field">
-              <span>Vessel profile</span>
+              <span>Προφίλ πλοίου</span>
               <select value={profileKey} onChange={(e) => setProfileKey(e.target.value as ProfileKey)}>
                 {Object.entries(PROFILES).map(([k, p]) => (
                   <option key={k} value={k}>
@@ -217,50 +217,50 @@ export function Value() {
                 ))}
               </select>
             </label>
-            <NumberField label="Ships in the fleet" value={fleet} onChange={setFleet} min={1} max={500} />
-            <NumberField label="Late-berth notices per ship per year" value={events} onChange={setEvents} min={0} max={60} />
-            <NumberField label="Average berth delay" value={delayH} onChange={setDelayH} min={1} max={240} suffix="h" />
-            <NumberField label="Distance to go when the notice arrives" value={distanceNm} onChange={setDistanceNm} min={100} max={8000} step={50} suffix="nm" />
-            <NumberField label="EU ETS scope of the trade (avg.)" value={euShare} onChange={setEuShare} min={0} max={100} step={5} suffix="%" />
-            <NumberField label="Calls where waiting counts as laytime" value={wibonShare} onChange={setWibonShare} min={0} max={100} step={5} suffix="%" />
-            <NumberField label="Demurrage rate" value={demRate} onChange={setDemRate} min={0} max={100_000} step={500} suffix="USD/day" />
-            <NumberField label="Sea days per year (for CII share)" value={seaDays} onChange={setSeaDays} min={100} max={350} step={5} suffix="days" />
+            <NumberField label="Πλοία στον στόλο" value={fleet} onChange={setFleet} min={1} max={500} />
+            <NumberField label="Ειδοποιήσεις καθυστέρησης ανά πλοίο τον χρόνο" value={events} onChange={setEvents} min={0} max={60} />
+            <NumberField label="Μέση καθυστέρηση πρόσδεσης" value={delayH} onChange={setDelayH} min={1} max={240} suffix="h" />
+            <NumberField label="Απόσταση που απομένει όταν έρχεται η ειδοποίηση" value={distanceNm} onChange={setDistanceNm} min={100} max={8000} step={50} suffix="nm" />
+            <NumberField label="Εμβέλεια EU ETS των δρομολογίων (μ.ό.)" value={euShare} onChange={setEuShare} min={0} max={100} step={5} suffix="%" />
+            <NumberField label="Προσεγγίσεις όπου η αναμονή μετράει ως laytime" value={wibonShare} onChange={setWibonShare} min={0} max={100} step={5} suffix="%" />
+            <NumberField label="Τιμή demurrage" value={demRate} onChange={setDemRate} min={0} max={100_000} step={500} suffix="USD/ημέρα" />
+            <NumberField label="Μέρες στη θάλασσα τον χρόνο (για το CII)" value={seaDays} onChange={setSeaDays} min={100} max={350} step={5} suffix="μέρες" />
           </div>
 
           <div className="value-results">
-            <p className="label">Per late-berth notice</p>
+            <p className="label">Ανά ειδοποίηση καθυστέρησης</p>
             <p className="value-results__event">
-              {profile.speed} kn → {result.b.speedKn.toFixed(1)} kn · {result.perEvent.fuelT.toFixed(1)} t fuel ·{" "}
+              {profile.speed} kn → {result.b.speedKn.toFixed(1)} kn · {result.perEvent.fuelT.toFixed(1)} t καύσιμο ·{" "}
               {eur(result.perEvent.fuelEur + result.perEvent.etsEur)}
             </p>
 
             <dl className="value-kpis">
               <div>
-                <dt>Per ship / year</dt>
+                <dt>Ανά πλοίο / έτος</dt>
                 <dd>{eur(totalVessel)}</dd>
                 <p>
-                  fuel {eur(v.fuelEur)} + EU ETS {eur(v.etsEur)}
+                  καύσιμο {eur(v.fuelEur)} + EU ETS {eur(v.etsEur)}
                 </p>
               </div>
               <div>
-                <dt>Fleet of {fleet} / year</dt>
+                <dt>Στόλος {fleet} πλοίων / έτος</dt>
                 <dd>{eur(totalVessel * fleet)}</dd>
-                <p>{Math.round(v.fuelT * fleet).toLocaleString("en-US")} t fuel</p>
+                <p>{Math.round(v.fuelT * fleet).toLocaleString("en-US")} t καύσιμο</p>
               </div>
               <div>
-                <dt>CO₂ avoided / year</dt>
+                <dt>CO₂ που αποφεύγεται / έτος</dt>
                 <dd>{Math.round(v.co2T * fleet).toLocaleString("en-US")} t</dd>
-                <p>≈ {result.ciiPct.toFixed(1)}% lower attained CII per ship</p>
+                <p>≈ {result.ciiPct.toFixed(1)}% χαμηλότερο επιτευχθέν CII ανά πλοίο</p>
               </div>
               <div>
-                <dt>Demurrage exposure avoided</dt>
+                <dt>Έκθεση σε demurrage που αποφεύγεται</dt>
                 <dd>{money(v.demurrage * fleet, "USD")}</dd>
-                <p>fleet / year · {money(v.demurrage, "USD")} per ship</p>
+                <p>στόλος / έτος · {money(v.demurrage, "USD")} ανά πλοίο</p>
               </div>
             </dl>
             <p className="value-note">
-              Demurrage is shown apart: it is paid by charterers to owners, so it is a saving for whoever carries it
-              (an operator chartering in, or the charterer under a JIT clause), not an extra for both.
+              Το demurrage φαίνεται χωριστά: το πληρώνουν οι ναυλωτές στους πλοιοκτήτες, άρα είναι εξοικονόμηση για όποιον το
+              επωμίζεται (operator που ναυλώνει πλοίο ή ναυλωτής με ρήτρα JIT), όχι επιπλέον όφελος και για τους δύο.
             </p>
           </div>
         </div>
@@ -268,28 +268,28 @@ export function Value() {
 
       <section className="value-section" aria-labelledby="now">
         <h3 id="now" className="value-h">
-          <Clock size={18} aria-hidden="true" /> Why now
+          <Clock size={18} aria-hidden="true" /> Γιατί τώρα
         </h3>
         <ol className="value-now">
           <li>
-            <strong>Carbon now has a full price.</strong> Shipping entered the EU ETS in 2024 at 40% of emissions, 70% for
-            2025 and 100% from 2026, with EUAs trading around €90/t in November 2026. Every tonne of fuel on an intra-EU
-            leg now costs about {eur(prices.co2Factor * prices.eua)} in allowances on top of the bunker price. <sup>[1][2]</sup>
+            <strong>Ο άνθρακας έχει πλέον πλήρη τιμή.</strong> Η ναυτιλία μπήκε στο EU ETS το 2024 με το 40% των εκπομπών,
+            70% για το 2025 και 100% από το 2026, με τα EUA γύρω στα €90/t τον Νοέμβριο 2026. Κάθε τόνος καυσίμου σε σκέλος
+            εντός ΕΕ κοστίζει πλέον περίπου {eur(prices.co2Factor * prices.eua)} σε δικαιώματα, πάνω από την τιμή του bunker. <sup>[1][2]</sup>
           </li>
           <li>
-            <strong>CII keeps tightening.</strong> Required carbon intensity is 11% below 2019 in 2026 and steps to 13.625%
-            in 2027 and 21.5% in 2030. A D for three years or an E in one year forces a corrective plan, and charterers
-            screen on the rating. Hours at anchor add CO₂ with no distance, the worst thing for CII. <sup>[3]</sup>
+            <strong>Το CII σφίγγει συνεχώς.</strong> Η απαιτούμενη ένταση άνθρακα είναι 11% κάτω από το 2019 το 2026 και
+            ανεβαίνει σε 13,625% το 2027 και 21,5% το 2030. Ένα D για τρία χρόνια ή ένα E σε ένα χρόνο επιβάλλει διορθωτικό
+            σχέδιο, και οι ναυλωτές κοιτούν τον βαθμό. Οι ώρες στην άγκυρα προσθέτουν CO₂ χωρίς απόσταση, το χειρότερο για το CII. <sup>[3]</sup>
           </li>
           <li>
-            <strong>Fuel is expensive.</strong> Rotterdam VLSFO is around $734/t (17 Nov 2026), so 50–70 t saved on one
-            notice is real money. <sup>[4]</sup>
+            <strong>Το καύσιμο είναι ακριβό.</strong> Το VLSFO στο Ρότερνταμ είναι γύρω στα $734/t (17 Νοε 2026), οπότε
+            50–70 t που γλιτώνονται σε μία ειδοποίηση είναι πραγματικά χρήματα. <sup>[4]</sup>
           </li>
           <li>
-            <strong>The industry is asking for JIT.</strong> IMO’s Global Industry Alliance found ships spend 4.6% of their
-            time at anchor because they arrive early (about 15 days a year) and JIT arrival cuts fuel and CO₂ by up to 14%
-            per voyage. JIT clauses now exist for charter parties; what is missing is the tool that applies them per
-            voyage. <sup>[5]</sup>
+            <strong>Η αγορά ζητά JIT.</strong> Η Global Industry Alliance του IMO βρήκε ότι τα πλοία περνούν το 4,6% του
+            χρόνου τους στην άγκυρα επειδή φτάνουν νωρίς (περίπου 15 μέρες τον χρόνο), και ότι η άφιξη JIT μειώνει καύσιμο
+            και CO₂ έως 14% ανά ταξίδι. Οι ρήτρες JIT υπάρχουν ήδη στα ναυλοσύμφωνα· αυτό που λείπει είναι το εργαλείο που
+            τις εφαρμόζει σε κάθε ταξίδι. <sup>[5]</sup>
           </li>
         </ol>
         <ol className="value-sources">
@@ -304,9 +304,9 @@ export function Value() {
       </section>
 
       <p className="value-foot">
-        <Ship size={14} aria-hidden="true" /> Estimates, not guarantees: vessel profiles are indicative, weather is calm
-        water here (the live scenarios use the forecast) and the demurrage line assumes a 72 h SHINC laytime with 60 h of
-        cargo operations.
+        <Ship size={14} aria-hidden="true" /> Εκτιμήσεις, όχι εγγυήσεις: τα προφίλ πλοίων είναι ενδεικτικά, εδώ ο καιρός
+        θεωρείται ήρεμος (τα ζωντανά σενάρια χρησιμοποιούν την πρόγνωση) και η γραμμή demurrage υποθέτει laytime 72 h SHINC
+        με 60 h φορτοεκφόρτωσης.
       </p>
     </div>
   );

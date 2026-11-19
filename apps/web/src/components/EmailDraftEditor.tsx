@@ -12,9 +12,9 @@ interface EmailDraftEditorProps {
 }
 
 function draftLabel(d: EmailDraftDTO): string {
-  if (d.kind === "ACCEPT") return d.optionKey === "KEEP_SPEED" ? "Accept · keep speed" : "Accept · eco speed";
-  if (d.kind === "COUNTER") return "Counter-offer";
-  return "Decline";
+  if (d.kind === "ACCEPT") return d.optionKey === "KEEP_SPEED" ? "Αποδοχή · ίδια ταχύτητα" : "Αποδοχή · οικονομική ταχύτητα";
+  if (d.kind === "COUNTER") return "Αντιπροσφορά";
+  return "Άρνηση";
 }
 
 /**
@@ -43,7 +43,7 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
   );
 
   if (drafts.length === 0 || !selected) {
-    return <p className="drafts__empty">No reply drafts for this offer.</p>;
+    return <p className="drafts__empty">Δεν υπάρχουν πρόχειρες απαντήσεις για αυτή την προσφορά.</p>;
   }
 
   const editable = selected.status === "DRAFT";
@@ -59,7 +59,7 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
     setInfo(null);
     try {
       await save();
-      setInfo("Saved.");
+      setInfo("Αποθηκεύτηκε.");
       await onChanged();
     } catch (e) {
       setError((e as Error).message);
@@ -69,15 +69,15 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
   };
 
   const handleSend = async () => {
-    const to = provider?.redirectTo ? `${provider.redirectTo} (test redirect for ${form.toAddr})` : form.toAddr;
-    if (!window.confirm(`Send "${form.subject}" to ${to}?`)) return;
+    const to = provider?.redirectTo ? `${provider.redirectTo} (δοκιμαστική ανακατεύθυνση, αντί για ${form.toAddr})` : form.toAddr;
+    if (!window.confirm(`Αποστολή του «${form.subject}» προς ${to};`)) return;
     setBusy(true);
     setError(null);
     setInfo(null);
     try {
       if (dirty) await save();
       const res = await api.sendEmailDraft(selected.id);
-      setInfo(`Sent to ${res.deliveredTo}.`);
+      setInfo(`Στάλθηκε στο ${res.deliveredTo}.`);
       await onChanged();
     } catch (e) {
       setError((e as Error).message);
@@ -90,15 +90,15 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(`To: ${form.toAddr}\nSubject: ${form.subject}\n\n${form.body}`);
-      setInfo("Copied to the clipboard.");
+      setInfo("Αντιγράφηκε στο πρόχειρο.");
     } catch {
-      setError("Couldn't copy; select the text and copy it by hand.");
+      setError("Η αντιγραφή απέτυχε· επιλέξτε το κείμενο και αντιγράψτε το χειροκίνητα.");
     }
   };
 
   return (
     <div className="drafts">
-      <div className="drafts__tabs" role="tablist" aria-label="Reply drafts">
+      <div className="drafts__tabs" role="tablist" aria-label="Πρόχειρες απαντήσεις">
         {drafts.map((d) => (
           <button
             key={d.id}
@@ -111,16 +111,16 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
             }}
           >
             {draftLabel(d)}
-            {d.status === "SENT" && <span className="chip chip--ok">sent</span>}
-            {d.status === "SUPERSEDED" && <span className="chip">not sent</span>}
-            {d.status === "DRAFT" && d.edited && <span className="chip">edited</span>}
+            {d.status === "SENT" && <span className="chip chip--ok">στάλθηκε</span>}
+            {d.status === "SUPERSEDED" && <span className="chip">δεν στάλθηκε</span>}
+            {d.status === "DRAFT" && d.edited && <span className="chip">με αλλαγές</span>}
           </button>
         ))}
       </div>
 
       <div className="drafts__form" role="tabpanel">
         <label className="drafts__field">
-          <span>To</span>
+          <span>Προς</span>
           <input
             type="email"
             value={form.toAddr}
@@ -129,11 +129,11 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
           />
         </label>
         <label className="drafts__field">
-          <span>Subject</span>
+          <span>Θέμα</span>
           <input value={form.subject} disabled={!editable || busy} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
         </label>
         <label className="drafts__field">
-          <span>Message</span>
+          <span>Μήνυμα</span>
           <textarea
             rows={14}
             value={form.body}
@@ -143,21 +143,21 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
         </label>
 
         {selected.status === "SENT" && selected.sentAt && (
-          <p className="drafts__note">Sent {new Date(selected.sentAt).toLocaleString()}.</p>
+          <p className="drafts__note">Στάλθηκε {new Date(selected.sentAt).toLocaleString("el-GR")}.</p>
         )}
         {selected.status === "SUPERSEDED" && (
           <p className="drafts__note">
-            {closedBecause ? `Can't be sent: ${closedBecause}.` : "Not sent: another reply to this offer went out."}
+            {closedBecause ? `Δεν μπορεί να σταλεί: ${closedBecause}.` : "Δεν στάλθηκε: έχει ήδη φύγει άλλη απάντηση σε αυτή την προσφορά."}
           </p>
         )}
         {editable && !provider?.configured && (
           <p className="drafts__note drafts__note--warn">
-            Sending needs the email provider. Fill in {provider?.missing.join(", ") || "SMTP_HOST, MAIL_FROM"} in <code>.env</code>{" "}
-            and restart the API. Until then you can copy the text.
+            Για αποστολή χρειάζεται ο email provider. Συμπληρώστε {provider?.missing.join(", ") || "SMTP_HOST, MAIL_FROM"} στο <code>.env</code>{" "}
+            και κάντε restart το API. Ως τότε μπορείτε να αντιγράψετε το κείμενο.
           </p>
         )}
         {editable && provider?.redirectTo && (
-          <p className="drafts__note">Test mode: emails go to {provider.redirectTo} (MAIL_REDIRECT_TO), not to the supplier.</p>
+          <p className="drafts__note">Δοκιμαστική λειτουργία: τα emails πάνε στο {provider.redirectTo} (MAIL_REDIRECT_TO), όχι στον προμηθευτή.</p>
         )}
         {error && <div className="error-state" role="alert">{error}</div>}
         {info && <p className="drafts__note drafts__note--ok" role="status">{info}</p>}
@@ -165,16 +165,16 @@ export function EmailDraftEditor({ drafts, provider, onChanged, closedBecause = 
         <div className="drafts__actions">
           {editable && (
             <button className="btn btn-primary" onClick={handleSend} disabled={!canSend || busy}>
-              {busy ? "Working…" : "Send"}
+              {busy ? "Σε εξέλιξη…" : "Αποστολή"}
             </button>
           )}
           {editable && (
             <button className="btn" onClick={handleSave} disabled={!dirty || busy}>
-              Save changes
+              Αποθήκευση αλλαγών
             </button>
           )}
           <button className="btn" onClick={handleCopy} disabled={busy}>
-            Copy
+            Αντιγραφή
           </button>
         </div>
       </div>

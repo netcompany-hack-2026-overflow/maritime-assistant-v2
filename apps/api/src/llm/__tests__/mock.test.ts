@@ -85,8 +85,8 @@ describe("mockAnswerQuestion", () => {
 
   it("falls back with an offline-mode hint when nothing matches", async () => {
     const result = await mockAnswerQuestion("What's the weather like?", []);
-    expect(result.answer).toMatch(/Offline mode/);
-    expect(result.answer).toMatch(/API key/);
+    expect(result.answer).toMatch(/Offline λειτουργία/);
+    expect(result.answer).toMatch(/κλειδί API/);
     expect(result.citations).toEqual([]);
   });
 });
@@ -138,12 +138,12 @@ describe("mockAnswerQuestion: bunker offers", () => {
       offer("r2", "Genoa", "REJECTED", {
         rejectReason: "Too far",
         verdict: "NOT_WORTH_IT",
-        notWorthItBecause: "the detour costs €60k more than the cheaper fuel saves",
+        notWorthItBecause: "η παράκαμψη κοστίζει €60k περισσότερα απ' όσα γλιτώνει το φθηνότερο καύσιμο",
       }),
     ];
     const a = await mockAnswerQuestion("Why didn't we take the Genoa offer?", rows);
-    expect(a.answer).toContain("Genoa offer for MV Aegean Star was declined (reason: Too far)");
-    expect(a.answer).toContain("flagged not worth it: the detour costs €60k more");
+    expect(a.answer).toContain("προσφορά του Genoa για το MV Aegean Star απορρίφθηκε (αιτιολογία: Too far)");
+    expect(a.answer).toContain("σημειωθεί ότι δεν αξίζει: η παράκαμψη κοστίζει €60k περισσότερα");
     expect(a.citations).toEqual([{ table: "recommendation", id: "r2" }]);
   });
 
@@ -151,7 +151,7 @@ describe("mockAnswerQuestion: bunker offers", () => {
     const a = await mockAnswerQuestion("Why didn't we take the Algeciras offer?", [
       offer("r1", "Algeciras", "PENDING", { costSavedEur: 109524, verdict: "WORTH_IT" }),
     ]);
-    expect(a.answer).toContain("is waiting for a decision (net €109,524)");
-    expect(a.answer).not.toContain("not worth it");
+    expect(a.answer).toContain("περιμένει απόφαση (καθαρό €109,524)");
+    expect(a.answer).not.toContain("δεν αξίζει");
   });
 });

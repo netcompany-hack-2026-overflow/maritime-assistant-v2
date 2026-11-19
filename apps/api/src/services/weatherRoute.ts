@@ -112,12 +112,12 @@ export async function findWeatherRoute(args: {
   const best = scored.reduce((a, b) => (b.fuel < a.fuel ? b : a));
   const extra = best.nm - legNm;
   const avoided =
-    worst?.waveM != null ? `, around ${worst.waveM.toFixed(1)} m seas on the planned track` : "";
+    worst?.waveM != null ? `, αποφεύγοντας κύμα περίπου ${worst.waveM.toFixed(1)} m στην προγραμματισμένη πορεία` : "";
   const { samples: _samples, ...weather } = best.weather;
   return {
     distanceNm: best.nm,
     weather,
     coords: best.coords,
-    via: `via ${fmtPos(best.wp)} (+${Math.round(extra)} nm${avoided})`,
+    via: `μέσω ${fmtPos(best.wp)} (+${Math.round(extra)} nm${avoided})`,
   };
 }

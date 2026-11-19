@@ -2,6 +2,13 @@
 
 [![CI](https://github.com/netcompany-hack-2026-overflow/maritime-assistant-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/netcompany-hack-2026-overflow/maritime-assistant-v2/actions/workflows/ci.yml)
 
+> **The app's interface is in Greek.** This English README calls pages and buttons by their
+> English meaning. Pages: Fleet = Στόλος, Voyages = Ταξίδια, Inbox = Εισερχόμενα, Actions = Ενέργειες,
+> Bunkering = Ανεφοδιασμός, Ask = Ερωτήσεις, Value = Αξία, Settings = Ρυθμίσεις. Common buttons:
+> Approve = Έγκριση, Reject = Απόρριψη, Undo approval = Αναίρεση έγκρισης, Send = Αποστολή,
+> "Simulate incoming email" = «Προσομοίωση εισερχόμενου email», "Simulate supplier quotes" =
+> «Προσομοίωση προσφορών προμηθευτών». Emails to suppliers and charterers stay in English.
+
 > 🇬🇷 Ελληνική έκδοση: [README.md](README.md)
 
 **Tidewise: Smart Maritime Operations Assistant.** Built for Netcompany Hackathon

@@ -21,7 +21,7 @@ async function requireVoyage(voyageId: string | undefined) {
 charterPartyRouter.get("/", async (req, res, next) => {
   try {
     const row = await prisma.charterParty.findUnique({ where: { voyageId: vid(req) } });
-    if (!row) return res.status(404).json({ error: "No charter party on file for this voyage" });
+    if (!row) return res.status(404).json({ error: "Δεν υπάρχει ναυλοσύμφωνο για αυτό το ταξίδι" });
     res.json(toCharterPartyDTO(row));
   } catch (err) {
     next(err);
@@ -29,16 +29,16 @@ charterPartyRouter.get("/", async (req, res, next) => {
 });
 
 const textSchema = z.object({
-  text: z.string().trim().min(50, "Paste the full charter party text").max(200_000),
+  text: z.string().trim().min(50, "Επικολλήστε όλο το κείμενο του ναυλοσυμφώνου").max(200_000),
   sourceName: z.string().trim().max(200).optional(),
 });
 
 /** Charter party as pasted text. */
 charterPartyRouter.post("/", async (req, res, next) => {
   try {
-    if (!(await requireVoyage(vid(req)))) return res.status(404).json({ error: "Voyage not found" });
+    if (!(await requireVoyage(vid(req)))) return res.status(404).json({ error: "Το ταξίδι δεν βρέθηκε" });
     const parsed = textSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Μη έγκυρο αίτημα" });
     res.status(201).json(await saveCharterParty(vid(req), parsed.data.text, parsed.data.sourceName ?? "Pasted text"));
   } catch (err) {
     next(err);
@@ -51,9 +51,9 @@ charterPartyRouter.post(
   express.raw({ type: "application/pdf", limit: MAX_PDF_BYTES }),
   async (req, res, next) => {
     try {
-      if (!(await requireVoyage(vid(req)))) return res.status(404).json({ error: "Voyage not found" });
+      if (!(await requireVoyage(vid(req)))) return res.status(404).json({ error: "Το ταξίδι δεν βρέθηκε" });
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-        return res.status(400).json({ error: "Send the PDF as the request body with Content-Type: application/pdf." });
+        return res.status(400).json({ error: "Στείλτε το PDF ως σώμα του αιτήματος με Content-Type: application/pdf." });
       }
       const filename = String(req.query.filename ?? "charter-party.pdf").slice(0, 200);
       const text = await pdfToText(req.body);
@@ -73,9 +73,9 @@ const patchSchema = z.object({
 charterPartyRouter.patch("/", async (req, res, next) => {
   try {
     const parsed = patchSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid terms", details: parsed.error.issues });
+    if (!parsed.success) return res.status(400).json({ error: "Μη έγκυροι όροι", details: parsed.error.issues });
     const row = await prisma.charterParty.findUnique({ where: { voyageId: vid(req) } });
-    if (!row) return res.status(404).json({ error: "No charter party on file for this voyage" });
+    if (!row) return res.status(404).json({ error: "Δεν υπάρχει ναυλοσύμφωνο για αυτό το ταξίδι" });
     res.json(await updateCharterParty(vid(req), parsed.data));
   } catch (err) {
     next(err);
@@ -85,7 +85,7 @@ charterPartyRouter.patch("/", async (req, res, next) => {
 charterPartyRouter.delete("/", async (req, res, next) => {
   try {
     const row = await prisma.charterParty.findUnique({ where: { voyageId: vid(req) } });
-    if (!row) return res.status(404).json({ error: "No charter party on file for this voyage" });
+    if (!row) return res.status(404).json({ error: "Δεν υπάρχει ναυλοσύμφωνο για αυτό το ταξίδι" });
     await prisma.charterParty.delete({ where: { id: row.id } });
     await recomputeVoyage(vid(req));
     res.status(204).end();

@@ -57,7 +57,7 @@ describe("findWeatherRoute", () => {
     // Starts and ends where the planned route does.
     expect(r!.coords![0]).toEqual(ahead[0]);
     expect(r!.coords![r!.coords!.length - 1]).toEqual(ahead[2]);
-    expect(r!.via).toMatch(/^via .*\(\+\d+ nm, around 6\.0 m seas/);
+    expect(r!.via).toMatch(/^μέσω .*\(\+\d+ nm, αποφεύγοντας κύμα περίπου 6\.0 m/);
   });
 
   it("offers nothing on a leg too short to re-route", async () => {

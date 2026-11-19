@@ -1,5 +1,8 @@
 import type { Prisma } from "@prisma/client";
+import { NOT_TAKEN_PREFIX } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
+
+export { NOT_TAKEN_PREFIX };
 
 /**
  * One decision per ship: the pending recommendations for a voyage (a speed
@@ -8,26 +11,23 @@ import { prisma } from "../lib/prisma.js";
  * the approval reopens them.
  */
 
-/** Start of the reason given to options closed because another one was approved. */
-export const NOT_TAKEN_PREFIX = "Not taken: ";
-
 type RecLike = {
   actionType: string;
   portEvent?: { eventType: string; supplier?: string | null; port?: { name: string } | null } | null;
 };
 
 const EVENT_WORDS: Record<string, string> = {
-  BERTH_DELAY: "berth delay",
-  CONGESTION: "congestion",
-  CLOSURE: "closure",
+  BERTH_DELAY: "την καθυστέρηση πρόσδεσης",
+  CONGESTION: "τη συμφόρηση",
+  CLOSURE: "το κλείσιμο",
 };
 
-/** "bunkering at Algeciras (Strait Bunkering Ltd)" or "the speed change for the Rotterdam berth delay". */
+/** «ο ανεφοδιασμός στο Algeciras (Strait Bunkering Ltd)» ή «η αλλαγή ταχύτητας για την καθυστέρηση πρόσδεσης στο Rotterdam». */
 export function describeOption(rec: RecLike): string {
   const ev = rec.portEvent;
-  const port = ev?.port?.name ?? "the port";
-  if (rec.actionType === "BUNKER_DETOUR") return `bunkering at ${port}${ev?.supplier ? ` (${ev.supplier})` : ""}`;
-  return `the speed change for the ${port} ${EVENT_WORDS[ev?.eventType ?? ""] ?? "port event"}`;
+  const port = ev?.port?.name ?? "το λιμάνι";
+  if (rec.actionType === "BUNKER_DETOUR") return `ο ανεφοδιασμός στο ${port}${ev?.supplier ? ` (${ev.supplier})` : ""}`;
+  return `η αλλαγή ταχύτητας για ${EVENT_WORDS[ev?.eventType ?? ""] ?? "το συμβάν"} στο ${port}`;
 }
 
 /** The other options still open for the same ship. */
@@ -45,7 +45,7 @@ export function closeAlternatives(ids: string[], chosen: string, now: Date): Pri
   return [
     prisma.recommendation.updateMany({
       where: { id: { in: ids }, status: "PENDING" },
-      data: { status: "REJECTED", decidedAt: now, rejectReason: `${NOT_TAKEN_PREFIX}${chosen} was approved for this ship` },
+      data: { status: "REJECTED", decidedAt: now, rejectReason: `${NOT_TAKEN_PREFIX}εγκρίθηκε ${chosen} για αυτό το πλοίο` },
     }),
     // Their acceptances and counter-offers can't go out any more; a polite decline still can.
     prisma.emailDraft.updateMany({

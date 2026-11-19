@@ -10,42 +10,42 @@ import "./Landing.css";
 const STEPS = [
   {
     icon: MailOpen,
-    title: "Reads the email",
-    body: "A port agent writes “berth delayed 24 h”. Tidewise extracts port, delay and new berth time, and highlights the exact words it used.",
+    title: "Διαβάζει το email",
+    body: "Ο πράκτορας γράφει «berth delayed 24 h». Το Tidewise βγάζει λιμάνι, καθυστέρηση και νέα ώρα πρόσδεσης, και επισημαίνει τις ακριβείς λέξεις που χρησιμοποίησε.",
   },
   {
     icon: FileText,
-    title: "Reads the charter party",
-    body: "Laytime, NOR, demurrage/despatch and the just-in-time arrival clause come out of the CP, so every option shows its contractual consequences.",
+    title: "Διαβάζει το ναυλοσύμφωνο",
+    body: "Laytime, NOR, demurrage/despatch και η ρήτρα άφιξης just-in-time διαβάζονται από το ναυλοσύμφωνο, ώστε κάθε επιλογή να δείχνει τις συμβατικές της συνέπειες.",
   },
   {
     icon: Sigma,
-    title: "Compares A, B, C",
-    body: "Keep speed, slow down for JIT, or re-route around the weather: ETA, fuel, CO₂, EU ETS cost, demurrage and CII side by side, on the live marine forecast.",
+    title: "Συγκρίνει A, B, C",
+    body: "Ίδια ταχύτητα, μείωση για άφιξη JIT ή αλλαγή διαδρομής λόγω καιρού: ETA, καύσιμο, CO₂, κόστος EU ETS, demurrage και CII δίπλα-δίπλα, με την τρέχουσα θαλάσσια πρόγνωση.",
   },
   {
     icon: ShieldCheck,
-    title: "You decide",
-    body: "Nothing runs on its own. An operator approves a scenario, and the ship visibly changes course or speed on the live globe.",
+    title: "Αποφασίζετε εσείς",
+    body: "Τίποτα δεν γίνεται μόνο του. Ο operator εγκρίνει ένα σενάριο και το πλοίο αλλάζει εμφανώς πορεία ή ταχύτητα στη ζωντανή υδρόγειο.",
   },
   {
     icon: Send,
-    title: "Tells the charterer",
-    body: "On approval, the email to charterers and agent is drafted: new ETA, the reason, and the charter-party terms that apply.",
+    title: "Ενημερώνει τον ναυλωτή",
+    body: "Με την έγκριση γράφεται το email προς ναυλωτές και πράκτορα: νέο ETA, ο λόγος και οι όροι του ναυλοσυμφώνου που ισχύουν.",
   },
 ];
 
 /** A static illustration of the product's core moment: email in, recommendation out. */
 function ProductMoment() {
   return (
-    <div className="moment" aria-label="Example: a berth-delay email becomes a speed recommendation" role="img">
+    <div className="moment" aria-label="Παράδειγμα: ένα email καθυστέρησης πρόσδεσης γίνεται σύσταση ταχύτητας" role="img">
       <div className="moment__card moment__email">
         <p className="moment__eyebrow">
-          <MailOpen size={14} aria-hidden="true" /> ops@rtm-agency · just now
+          <MailOpen size={14} aria-hidden="true" /> ops@rtm-agency · μόλις τώρα
         </p>
         <p className="moment__text">
-          The berth for <mark>MV Aegean Star</mark> at <mark>Rotterdam</mark> has been{" "}
-          <mark>delayed by 24 hours</mark>.
+          Η θέση του <mark>MV Aegean Star</mark> στο <mark>Ρότερνταμ</mark>{" "}
+          <mark>καθυστερεί 24 ώρες</mark>.
         </p>
       </div>
 
@@ -55,18 +55,18 @@ function ProductMoment() {
 
       <div className="moment__card moment__rec">
         <div className="moment__rec-head">
-          <p className="moment__eyebrow">Recommendation · awaiting approval</p>
+          <p className="moment__eyebrow">Σύσταση · αναμένει έγκριση</p>
           <p className="moment__speed">
             14.0 kn <ArrowRight size={16} aria-hidden="true" /> <strong>10.7 kn</strong>
           </p>
         </div>
         <dl className="moment__kpis">
           <div>
-            <dt>Fuel</dt>
+            <dt>Καύσιμο</dt>
             <dd>57.1 t</dd>
           </div>
           <div>
-            <dt>Cost</dt>
+            <dt>Κόστος</dt>
             <dd>€34.3k</dd>
           </div>
           <div>
@@ -76,10 +76,10 @@ function ProductMoment() {
         </dl>
         <div className="moment__actions">
           <span className="moment__btn moment__btn--approve">
-            <Check size={14} aria-hidden="true" /> Approve
+            <Check size={14} aria-hidden="true" /> Έγκριση
           </span>
           <span className="moment__btn">
-            <X size={14} aria-hidden="true" /> Reject
+            <X size={14} aria-hidden="true" /> Απόρριψη
           </span>
         </div>
       </div>
@@ -106,7 +106,7 @@ export function Landing() {
   return (
     <div className="landing">
       <a className="skip-link" href="#landing-main">
-        Skip to content
+        Μετάβαση στο περιεχόμενο
       </a>
 
       <section
@@ -119,38 +119,38 @@ export function Landing() {
         }
       >
         <header className="hero__nav">
-          <Link to="/" className="hero__brand" aria-label="Tidewise home">
+          <Link to="/" className="hero__brand" aria-label="Αρχική Tidewise">
             <Monogram />
             <span>Tidewise</span>
           </Link>
-          <nav aria-label="Main" className="hero__links">
-            <a href="#how">How it works</a>
-            <a href="#value">Business value</a>
-            <Link to="/ask">Ask the fleet</Link>
+          <nav aria-label="Κύριο μενού" className="hero__links">
+            <a href="#how">Πώς δουλεύει</a>
+            <a href="#value">Επιχειρηματική αξία</a>
+            <Link to="/ask">Ρωτήστε για τον στόλο</Link>
             <Link to="/fleet" className="hero__nav-cta">
-              Open console
+              Άνοιγμα κονσόλας
             </Link>
           </nav>
         </header>
 
         <main id="landing-main" className="hero__body">
           <div className="hero__copy">
-            <p className="hero__eyebrow">Smart maritime operations assistant</p>
+            <p className="hero__eyebrow">Έξυπνος βοηθός ναυτιλιακών επιχειρήσεων</p>
             <h1 className="hero__title">
-              Arrive <em>on time,</em>
+              Φτάστε <em>στην ώρα σας,</em>
               <br />
-              not early.
+              όχι νωρίτερα.
             </h1>
             <p className="hero__lede">
-              When a berth slips, Tidewise reads the agent’s email, finds the ship and works out
-              the exact speed to arrive just in time. Then it waits for your approval.
+              Όταν η θέση πρόσδεσης καθυστερεί, το Tidewise διαβάζει το email του πράκτορα, βρίσκει το
+              πλοίο και υπολογίζει την ακριβή ταχύτητα για άφιξη just in time. Μετά περιμένει την έγκρισή σας.
             </p>
             <div className="hero__ctas">
               <Link to="/fleet" className="hero__cta">
-                Open the console <ArrowRight size={16} aria-hidden="true" />
+                Άνοιγμα κονσόλας <ArrowRight size={16} aria-hidden="true" />
               </Link>
               <a href="#how" className="hero__ghost">
-                How it works
+                Πώς δουλεύει
               </a>
             </div>
           </div>
@@ -160,15 +160,15 @@ export function Landing() {
 
         <dl className="hero__stats">
           <div>
-            <dt>Saved on a single 24 h berth delay</dt>
+            <dt>Εξοικονόμηση σε μία καθυστέρηση πρόσδεσης 24 h</dt>
             <dd>€34.3k</dd>
           </div>
           <div>
-            <dt>Evaluation emails extracted exactly</dt>
-            <dd>12 / 12</dd>
+            <dt>Emails αξιολόγησης με ακριβή εξαγωγή</dt>
+            <dd>18 / 18</dd>
           </div>
           <div>
-            <dt>{savedT && savedT > 0 ? "Saved by approved actions so far" : "Actions taken without a human"}</dt>
+            <dt>{savedT && savedT > 0 ? "Εξοικονόμηση από εγκεκριμένες ενέργειες ως τώρα" : "Ενέργειες χωρίς ανθρώπινη έγκριση"}</dt>
             <dd>
               {savedT && savedT > 0 ? (
                 <>
@@ -186,7 +186,7 @@ export function Landing() {
       <section id="how" className="how" aria-labelledby="how-title">
         <div className="how__inner">
           <h2 id="how-title" className="how__title">
-            From one email to one <em>decision.</em>
+            Από ένα email σε μία <em>απόφαση.</em>
           </h2>
           <ol className="how__steps">
             {STEPS.map(({ icon: Icon, title, body }, i) => (
@@ -199,7 +199,7 @@ export function Landing() {
             ))}
           </ol>
           <Link to="/fleet" className="how__cta">
-            Open the console <ArrowRight size={16} aria-hidden="true" />
+            Άνοιγμα κονσόλας <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       </section>
@@ -207,35 +207,35 @@ export function Landing() {
       <section id="value" className="how value-teaser" aria-labelledby="value-title">
         <div className="how__inner">
           <h2 id="value-title" className="how__title">
-            Business <em>value.</em>
+            Επιχειρηματική <em>αξία.</em>
           </h2>
           <div className="value-teaser__grid">
             <div>
-              <p className="value-teaser__q">Who is the customer?</p>
+              <p className="value-teaser__q">Ποιος είναι ο πελάτης;</p>
               <p>
-                Dry bulk and tanker owner-operators on voyage charters, starting with Greek fleets. Used daily by
-                operations, chartering and the technical/ESG team.
+                Πλοιοκτήτριες-διαχειρίστριες εταιρείες ξηρού φορτίου και δεξαμενόπλοιων σε ναυλώσεις ταξιδιού, ξεκινώντας
+                από ελληνικούς στόλους. Το χρησιμοποιούν καθημερινά το operations, το chartering και η τεχνική/ESG ομάδα.
               </p>
             </div>
             <div>
-              <p className="value-teaser__q">What does it save?</p>
+              <p className="value-teaser__q">Τι εξοικονομεί;</p>
               <p>
-                One 24 h berth delay on a Supramax 1,200 nm out: about 43 t of fuel and 135 t of CO₂, roughly €33k in fuel plus EU ETS
-                allowances, and the demurrage of a day at anchor. At ten notices a year that is around €330k per ship.
+                Μία καθυστέρηση πρόσδεσης 24 h σε Supramax 1.200 nm πριν το λιμάνι: περίπου 43 t καυσίμου και 135 t CO₂, περίπου €33k
+                σε καύσιμο και δικαιώματα EU ETS, και το demurrage μιας μέρας στην άγκυρα. Με δέκα ειδοποιήσεις τον χρόνο, περίπου €330k ανά πλοίο.
               </p>
             </div>
             <div>
-              <p className="value-teaser__q">Why now?</p>
+              <p className="value-teaser__q">Γιατί τώρα;</p>
               <p>
-                EU ETS covers 100% of shipping emissions from 2026 with EUAs near €90/t, CII tightens every year to 2030,
-                VLSFO is above $700/t, and IMO is pushing just-in-time arrival.
+                Το EU ETS καλύπτει το 100% των εκπομπών της ναυτιλίας από το 2026 με EUA κοντά στα €90/t, το CII σφίγγει κάθε
+                χρόνο ως το 2030, το VLSFO είναι πάνω από $700/t και ο IMO προωθεί την άφιξη just-in-time.
               </p>
             </div>
           </div>
           <Link to="/value" className="how__cta">
-            Run the numbers for your fleet <ArrowRight size={16} aria-hidden="true" />
+            Υπολογίστε τα νούμερα για τον στόλο σας <ArrowRight size={16} aria-hidden="true" />
           </Link>
-          <p className="how__credit">Photo: Austin Neill / Unsplash</p>
+          <p className="how__credit">Φωτογραφία: Austin Neill / Unsplash</p>
         </div>
       </section>
     </div>

@@ -381,65 +381,75 @@ export async function mockExtractEmail(text: string): Promise<PortEventExtractio
 
 const eur = (v: number) => `€${Math.round(Math.abs(v)).toLocaleString("en-US")}`;
 
+/** ["α", "β", "γ"] -> "α, β και γ" */
+function joinKai(parts: string[]): string {
+  return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} και ${parts[parts.length - 1]}`;
+}
+
 function explainBunker(facts: RecommendationFacts, b: NonNullable<RecommendationFacts["bunker"]>): string {
-  const grade = b.fuelGrade ?? "fuel";
+  const grade = b.fuelGrade ?? "καυσίμου";
   const offer =
-    `${b.bunkerPortName} offers ${b.qtyT.toLocaleString("en-US")} t of ${grade} at $${b.priceUsdPerT}/t, ` +
-    `${b.priceSavingEur >= 0 ? "saving" : "costing"} ${eur(b.priceSavingEur)} against our reference price. `;
+    `Το ${b.bunkerPortName} προσφέρει ${b.qtyT.toLocaleString("en-US")} t ${grade} στα $${b.priceUsdPerT}/t, ` +
+    `${b.priceSavingEur >= 0 ? "γλιτώνοντας" : "με επιπλέον κόστος"} ${eur(b.priceSavingEur)} σε σχέση με την τιμή αναφοράς μας. `;
   const detour =
-    `For ${facts.vesselName} (${facts.originPortName} → ${facts.destPortName}) the call is a ` +
-    `${b.detourNm.toFixed(0)} nm detour and about ${b.extraHours.toFixed(0)} h extra, burning ` +
-    `${b.extraFuelT.toFixed(1)} t more fuel. `;
+    `Για το ${facts.vesselName} (${facts.originPortName} → ${facts.destPortName}) η προσέγγιση σημαίνει ` +
+    `παράκαμψη ${b.detourNm.toFixed(0)} nm και περίπου ${b.extraHours.toFixed(0)} h επιπλέον, με ` +
+    `${b.extraFuelT.toFixed(1)} t επιπλέον καύσιμο. `;
   if (b.verdict === "WORTH_IT") {
     return (
       offer + detour +
-      `It still makes the ${facts.destPortName} berth` +
+      `Το πλοίο προλαβαίνει ακόμα την πρόσδεση στο ${facts.destPortName}` +
       (facts.recommendedSpeedKn > facts.currentSpeedKn + 0.05
-        ? ` by sailing at ${facts.recommendedSpeedKn.toFixed(1)} kn instead of ${facts.currentSpeedKn.toFixed(1)} kn`
+        ? ` πλέοντας με ${facts.recommendedSpeedKn.toFixed(1)} kn αντί για ${facts.currentSpeedKn.toFixed(1)} kn`
         : "") +
-      `, so the net result is ${eur(b.netEur)} saved.`
+      `, οπότε το καθαρό όφελος είναι ${eur(b.netEur)}.`
     );
   }
   const why = [
-    b.netEur <= 0 ? `the detour costs ${eur(b.netEur)} more than the cheaper fuel saves` : null,
-    !b.stillMakesBerth ? `the ship would miss the ${facts.destPortName} berth even at full speed` : null,
-    !b.offerValidAtArrival ? "the offer expires before the ship could get there" : null,
+    b.netEur <= 0 ? `η παράκαμψη κοστίζει ${eur(b.netEur)} περισσότερα απ' όσα γλιτώνει το φθηνότερο καύσιμο` : null,
+    !b.stillMakesBerth ? `το πλοίο θα έχανε την πρόσδεση στο ${facts.destPortName} ακόμα και με πλήρη ταχύτητα` : null,
+    !b.offerValidAtArrival ? "η προσφορά λήγει πριν προλάβει να φτάσει το πλοίο" : null,
   ].filter((x): x is string => x !== null);
-  const list = why.length <= 1 ? (why[0] ?? "") : `${why.slice(0, -1).join(", ")} and ${why[why.length - 1]}`;
-  return offer + detour + `Not worth it: ${list}.`;
+  return offer + detour + `Δεν αξίζει: ${joinKai(why)}.`;
 }
 
 /** Offline: the deterministic explanation, as one paragraph. */
 export async function mockExplainBunkerComparison(facts: BunkerComparisonFacts): Promise<string> {
   const { headline, reasons, warnings } = facts.draft;
-  const why = reasons.length > 0 ? ` Why: ${reasons.join("; ")}.` : "";
+  const why = reasons.length > 0 ? ` Γιατί: ${reasons.join("· ")}.` : "";
   return `${headline}${why}${warnings.length > 0 ? ` ${warnings.join(" ")}` : ""}`;
 }
+
+const EVENT_WORDS: Record<string, string> = {
+  BERTH_DELAY: "καθυστέρηση πρόσδεσης",
+  CONGESTION: "συμφόρηση",
+  CLOSURE: "κλείσιμο λιμανιού",
+};
 
 export async function mockExplainRecommendation(facts: RecommendationFacts): Promise<string> {
   if (facts.bunker) return explainBunker(facts, facts.bunker);
   const how =
     facts.scenarioLabel && facts.scenarioLabel.startsWith("C")
-      ? `Re-routing (${facts.scenarioDescription ?? "around the weather"}) at ${facts.recommendedSpeedKn.toFixed(1)} kn `
-      : `Slowing from ${facts.currentSpeedKn.toFixed(1)} kn to ${facts.recommendedSpeedKn.toFixed(1)} kn `;
+      ? `Η αλλαγή διαδρομής (${facts.scenarioDescription ?? "γύρω από τον καιρό"}) με ${facts.recommendedSpeedKn.toFixed(1)} kn `
+      : `Η μείωση ταχύτητας από ${facts.currentSpeedKn.toFixed(1)} kn σε ${facts.recommendedSpeedKn.toFixed(1)} kn `;
   return (
-    `${facts.portName} has reported ${facts.portEventType.toLowerCase().replace("_", " ")} ` +
-    `affecting ${facts.vesselName} on its ${facts.originPortName} → ${facts.destPortName} voyage, ` +
-    `pushing the berth time back by ${facts.delayHours.toFixed(0)} hours. ` +
+    `Το ${facts.portName} ανέφερε ${EVENT_WORDS[facts.portEventType] ?? "συμβάν"} ` +
+    `που αφορά το ${facts.vesselName} στο ταξίδι ${facts.originPortName} → ${facts.destPortName}, ` +
+    `μεταθέτοντας την πρόσδεση κατά ${facts.delayHours.toFixed(0)} ώρες. ` +
     how +
-    `lets the vessel arrive exactly when the berth is ready instead of rushing to wait at anchor, ` +
-    `saving an estimated ${facts.fuelSavedT.toFixed(1)} t of fuel ` +
-    `(€${Math.round(facts.costSavedEur).toLocaleString("en-US")}) and ` +
-    `${facts.co2SavedT.toFixed(1)} t of CO₂ emissions` +
+    `επιτρέπει στο πλοίο να φτάσει ακριβώς όταν η θέση είναι έτοιμη, αντί να βιαστεί για να περιμένει στην άγκυρα, ` +
+    `γλιτώνοντας περίπου ${facts.fuelSavedT.toFixed(1)} t καυσίμου ` +
+    `(€${Math.round(facts.costSavedEur).toLocaleString("en-US")}) και ` +
+    `${facts.co2SavedT.toFixed(1)} t CO₂` +
     (facts.etsSavedEur && facts.etsSavedEur > 0
-      ? ` (€${Math.round(facts.etsSavedEur).toLocaleString("en-US")} of EU ETS allowances)`
+      ? ` (€${Math.round(facts.etsSavedEur).toLocaleString("en-US")} σε δικαιώματα EU ETS)`
       : "") +
     "." +
     (facts.demurrageAvoided && facts.demurrageAvoided > 0
-      ? ` It also keeps discharge within laytime, avoiding about ${facts.currency ?? "USD"} ` +
-        `${Math.round(facts.demurrageAvoided).toLocaleString("en-US")} of demurrage.`
+      ? ` Επίσης κρατά την εκφόρτωση εντός laytime, αποφεύγοντας περίπου ${facts.currency ?? "USD"} ` +
+        `${Math.round(facts.demurrageAvoided).toLocaleString("en-US")} demurrage.`
       : "") +
-    (facts.jitNote ? ` Charter party: ${facts.jitNote}` : "")
+    (facts.jitNote ? ` Ναυλοσύμφωνο: ${facts.jitNote}` : "")
   );
 }
 
@@ -448,44 +458,62 @@ function rowMatchesVesselName(row: CitableRow, name: string): boolean {
   return typeof vesselName === "string" && vesselName.toLowerCase() === name.toLowerCase();
 }
 
+/** Greek spellings people type for the demo ports, so «Γένοβα» finds Genoa. */
+const GREEK_PORT_NAMES: Record<string, string[]> = {
+  genoa: ["γένοβα"],
+  algeciras: ["αλχεθίρας", "αλγεθίρας", "αλγκεθίρας"],
+  gibraltar: ["γιβραλτάρ"],
+  ceuta: ["θέουτα", "σέουτα"],
+  rotterdam: ["ρότερνταμ"],
+  singapore: ["σιγκαπούρη"],
+  valencia: ["βαλένθια", "βαλένσια"],
+  "jebel ali": ["τζεμπέλ αλί"],
+};
+
+const has = (q: string, words: string[]) => words.some((w) => q.includes(w));
+
 export async function mockAnswerQuestion(question: string, rows: CitableRow[]): Promise<Answer> {
   const q = question.toLowerCase();
 
   const vesselMatch = question.match(/\bMV\s+[A-Z][\p{L}]+(?:\s+[A-Z][\p{L}]+)*/u);
 
-  if (q.includes("fuel") && (q.includes("saved") || q.includes("approved"))) {
+  if (has(q, ["fuel", "καύσιμ"]) && has(q, ["saved", "approved", "γλιτ", "εγκεκριμ", "εξοικον"])) {
     const approved = rows.filter(
       (r) => r.table === "recommendation" && r.data.status === "APPROVED"
     );
     const total = approved.reduce((sum, r) => sum + Number(r.data.fuelSavedT ?? 0), 0);
     if (approved.length === 0) {
       return {
-        answer: "No actions have been approved yet, so 0 t of fuel has been saved so far.",
+        answer: "Δεν έχει εγκριθεί ακόμα καμία ενέργεια, οπότε ως τώρα έχουν γλιτωθεί 0 t καυσίμου.",
         citations: [],
       };
     }
     return {
-      answer: `Approved actions have saved a total of ${total.toFixed(1)} t of fuel across ${
+      answer: `Οι εγκεκριμένες ενέργειες έχουν γλιτώσει συνολικά ${total.toFixed(1)} t καυσίμου από ${
         approved.length
-      } approved recommendation(s).`,
+      } εγκεκριμένες συστάσεις.`,
       citations: approved.map((r) => ({ table: r.table, id: r.id })),
     };
   }
 
-  if ((q.includes("offer") || q.includes("bunker")) && (q.includes("why") || q.includes("take"))) {
+  if (has(q, ["offer", "bunker", "προσφορ", "ανεφοδιασ"]) && has(q, ["why", "take", "γιατί", "γιατι", "πήραμε", "πάρουμε"])) {
     const offers = rows.filter((r) => r.table === "recommendation" && r.data.actionType === "BUNKER_DETOUR");
-    const named = offers.filter((r) => typeof r.data.portName === "string" && q.includes(r.data.portName.toLowerCase()));
+    const named = offers.filter((r) => {
+      if (typeof r.data.portName !== "string") return false;
+      const name = r.data.portName.toLowerCase();
+      return q.includes(name) || has(q, GREEK_PORT_NAMES[name] ?? []);
+    });
     const picked = named.length > 0 ? named : offers;
     if (picked.length > 0) {
       const lines = picked.map((r) => {
-        const where = `${r.data.portName} offer for ${r.data.vesselName}`;
-        const net = `net €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}`;
-        const flagged = r.data.verdict === "NOT_WORTH_IT" ? ` It was flagged not worth it: ${r.data.notWorthItBecause}.` : "";
+        const where = `προσφορά του ${r.data.portName} για το ${r.data.vesselName}`;
+        const net = `καθαρό €${Math.round(Number(r.data.costSavedEur)).toLocaleString("en-US")}`;
+        const flagged = r.data.verdict === "NOT_WORTH_IT" ? ` Είχε σημειωθεί ότι δεν αξίζει: ${r.data.notWorthItBecause}.` : "";
         if (r.data.status === "REJECTED") {
-          return `The ${where} was declined${r.data.rejectReason ? ` (reason: ${r.data.rejectReason})` : ""}.${flagged}`;
+          return `Η ${where} απορρίφθηκε${r.data.rejectReason ? ` (αιτιολογία: ${r.data.rejectReason})` : ""}.${flagged}`;
         }
-        if (r.data.status === "APPROVED") return `The ${where} was approved (${net}).${flagged}`;
-        return `The ${where} is waiting for a decision (${net}).${flagged}`;
+        if (r.data.status === "APPROVED") return `Η ${where} εγκρίθηκε (${net}).${flagged}`;
+        return `Η ${where} περιμένει απόφαση (${net}).${flagged}`;
       });
       return { answer: lines.join(" "), citations: picked.map((r) => ({ table: r.table, id: r.id })) };
     }
@@ -497,13 +525,13 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     );
     if (voyageRow) {
       return {
-        answer: `${vesselMatch[0]}'s planned ETA is ${voyageRow.data.plannedEta}.`,
+        answer: `Το προγραμματισμένο ETA του ${vesselMatch[0]} είναι ${voyageRow.data.plannedEta}.`,
         citations: [{ table: voyageRow.table, id: voyageRow.id }],
       };
     }
   }
 
-  if (q.includes("affected") && (q.includes("delay") || q.includes("port"))) {
+  if (has(q, ["affected", "επηρε"]) && has(q, ["delay", "port", "καθυστ", "λιμ"])) {
     const affectedVoyageIds = new Set(
       rows
         .filter((r) => r.table === "portEvent" && r.data.eventType !== "NONE")
@@ -516,7 +544,7 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     if (affectedVoyages.length > 0) {
       const names = affectedVoyages.map((r) => r.data.vesselName).join(", ");
       return {
-        answer: `Vessels affected by reported port delays: ${names}.`,
+        answer: `Πλοία που επηρεάζονται από αναφερθείσες καθυστερήσεις λιμανιών: ${names}.`,
         citations: affectedVoyages.map((r) => ({ table: r.table, id: r.id })),
       };
     }
@@ -524,10 +552,10 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
 
   return {
     answer:
-      "Offline mode (no LLM API key configured): I can only answer a few fixed question types, " +
-      "e.g. fuel saved from approved recommendations, why a bunker offer was or wasn't taken, a named vessel's ETA (\"What's MV Aegean " +
-      "Star's ETA?\"), or which vessels are affected by port delays. Configure LLM_PROVIDER and " +
-      "an API key to ask anything about the fleet.",
+      "Offline λειτουργία (δεν έχει οριστεί κλειδί LLM): απαντώ μόνο σε λίγους τύπους ερωτήσεων, " +
+      "π.χ. πόσο καύσιμο γλιτώσαμε από εγκεκριμένες συστάσεις, γιατί πήραμε ή όχι μια προσφορά καυσίμου, το ETA ενός πλοίου " +
+      "(«Ποιο είναι το ETA του MV Aegean Star;») ή ποια πλοία επηρεάζονται από καθυστερήσεις λιμανιών. Ορίστε LLM_PROVIDER " +
+      "και κλειδί API για οποιαδήποτε ερώτηση για τον στόλο.",
     citations: [],
   };
 }

@@ -68,31 +68,31 @@ export function NoticePanel({ notice, onChange }: Props) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      setError("Could not copy to the clipboard.");
+      setError("Δεν ήταν δυνατή η αντιγραφή στο πρόχειρο.");
     }
   };
 
   return (
-    <section className="notice" aria-label="Notice to charterers and agent">
+    <section className="notice" aria-label="Ειδοποίηση προς ναυλωτές και πράκτορα">
       <div className="notice__head">
         <p className="label">
-          <Mail size={12} aria-hidden="true" /> Notice to charterers &amp; agent
+          <Mail size={12} aria-hidden="true" /> Ειδοποίηση προς ναυλωτές &amp; πράκτορα
         </p>
         <span className={`notice__status notice__status--${notice.status.toLowerCase()}`}>
           {notice.status === "DRAFT"
-            ? "Draft — not sent"
+            ? "Πρόχειρο — δεν έχει σταλεί"
             : notice.status === "SENT"
-              ? `Sent ${notice.sentAt ? new Date(notice.sentAt).toLocaleString() : ""}`
-              : "Withdrawn (approval undone)"}
+              ? `Στάλθηκε ${notice.sentAt ? new Date(notice.sentAt).toLocaleString("el-GR") : ""}`
+              : "Αποσύρθηκε (η έγκριση αναιρέθηκε)"}
         </span>
       </div>
 
       <div className="notice__fields">
         <label>
-          <span>To</span>
+          <span>Προς</span>
           <input
             value={draft.toAddrs}
-            placeholder="charterers' address (not in the charter party)"
+            placeholder="διεύθυνση ναυλωτών (δεν υπάρχει στο ναυλοσύμφωνο)"
             onChange={(e) => setDraft({ ...draft, toAddrs: e.target.value })}
             disabled={!editable}
           />
@@ -102,11 +102,11 @@ export function NoticePanel({ notice, onChange }: Props) {
           <input value={draft.ccAddrs} onChange={(e) => setDraft({ ...draft, ccAddrs: e.target.value })} disabled={!editable} />
         </label>
         <label>
-          <span>Subject</span>
+          <span>Θέμα</span>
           <input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} disabled={!editable} />
         </label>
         <textarea
-          aria-label="Email body"
+          aria-label="Κείμενο email"
           value={draft.body}
           rows={14}
           onChange={(e) => setDraft({ ...draft, body: e.target.value })}
@@ -120,27 +120,27 @@ export function NoticePanel({ notice, onChange }: Props) {
         <div className="notice__actions">
           {editable && dirty && (
             <button className="btn" onClick={save} disabled={busy}>
-              Save edits
+              Αποθήκευση αλλαγών
             </button>
           )}
           <button className="btn" onClick={copy}>
             {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? "Αντιγράφηκε" : "Αντιγραφή"}
           </button>
           <a className="btn" href={mailtoHref(draft)}>
-            <Mail size={14} aria-hidden="true" /> Open in mail app
+            <Mail size={14} aria-hidden="true" /> Άνοιγμα στο πρόγραμμα email
           </a>
           {editable && provider?.configured && (
             <button
               className="btn btn-primary"
               onClick={() => {
-                const to = provider.redirectTo ? `${provider.redirectTo} (test redirect)` : draft.toAddrs;
-                if (window.confirm(`Send "${draft.subject}" to ${to}?`)) void run(() => api.sendOutboundEmail(notice.id));
+                const to = provider.redirectTo ? `${provider.redirectTo} (δοκιμαστική ανακατεύθυνση)` : draft.toAddrs;
+                if (window.confirm(`Αποστολή του «${draft.subject}» προς ${to};`)) void run(() => api.sendOutboundEmail(notice.id));
               }}
               disabled={busy || dirty || !draft.toAddrs.trim()}
-              title={dirty ? "Save your edits first" : !draft.toAddrs.trim() ? "Add the charterers' address first" : undefined}
+              title={dirty ? "Αποθηκεύστε πρώτα τις αλλαγές" : !draft.toAddrs.trim() ? "Συμπληρώστε πρώτα τη διεύθυνση των ναυλωτών" : undefined}
             >
-              <Send size={14} aria-hidden="true" /> Send
+              <Send size={14} aria-hidden="true" /> Αποστολή
             </button>
           )}
           {editable && (
@@ -149,7 +149,7 @@ export function NoticePanel({ notice, onChange }: Props) {
               onClick={() => run(() => api.markOutboundEmailSent(notice.id))}
               disabled={busy || dirty}
             >
-              <Check size={14} aria-hidden="true" /> Mark as sent
+              <Check size={14} aria-hidden="true" /> Σήμανση ως απεσταλμένο
             </button>
           )}
         </div>

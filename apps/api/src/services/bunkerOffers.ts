@@ -67,7 +67,7 @@ export function matchSupplier(suppliers: Supplier[], fromAddr: string, signedNam
     suppliers.find((s) => domain && s.emailDomain.toLowerCase() === domain) ??
     suppliers.find((s) => signedName && s.name.toLowerCase() === signedName.trim().toLowerCase());
   if (found) return { name: found.name, reliabilityScore: found.reliabilityScore, known: true };
-  return { name: signedName ?? (domain || "Unknown supplier"), reliabilityScore: DEFAULT_RELIABILITY, known: false };
+  return { name: signedName ?? (domain || "Άγνωστος προμηθευτής"), reliabilityScore: DEFAULT_RELIABILITY, known: false };
 }
 
 function toDTO(r: OfferRow, suppliers: Supplier[]): BunkerOfferDTO {
@@ -165,7 +165,7 @@ export async function explainOffersWithAi(voyageId: string, assumptions: TcoAssu
     .filter((o): o is TcoOffer => o !== null);
   const rows = compareOffers(offers, assumptions);
   const draft = explainComparison(rows);
-  const vesselName = (await prisma.voyage.findUnique({ where: { id: voyageId }, include: { vessel: true } }))?.vessel.name ?? "the ship";
+  const vesselName = (await prisma.voyage.findUnique({ where: { id: voyageId }, include: { vessel: true } }))?.vessel.name ?? "το πλοίο";
   const text = await getLlmProvider().explainBunkerComparison({
     vesselName,
     assumptions: { ...assumptions },

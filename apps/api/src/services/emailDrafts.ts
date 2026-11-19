@@ -22,8 +22,8 @@ export interface DraftEdit {
 /** Save a person's edits. Edited drafts are kept when prices change and drafts are rewritten. */
 export async function updateDraft(id: string, edit: DraftEdit) {
   const draft = await prisma.emailDraft.findUnique({ where: { id } });
-  if (!draft) throw new HttpError(404, "Draft not found");
-  if (draft.status !== "DRAFT") throw new HttpError(409, `This email was already ${draft.status.toLowerCase()}`);
+  if (!draft) throw new HttpError(404, "Το πρόχειρο δεν βρέθηκε");
+  if (draft.status !== "DRAFT") throw new HttpError(409, `Αυτό το email έχει ήδη ${draft.status === "SENT" ? "σταλεί" : "κλείσει"}`);
   const updated = await prisma.emailDraft.update({ where: { id }, data: { ...edit, edited: true } });
   return draftToDTO(updated);
 }
@@ -40,19 +40,19 @@ export async function sendDraft(id: string) {
     where: { id },
     include: { recommendation: { include: { voyage: true, portEvent: { include: { port: true } } } } },
   });
-  if (!draft) throw new HttpError(404, "Draft not found");
-  if (draft.status === "SENT") throw new HttpError(409, "This email was already sent");
+  if (!draft) throw new HttpError(404, "Το πρόχειρο δεν βρέθηκε");
+  if (draft.status === "SENT") throw new HttpError(409, "Αυτό το email έχει ήδη σταλεί");
   const rec = draft.recommendation;
   if (draft.status === "SUPERSEDED") {
     throw new HttpError(
       409,
       rec.rejectReason?.startsWith(NOT_TAKEN_PREFIX)
-        ? `This offer is closed (${rec.rejectReason}). Undo that approval to accept it instead.`
-        : "Another reply to this offer was already sent"
+        ? `Η προσφορά έκλεισε (${rec.rejectReason}). Αναιρέστε εκείνη την έγκριση για να την αποδεχτείτε.`
+        : "Έχει ήδη σταλεί άλλη απάντηση σε αυτή την προσφορά"
     );
   }
   if (draft.kind === "ACCEPT" && rec.status === "PENDING" && rec.voyage.status !== "UNDERWAY") {
-    throw new HttpError(409, "The voyage is no longer underway, so the offer can't be accepted");
+    throw new HttpError(409, "Το ταξίδι δεν είναι πλέον σε εξέλιξη, οπότε η προσφορά δεν μπορεί να γίνει δεκτή");
   }
 
   let result: { messageId: string; deliveredTo: string };
@@ -122,7 +122,7 @@ export async function sendDraft(id: string) {
     ops.push(
       prisma.recommendation.update({
         where: { id: rec.id },
-        data: { status: "REJECTED", decidedAt: now, rejectReason: `Declined by email to ${draft.toAddr}` },
+        data: { status: "REJECTED", decidedAt: now, rejectReason: `Απορρίφθηκε με email προς ${draft.toAddr}` },
       })
     );
   }

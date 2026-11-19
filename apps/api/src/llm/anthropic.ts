@@ -21,7 +21,7 @@ import { mockExplainBunkerComparison } from "./mock.js";
 
 export const BUNKER_COMPARISON_SYSTEM =
   "You advise a ship operator choosing between bunker (fuel) offers. Using ONLY the numbers in the JSON, " +
-  "write at most 4 short sentences of plain English: which offer to take, why it beats the others (name the " +
+  "write at most 4 short sentences of plain Greek (keep vessel, port, supplier names and terms like ETA, EU ETS, barging in English): which offer to take, why it beats the others (name the " +
   "cheapest-on-paper offer if it is not the best), and anything urgent (an expiring quote, an offer that " +
   "doesn't fit the schedule). Never invent or recalculate numbers; reuse the ones given, rounded as given. " +
   "The 'draft' field is a correct explanation you may reword.";
@@ -80,7 +80,7 @@ export class AnthropicProvider implements LlmProvider {
       model: this.model,
       max_tokens: 300,
       system:
-        "You write a 2-3 sentence plain-English rationale for a ship operations recommendation " +
+        "You write a 2-3 sentence rationale in plain Greek (keep vessel and port names, kn, ETA, EU ETS in English) for a ship operations recommendation " +
         "(a speed adjustment, or, when a bunker block is present, whether a bunker detour is worth it), " +
         "given the facts and numbers already computed. Never invent numbers; " +
         "only restate the ones given.",
@@ -113,7 +113,7 @@ export class AnthropicProvider implements LlmProvider {
       "You answer questions about a maritime fleet using ONLY the rows provided. " +
       'Reply with ONLY a JSON object: {"answer":string,"citations":[{"table":string,"id":string}]}. ' +
       "Every citation must reference a table+id pair that appears in the provided rows. " +
-      "If you cannot answer from the rows, reply with answer \"I can't answer that from the data.\" and citations: [].";
+      "Write the answer in Greek. If you cannot answer from the rows, reply with answer \"Δεν μπορώ να απαντήσω από τα δεδομένα.\" and citations: [].";
 
     const raw = await this.completeJson(
       system,

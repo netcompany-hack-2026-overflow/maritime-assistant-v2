@@ -212,7 +212,7 @@ describe("processEmail: bunker options and reply drafts", () => {
     const rec = recommendation as Record<string, unknown>;
     expect(planOf(rec).screen).toMatchObject({ passed: false, stoppedBecause: "TIME" });
     expect(planOf(rec).options).toEqual([]);
-    expect(rec.rationale).toMatch(/^Not analysed further: calling at Algeciras needs about/);
+    expect(rec.rationale).toMatch(/^Δεν αναλύθηκε περαιτέρω: η προσέγγιση στο Algeciras χρειάζεται περίπου/);
     expect(db.llmCalls).toBe(0);
     expect(draftKinds()).toEqual(["DECLINE:"]);
   });
@@ -232,7 +232,7 @@ describe("processEmail: bunker options and reply drafts", () => {
     db.portConditions = [{ portId: "pALG", eventType: "CONGESTION", delayHours: 10 }];
     const { recommendation } = await processEmail("e-Algeciras");
     const plan = planOf(recommendation as Record<string, unknown>);
-    expect(plan.input.delays).toEqual([{ source: "PORT_CONGESTION", hours: 10, note: "Algeciras congestion reported: +10 h" }]);
+    expect(plan.input.delays).toEqual([{ source: "PORT_CONGESTION", hours: 10, note: "αναφέρθηκε συμφόρηση στο Algeciras: +10 h" }]);
     expect(plan.screen.delayHours).toBe(10);
   });
 });
@@ -289,7 +289,7 @@ describe("the four demo supplier quotes, end to end (parser → ship → plan �
     expect(rows[0].offer.id).toBe("balanced");
     expect(rows.at(-1)!.offer.id).toBe("trap-lowball");
     expect(explainComparison(rows).headline).toMatch(
-      /^Strait Bunkering Ltd \(Algeciras\) is \$5\.00\/t dearer on paper than Rock Marine Fuels \(Gibraltar\), but \$[\d,]+ cheaper overall/
+      /^Η Strait Bunkering Ltd \(Algeciras\) είναι \$5\.00\/t ακριβότερη στο χαρτί από την Rock Marine Fuels \(Gibraltar\), αλλά \$[\d,]+ φθηνότερη συνολικά/
     );
   });
 

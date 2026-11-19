@@ -92,7 +92,7 @@ async function bunkerPortDelays(
     delays.push({
       source: "SUPPLIER_WINDOW",
       hours: terms.deliveryDelayHours,
-      note: `barge alongside ${terms.deliveryDelayHours} h after arrival (supplier's window)`,
+      note: `barge ${terms.deliveryDelayHours} h μετά την άφιξη (παράθυρο του προμηθευτή)`,
     });
   }
   if (terms?.deliveryEarliest) {
@@ -101,7 +101,7 @@ async function bunkerPortDelays(
       delays.push({
         source: "SUPPLIER_WINDOW",
         hours,
-        note: `earliest delivery ${formatUtc(terms.deliveryEarliest)}, ${hours.toFixed(1)} h after the ship gets there`,
+        note: `νωρίτερη παράδοση ${formatUtc(terms.deliveryEarliest)}, ${hours.toFixed(1)} h αφού φτάσει το πλοίο`,
       });
     }
   }
@@ -120,7 +120,7 @@ async function bunkerPortDelays(
     delays.push({
       source: latest.eventType === "CLOSURE" ? "PORT_CLOSURE" : "PORT_CONGESTION",
       hours: latest.delayHours,
-      note: `${port.name} ${latest.eventType === "CLOSURE" ? "closure" : "congestion"} reported: +${latest.delayHours} h`,
+      note: `αναφέρθηκε ${latest.eventType === "CLOSURE" ? "κλείσιμο" : "συμφόρηση"} στο ${port.name}: +${latest.delayHours} h`,
     });
   }
   return delays;
@@ -130,17 +130,17 @@ async function bunkerPortDelays(
 function screenedOutRationale(screen: BunkerScreen, vesselName: string, portName: string, destPortName: string): string {
   if (screen.stoppedBecause === "EXPIRED") {
     return (
-      `Not analysed further: even at full speed ${vesselName} would reach ${portName} ` +
-      `${formatUtc(screen.earliestEtaAtBunker)}, after the offer expires (${formatUtc(screen.validUntil!)}).`
+      `Δεν αναλύθηκε περαιτέρω: ακόμα και με πλήρη ταχύτητα το ${vesselName} θα έφτανε στο ${portName} ` +
+      `${formatUtc(screen.earliestEtaAtBunker)}, μετά τη λήξη της προσφοράς (${formatUtc(screen.validUntil!)}).`
     );
   }
-  const parts = [`${screen.bunkeringHours.toFixed(1)} h alongside`];
-  if (screen.delayHours > 0) parts.push(`${screen.delayHours.toFixed(1)} h waiting for the barge`);
-  parts.push(`${screen.detourHours.toFixed(1)} h detour`);
+  const parts = [`${screen.bunkeringHours.toFixed(1)} h ανεφοδιασμός`];
+  if (screen.delayHours > 0) parts.push(`${screen.delayHours.toFixed(1)} h αναμονή για το barge`);
+  parts.push(`${screen.detourHours.toFixed(1)} h παράκαμψη`);
   return (
-    `Not analysed further: calling at ${portName} needs about ${screen.neededHours.toFixed(1)} h ` +
-    `(${parts.join(" + ")}), but ${vesselName} has only ${Math.max(0, screen.slackHours).toFixed(1)} h to spare ` +
-    `before its ${destPortName} berth (tolerance ${Math.round(screen.toleranceHours * 60)} min).`
+    `Δεν αναλύθηκε περαιτέρω: η προσέγγιση στο ${portName} χρειάζεται περίπου ${screen.neededHours.toFixed(1)} h ` +
+    `(${parts.join(" + ")}), αλλά το ${vesselName} έχει περιθώριο μόνο ${Math.max(0, screen.slackHours).toFixed(1)} h ` +
+    `ως την πρόσδεση στο ${destPortName} (ανοχή ${Math.round(screen.toleranceHours * 60)} min).`
   );
 }
 
@@ -331,7 +331,7 @@ async function createRecommendationForPortEvent(
 export async function processEmail(emailId: string) {
   const email = await prisma.email.findUnique({ where: { id: emailId } });
   if (!email) {
-    const err = new Error("Email not found") as Error & { status?: number };
+    const err = new Error("Το email δεν βρέθηκε") as Error & { status?: number };
     err.status = 404;
     throw err;
   }

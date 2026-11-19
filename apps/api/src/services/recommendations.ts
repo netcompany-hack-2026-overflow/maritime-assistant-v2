@@ -28,21 +28,21 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
     where: { id },
     include: { portEvent: { include: { port: true } } },
   });
-  if (!recommendation) throw new HttpError(404, "Recommendation not found");
+  if (!recommendation) throw new HttpError(404, "Η σύσταση δεν βρέθηκε");
   if (recommendation.rejectReason?.startsWith(NOT_TAKEN_PREFIX)) {
-    throw new HttpError(409, `${recommendation.rejectReason}. Undo that approval to choose this option instead.`);
+    throw new HttpError(409, `${recommendation.rejectReason}. Αναιρέστε εκείνη την έγκριση για να επιλέξετε αυτή.`);
   }
   if (recommendation.status !== "PENDING") {
-    throw new HttpError(409, `Recommendation is already ${recommendation.status.toLowerCase()}`);
+    throw new HttpError(409, `Η σύσταση έχει ήδη ${recommendation.status === "APPROVED" ? "εγκριθεί" : "απορριφθεί"}`);
   }
 
   const voyage = await prisma.voyage.findUnique({
     where: { id: recommendation.voyageId },
     include: { vessel: true, originPort: true, destPort: true },
   });
-  if (!voyage) throw new HttpError(404, "Voyage not found");
+  if (!voyage) throw new HttpError(404, "Το ταξίδι δεν βρέθηκε");
   if (voyage.status !== "UNDERWAY") {
-    throw new HttpError(409, "Voyage is no longer underway");
+    throw new HttpError(409, "Το ταξίδι δεν είναι πλέον σε εξέλιξη");
   }
 
   // The ship's other open options are alternatives to this one: approving it closes them.
@@ -74,15 +74,15 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
   }
 
   const portEvent = await prisma.portEvent.findUnique({ where: { id: recommendation.portEventId } });
-  if (!portEvent?.newBerthTime) throw new HttpError(409, "Port event has no berth time to target");
+  if (!portEvent?.newBerthTime) throw new HttpError(409, "Το συμβάν λιμανιού δεν έχει ώρα πρόσδεσης για στόχο");
 
   const set = parseScenarioSet(recommendation.scenarios);
   const chosenId: ScenarioId = scenarioId ?? set?.recommendedId ?? "B";
   if (chosenId === "A") {
-    throw new HttpError(400, "Scenario A is the baseline (no change). Reject the recommendation instead.");
+    throw new HttpError(400, "Το σενάριο A είναι η βάση (καμία αλλαγή). Απορρίψτε καλύτερα τη σύσταση.");
   }
   const scenario = set?.scenarios.find((s) => s.id === chosenId) ?? null;
-  if (set && !scenario) throw new HttpError(400, `Scenario ${chosenId} is not available for this recommendation`);
+  if (set && !scenario) throw new HttpError(400, `Το σενάριο ${chosenId} δεν είναι διαθέσιμο για αυτή τη σύσταση`);
   const baseline = set?.scenarios.find((s) => s.id === "A") ?? null;
 
   const now = new Date();
@@ -205,9 +205,9 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
  */
 export async function undoApproval(id: string) {
   const recommendation = await prisma.recommendation.findUnique({ where: { id } });
-  if (!recommendation) throw new HttpError(404, "Recommendation not found");
+  if (!recommendation) throw new HttpError(404, "Η σύσταση δεν βρέθηκε");
   if (recommendation.status !== "APPROVED") {
-    throw new HttpError(409, "Only approved recommendations can be undone");
+    throw new HttpError(409, "Αναίρεση γίνεται μόνο σε εγκεκριμένες συστάσεις");
   }
 
   // The options this approval closed become open again.
@@ -229,9 +229,9 @@ export async function undoApproval(id: string) {
     where: { id: recommendation.voyageId },
     include: { vessel: true, originPort: true, destPort: true },
   });
-  if (!voyage) throw new HttpError(404, "Voyage not found");
+  if (!voyage) throw new HttpError(404, "Το ταξίδι δεν βρέθηκε");
   if (voyage.status !== "UNDERWAY") {
-    throw new HttpError(409, "Voyage is no longer underway, so the approval can't be undone");
+    throw new HttpError(409, "Το ταξίδι δεν είναι πλέον σε εξέλιξη, οπότε η έγκριση δεν αναιρείται");
   }
 
   // If a later approval changed this voyage again, rolling this one back would
@@ -245,7 +245,7 @@ export async function undoApproval(id: string) {
     },
   });
   if (laterApproval) {
-    throw new HttpError(409, "A later action on this voyage was approved; undo that one first");
+    throw new HttpError(409, "Εγκρίθηκε μεταγενέστερη ενέργεια σε αυτό το ταξίδι· αναιρέστε πρώτα εκείνη");
   }
 
   const approvalLog = await prisma.auditLog.findFirst({
@@ -347,9 +347,9 @@ export async function undoApproval(id: string) {
 
 export async function rejectRecommendation(id: string, reason: string) {
   const recommendation = await prisma.recommendation.findUnique({ where: { id } });
-  if (!recommendation) throw new HttpError(404, "Recommendation not found");
+  if (!recommendation) throw new HttpError(404, "Η σύσταση δεν βρέθηκε");
   if (recommendation.status !== "PENDING") {
-    throw new HttpError(409, `Recommendation is already ${recommendation.status.toLowerCase()}`);
+    throw new HttpError(409, `Η σύσταση έχει ήδη ${recommendation.status === "APPROVED" ? "εγκριθεί" : "απορριφθεί"}`);
   }
 
   const now = new Date();

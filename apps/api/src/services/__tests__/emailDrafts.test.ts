@@ -98,7 +98,7 @@ describe("sendDraft", () => {
 
   it("sending the decline rejects the offer", async () => {
     await sendDraft("d-no");
-    expect(db.rec).toMatchObject({ status: "REJECTED", rejectReason: "Declined by email to trading@strait-bunkering.example" });
+    expect(db.rec).toMatchObject({ status: "REJECTED", rejectReason: "Απορρίφθηκε με email προς trading@strait-bunkering.example" });
   });
 
   it("a counter-offer leaves it pending, waiting for the supplier", async () => {
@@ -108,14 +108,14 @@ describe("sendDraft", () => {
 
   it("only one reply per offer", async () => {
     await sendDraft("d-eco");
-    await expect(sendDraft("d-eco")).rejects.toThrow(/already sent/);
-    await expect(sendDraft("d-no")).rejects.toThrow(/Another reply/);
+    await expect(sendDraft("d-eco")).rejects.toThrow(/έχει ήδη σταλεί/);
+    await expect(sendDraft("d-no")).rejects.toThrow(/Έχει ήδη σταλεί άλλη απάντηση/);
     expect(db.sent).toHaveLength(1);
   });
 
   it("won't accept for a voyage that's no longer underway (and sends nothing)", async () => {
     db.rec!.voyage = { status: "ARRIVED" };
-    await expect(sendDraft("d-eco")).rejects.toThrow(/no longer underway/);
+    await expect(sendDraft("d-eco")).rejects.toThrow(/δεν είναι πλέον σε εξέλιξη/);
     expect(db.sent).toHaveLength(0);
   });
 
@@ -135,6 +135,6 @@ describe("updateDraft", () => {
 
   it("can't edit a sent email", async () => {
     await sendDraft("d-eco");
-    await expect(updateDraft("d-eco", { body: "x" })).rejects.toThrow(/already sent/);
+    await expect(updateDraft("d-eco", { body: "x" })).rejects.toThrow(/έχει ήδη σταλεί/);
   });
 });

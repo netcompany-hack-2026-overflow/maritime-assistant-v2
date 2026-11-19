@@ -3,12 +3,13 @@ import type { PortDTO, SeaRouteDTO } from "@maritime/shared";
 import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { PortPickerGlobe } from "../components/PortPickerGlobe.js";
 import { CharterPartyDialog } from "../components/CharterPartyDialog.js";
+import { STATUS_LABEL } from "../lib/labels.js";
 import "./Voyages.css";
 
 const ACTIVE_STATUSES = new Set(["UNDERWAY", "PLANNED"]);
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return new Date(iso).toLocaleString("el-GR");
 }
 
 const CII_BADGE_STYLES: Record<string, React.CSSProperties> = {
@@ -139,7 +140,7 @@ export function Voyages() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vesselId || !originPortId || !destPortId) {
-      setFormError("Choose a vessel, origin port, and destination port.");
+      setFormError("Επιλέξτε πλοίο, λιμάνι αναχώρησης και λιμάνι προορισμού.");
       return;
     }
     setSubmitting(true);
@@ -176,7 +177,7 @@ export function Voyages() {
   return (
     <div className="page page--voyages">
       <div className="voyages-toolbar">
-        <p className="label">Voyages</p>
+        <p className="label">Ταξίδια</p>
         <button
           className="btn btn-primary"
           onClick={() => {
@@ -184,7 +185,7 @@ export function Voyages() {
             if (showForm) resetForm();
           }}
         >
-          {showForm ? "Cancel" : "New voyage"}
+          {showForm ? "Ακύρωση" : "Νέο ταξίδι"}
         </button>
       </div>
 
@@ -192,10 +193,10 @@ export function Voyages() {
         <form className="voyage-form" onSubmit={handleSubmit}>
           <div className="voyage-form__fields">
             <label>
-              Vessel
+              Πλοίο
               <select value={vesselId} onChange={(e) => setVesselId(e.target.value)} required>
                 <option value="" disabled>
-                  Select a vessel…
+                  Επιλέξτε πλοίο…
                 </option>
                 {availableVessels.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -206,14 +207,14 @@ export function Voyages() {
             </label>
 
             <label>
-              Origin port
+              Λιμάνι αναχώρησης
               <select
                 value={originPortId ?? ""}
                 onChange={(e) => setOriginPortId(e.target.value || null)}
                 required
               >
                 <option value="" disabled>
-                  Select origin…
+                  Επιλέξτε αναχώρηση…
                 </option>
                 {ports.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -224,14 +225,14 @@ export function Voyages() {
             </label>
 
             <label>
-              Destination port
+              Λιμάνι προορισμού
               <select
                 value={destPortId ?? ""}
                 onChange={(e) => setDestPortId(e.target.value || null)}
                 required
               >
                 <option value="" disabled>
-                  Select destination…
+                  Επιλέξτε προορισμό…
                 </option>
                 {ports.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -242,12 +243,12 @@ export function Voyages() {
             </label>
 
             <label>
-              Speed (kn)
+              Ταχύτητα (kn)
               <input
                 type="number"
                 min="1"
                 step="0.1"
-                placeholder={selectedVessel ? selectedVessel.designSpeedKn.toFixed(1) : "e.g. 14"}
+                placeholder={selectedVessel ? selectedVessel.designSpeedKn.toFixed(1) : "π.χ. 14"}
                 value={speedKn}
                 onChange={(e) => setSpeedKn(e.target.value)}
               />
@@ -255,14 +256,14 @@ export function Voyages() {
 
             {preview && (
               <p className="voyage-form__preview">
-                {preview.distanceNm.toFixed(0)} nm by sea · ETA {preview.eta.toLocaleString()}
+                {preview.distanceNm.toFixed(0)} nm θαλάσσια · ETA {preview.eta.toLocaleString("el-GR")}
               </p>
             )}
 
             {formError && <div className="error-state" role="alert">{formError}</div>}
 
             <button className="btn btn-primary" type="submit" disabled={submitting}>
-              Create voyage
+              Δημιουργία ταξιδιού
             </button>
           </div>
 
@@ -277,27 +278,27 @@ export function Voyages() {
       )}
 
       {loading ? (
-        <div className="loading-state" role="status">Loading voyages…</div>
+        <div className="loading-state" role="status">Φόρτωση ταξιδιών…</div>
       ) : error ? (
         <div className="error-state" role="alert">{error}</div>
       ) : voyages.length === 0 ? (
         <div className="empty-state">
-          <p>No voyages yet. Create one above.</p>
+          <p>Δεν υπάρχουν ακόμα ταξίδια. Δημιουργήστε ένα παραπάνω.</p>
         </div>
       ) : (
-        <div className="table-scroll" role="region" aria-label="Voyages table" tabIndex={0}>
+        <div className="table-scroll" role="region" aria-label="Πίνακας ταξιδιών" tabIndex={0}>
         <table className="voyage-table">
           <thead>
             <tr>
-              <th>Vessel</th>
-              <th>Route</th>
-              <th>Speed</th>
-              <th>CII Rating</th>
-              <th>Departed</th>
+              <th>Πλοίο</th>
+              <th>Διαδρομή</th>
+              <th>Ταχύτητα</th>
+              <th>Βαθμός CII</th>
+              <th>Αναχώρηση</th>
               <th>ETA</th>
-              <th>Berth time</th>
-              <th>Charter party</th>
-              <th>Status</th>
+              <th>Ώρα πρόσδεσης</th>
+              <th>Ναυλοσύμφωνο</th>
+              <th>Κατάσταση</th>
               <th></th>
             </tr>
           </thead>
@@ -320,9 +321,9 @@ export function Voyages() {
                     <button
                       className={v.charterParty ? "btn voyage-cp voyage-cp--on" : "btn voyage-cp"}
                       onClick={() => setCpVoyage(v)}
-                      aria-label={`${v.charterParty ? "View" : "Add"} charter party for ${v.vesselName}`}
+                      aria-label={`${v.charterParty ? "Προβολή" : "Προσθήκη"} ναυλοσυμφώνου για ${v.vesselName}`}
                     >
-                      {v.charterParty ? "On file" : "Add"}
+                      {v.charterParty ? "Υπάρχει" : "Προσθήκη"}
                     </button>
                   ) : (
                     "—"
@@ -330,7 +331,7 @@ export function Voyages() {
                 </td>
                 <td>
                   <span className={`voyage-status voyage-status--${v.status.toLowerCase()}`}>
-                    {v.status}
+                    {STATUS_LABEL[v.status] ?? v.status}
                   </span>
                 </td>
                 <td>
@@ -338,10 +339,10 @@ export function Voyages() {
                     <button
                       className="btn"
                       onClick={() => handleCancel(v.id)}
-                      aria-label={`Cancel voyage of ${v.vesselName}`}
+                      aria-label={`Ακύρωση ταξιδιού του ${v.vesselName}`}
                       disabled={cancellingId === v.id}
                     >
-                      Cancel
+                      Ακύρωση
                     </button>
                   )}
                 </td>

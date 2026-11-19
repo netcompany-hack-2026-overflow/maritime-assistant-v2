@@ -19,14 +19,14 @@ portsRouter.get("/route", async (req, res, next) => {
   try {
     const from = String(req.query.from ?? "").trim().toUpperCase();
     const to = String(req.query.to ?? "").trim().toUpperCase();
-    if (!from || !to) return res.status(400).json({ error: "from and to are required" });
-    if (from === to) return res.status(400).json({ error: "from and to must differ" });
+    if (!from || !to) return res.status(400).json({ error: "Χρειάζονται τα from και to" });
+    if (from === to) return res.status(400).json({ error: "Τα from και to πρέπει να διαφέρουν" });
 
     const [origin, dest] = await Promise.all([
       prisma.port.findUnique({ where: { unlocode: from } }),
       prisma.port.findUnique({ where: { unlocode: to } }),
     ]);
-    if (!origin || !dest) return res.status(404).json({ error: "Port not found" });
+    if (!origin || !dest) return res.status(404).json({ error: "Το λιμάνι δεν βρέθηκε" });
 
     const route = routeBetweenPorts(origin, dest);
     const dto: SeaRouteDTO = { from, to, coords: route.coords, distanceNm: route.lengthNm };

@@ -12,7 +12,7 @@ askRouter.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid request", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο αίτημα", details: errors.array() });
       }
       const question = req.body?.question as string;
       const rows = await buildCitableRows();

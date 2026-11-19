@@ -82,7 +82,7 @@ export class OpenAiProvider implements LlmProvider {
         {
           role: "system",
           content:
-            "You write a 2-3 sentence plain-English rationale for a ship operations recommendation " +
+            "You write a 2-3 sentence rationale in plain Greek (keep vessel and port names, kn, ETA, EU ETS in English) for a ship operations recommendation " +
             "(a speed adjustment, or, when a bunker block is present, whether a bunker detour is worth it), " +
             "given the facts and numbers already computed. Never invent numbers; " +
             "only restate the ones given.",
@@ -114,7 +114,7 @@ export class OpenAiProvider implements LlmProvider {
       "You answer questions about a maritime fleet using ONLY the rows provided. " +
       'Reply with ONLY a JSON object: {"answer":string,"citations":[{"table":string,"id":string}]}. ' +
       "Every citation must reference a table+id pair that appears in the provided rows. " +
-      "If you cannot answer from the rows, reply with answer \"I can't answer that from the data.\" and citations: [].";
+      "Write the answer in Greek. If you cannot answer from the rows, reply with answer \"Δεν μπορώ να απαντήσω από τα δεδομένα.\" and citations: [].";
 
     const raw = await this.completeJson(
       system,

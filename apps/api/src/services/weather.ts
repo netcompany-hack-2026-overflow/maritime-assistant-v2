@@ -76,10 +76,10 @@ export function summarise(samples: WeatherSample[], source: RouteWeather["source
     : 1;
   const current =
     Math.abs(headCurrentKn) < 0.05
-      ? "no net current"
-      : `${Math.abs(headCurrentKn).toFixed(1)} kn ${headCurrentKn > 0 ? "adverse" : "following"} current`;
+      ? "χωρίς καθαρό ρεύμα"
+      : `${Math.abs(headCurrentKn).toFixed(1)} kn ${headCurrentKn > 0 ? "αντίθετο" : "ευνοϊκό"} ρεύμα`;
   const waveText =
-    meanWaveM == null ? "waves unknown" : `waves ${meanWaveM.toFixed(1)} m mean / ${maxWaveM!.toFixed(1)} m max`;
+    meanWaveM == null ? "άγνωστο κύμα" : `κύμα ${meanWaveM.toFixed(1)} m μέσο / ${maxWaveM!.toFixed(1)} m μέγιστο`;
   return {
     headCurrentKn: Math.round(headCurrentKn * 100) / 100,
     seaStateFuelFactor: Math.round(seaStateFuelFactor * 1000) / 1000,

@@ -20,7 +20,7 @@ recommendationsRouter.get(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid query", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο ερώτημα", details: errors.array() });
       }
       const status = req.query?.status as "PENDING" | "APPROVED" | "REJECTED" | undefined;
       const recommendations = await prisma.recommendation.findMany({
@@ -41,13 +41,13 @@ recommendationsRouter.get(
   async (req, res, next) => {
     try {
       const id = req.params?.id;
-      if (!id) return res.status(400).json({ error: "Invalid request" });
+      if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
       const recommendation = await prisma.recommendation.findUnique({
         where: { id },
         include,
       });
       if (!recommendation) {
-        return res.status(404).json({ error: "Recommendation not found" });
+        return res.status(404).json({ error: "Η σύσταση δεν βρέθηκε" });
       }
       res.json(recommendation);
     } catch (err) {
@@ -64,10 +64,10 @@ recommendationsRouter.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid request", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο αίτημα", details: errors.array() });
       }
       const id = req.params?.id;
-      if (!id) return res.status(400).json({ error: "Invalid request" });
+      if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
       const result = await approveRecommendation(id, req.body?.scenarioId);
       res.json(result);
     } catch (err) {
@@ -83,9 +83,9 @@ recommendationsRouter.post(
   async (req, res, next) => {
     try {
       const id = req.params?.id;
-      if (!id) return res.status(400).json({ error: "Invalid request" });
+      if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
       const updated = await recomputeRecommendation(id);
-      if (!updated) return res.status(409).json({ error: "Only pending recommendations on an underway voyage can be refreshed" });
+      if (!updated) return res.status(409).json({ error: "Ανανέωση γίνεται μόνο σε συστάσεις σε αναμονή για ταξίδι σε εξέλιξη" });
       const full = await prisma.recommendation.findUnique({ where: { id }, include });
       res.json(full);
     } catch (err) {
@@ -100,7 +100,7 @@ recommendationsRouter.post(
   async (req, res, next) => {
     try {
       const id = req.params?.id;
-      if (!id) return res.status(400).json({ error: "Invalid request" });
+      if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
       const result = await undoApproval(id);
       res.json(result);
     } catch (err) {
@@ -117,10 +117,10 @@ recommendationsRouter.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid request", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο αίτημα", details: errors.array() });
       }
       const id = req.params?.id;
-      if (!id) return res.status(400).json({ error: "Invalid request" });
+      if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
       const result = await rejectRecommendation(id, req.body.reason);
       res.json(result);
     } catch (err) {

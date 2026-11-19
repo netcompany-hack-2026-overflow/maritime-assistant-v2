@@ -116,9 +116,9 @@ describe("assessOffer", () => {
 
   it("flags what it had to assume", () => {
     const r = assessOffer({ ...balanced, reliabilityKnown: false, reliabilityScore: 6, terms: terms({ bargingType: null, paymentDays: null }) }, A);
-    expect(r.flags.join(" ")).toMatch(/barging not stated/);
-    expect(r.flags.join(" ")).toMatch(/payment terms not stated/);
-    expect(r.flags.join(" ")).toMatch(/no history/);
+    expect(r.flags.join(" ")).toMatch(/το barging δεν αναφέρεται/);
+    expect(r.flags.join(" ")).toMatch(/οι όροι πληρωμής δεν αναφέρονται/);
+    expect(r.flags.join(" ")).toMatch(/χωρίς ιστορικό/);
   });
 
   it("an offer the time check stops gets no cost breakdown", () => {
@@ -133,9 +133,9 @@ describe("compareOffers + explainComparison", () => {
     expect(rows[0].offer.id).toBe("balanced");
     expect(rows.find((r) => r.offer.id === "trap")!.rank).toBe(3);
     const e = explainComparison(rows);
-    expect(e.headline).toMatch(/^Strait Bunkering Ltd \(Algeciras\) is \$5\.00\/t dearer on paper than Rock Marine Fuels \(Gibraltar\), but \$[\d,]+ cheaper overall/);
-    expect(e.reasons.join(" ")).toMatch(/barging included vs \$4,500 barging on top/);
-    expect(e.reasons.join(" ")).toMatch(/barge on arrival vs barge 12 h after arrival/);
+    expect(e.headline).toMatch(/^Η Strait Bunkering Ltd \(Algeciras\) είναι \$5\.00\/t ακριβότερη στο χαρτί από την Rock Marine Fuels \(Gibraltar\), αλλά \$[\d,]+ φθηνότερη συνολικά/);
+    expect(e.reasons.join(" ")).toMatch(/barging μέσα στην τιμή έναντι \$4,500 barging επιπλέον/);
+    expect(e.reasons.join(" ")).toMatch(/barge με την άφιξη έναντι barge 12 h μετά την άφιξη/);
   });
 
   it("a higher charter rate widens the gap to the slow-barge offer", () => {
@@ -157,13 +157,13 @@ describe("compareOffers + explainComparison", () => {
     const rows = compareOffers([stopped, balanced], A);
     expect(rows.map((r) => r.offer.id)).toEqual(["balanced", "stopped"]);
     const e = explainComparison(rows);
-    expect(e.headline).toMatch(/only offer that fits/);
-    expect(e.warnings[0]).toMatch(/not analysed further: the call needs/);
+    expect(e.headline).toMatch(/η μόνη προσφορά που χωράει/);
+    expect(e.warnings[0]).toMatch(/δεν αναλύθηκε περαιτέρω, η προσέγγιση χρειάζεται/);
   });
 
   it("says so when nothing fits", () => {
     const e = explainComparison(compareOffers([{ ...balanced, planInput: planInput({}, 0) }], A));
-    expect(e.headline).toBe("None of the 1 offers fits the ship's schedule.");
+    expect(e.headline).toBe("Καμία από τις 1 προσφορές δεν χωράει στο πρόγραμμα του πλοίου.");
   });
 });
 

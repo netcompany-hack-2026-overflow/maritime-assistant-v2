@@ -146,7 +146,7 @@ describe("one decision per ship", () => {
     for (const id of ["ceuta", "slowdown"]) {
       expect(rec(id)).toMatchObject({
         status: "REJECTED",
-        rejectReason: "Not taken: bunkering at Algeciras (Strait Bunkering Ltd) was approved for this ship",
+        rejectReason: "Δεν επιλέχθηκε: εγκρίθηκε ο ανεφοδιασμός στο Algeciras (Strait Bunkering Ltd) για αυτό το πλοίο",
       });
     }
     expect(rec("other-ship").status).toBe("PENDING");
@@ -157,7 +157,7 @@ describe("one decision per ship", () => {
     expect(draft("ceuta-ACCEPT").status).toBe("SUPERSEDED");
     expect(draft("ceuta-COUNTER").status).toBe("SUPERSEDED");
     expect(draft("ceuta-DECLINE").status).toBe("DRAFT");
-    await expect(sendDraft("ceuta-ACCEPT")).rejects.toThrow(/This offer is closed \(Not taken: bunkering at Algeciras/);
+    await expect(sendDraft("ceuta-ACCEPT")).rejects.toThrow(/Η προσφορά έκλεισε \(Δεν επιλέχθηκε: εγκρίθηκε ο ανεφοδιασμός στο Algeciras/);
     await sendDraft("ceuta-DECLINE");
     expect(db.sent).toHaveLength(1);
     expect(rec("ceuta").status).toBe("REJECTED");
@@ -184,7 +184,7 @@ describe("one decision per ship", () => {
   it("sending an acceptance email is the same decision: the others close, and undo reopens them", async () => {
     await sendDraft("ceuta-ACCEPT");
     expect(rec("ceuta").status).toBe("APPROVED");
-    expect(rec("algeciras").rejectReason).toBe("Not taken: bunkering at Ceuta (Ceuta Oil Trading) was approved for this ship");
+    expect(rec("algeciras").rejectReason).toBe("Δεν επιλέχθηκε: εγκρίθηκε ο ανεφοδιασμός στο Ceuta (Ceuta Oil Trading) για αυτό το πλοίο");
     expect(rec("slowdown").status).toBe("REJECTED");
     await undoApproval("ceuta");
     expect(rec("algeciras").status).toBe("PENDING");
@@ -203,7 +203,7 @@ describe("trying to approve a closed option", () => {
   it("says which option was chosen and how to change it", async () => {
     await approveRecommendation("algeciras");
     await expect(approveRecommendation("ceuta")).rejects.toThrow(
-      "Not taken: bunkering at Algeciras (Strait Bunkering Ltd) was approved for this ship. Undo that approval to choose this option instead."
+      "Δεν επιλέχθηκε: εγκρίθηκε ο ανεφοδιασμός στο Algeciras (Strait Bunkering Ltd) για αυτό το πλοίο. Αναιρέστε εκείνη την έγκριση για να επιλέξετε αυτή."
     );
   });
 });

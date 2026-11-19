@@ -216,8 +216,8 @@ export function buildScenarios(input: ScenarioInput): ScenarioSet {
     toScenario(
       input,
       "A",
-      "Baseline",
-      `Keep ${currentSpeedKn.toFixed(1)} kn on the planned route, then wait at anchor for the berth.`,
+      "Βάση",
+      `Ίδια ταχύτητα ${currentSpeedKn.toFixed(1)} kn στην προγραμματισμένη διαδρομή, μετά αναμονή στην άγκυρα για τη θέση.`,
       baseRoute,
       legA,
       false
@@ -232,7 +232,7 @@ export function buildScenarios(input: ScenarioInput): ScenarioSet {
       input,
       "B",
       "Just-in-time",
-      `Slow to ${vB.toFixed(1)} kn on the planned route to arrive when the berth is ready.`,
+      `Μείωση στα ${vB.toFixed(1)} kn στην προγραμματισμένη διαδρομή, για άφιξη όταν η θέση είναι έτοιμη.`,
       baseRoute,
       sailLeg(input, baseRoute, vB),
       vB !== rawB
@@ -248,8 +248,8 @@ export function buildScenarios(input: ScenarioInput): ScenarioSet {
       toScenario(
         input,
         "C",
-        "Weather route",
-        `Re-route ${altRoute.via ?? "around the weather"} and sail ${vC.toFixed(1)} kn to make the berth time.`,
+        "Διαδρομή καιρού",
+        `Αλλαγή διαδρομής ${altRoute.via ?? "γύρω από τον καιρό"} με ${vC.toFixed(1)} kn για να προλάβει την ώρα πρόσδεσης.`,
         altRoute,
         sailLeg(input, altRoute, vC),
         vC !== rawC

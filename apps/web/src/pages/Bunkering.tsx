@@ -18,6 +18,7 @@ import {
   type Urgency,
 } from "@maritime/shared";
 import { api, type MetaResponse } from "../lib/api.js";
+import { NOT_TAKEN_PREFIX } from "../lib/labels.js";
 import { RouteSketch } from "../components/RouteSketch.js";
 import { EmailDraftEditor } from "../components/EmailDraftEditor.js";
 import "./Bunkering.css";
@@ -39,36 +40,38 @@ function useNow(): number {
 function countdown(until: string | null, now: number): { text: string; level: "ok" | "soon" | "lapsed" } | null {
   if (!until) return null;
   const ms = new Date(until).getTime() - now;
-  if (ms <= 0) return { text: "lapsed: ask for a re-quote", level: "lapsed" };
+  if (ms <= 0) return { text: "έληξε: ζητήστε νέα τιμή", level: "lapsed" };
   const total = Math.floor(ms / 1000);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
-  const text = h > 0 ? `${h} h ${String(m).padStart(2, "0")} min left` : `${m}:${String(s).padStart(2, "0")} left`;
+  const text = h > 0 ? `απομένουν ${h} h ${String(m).padStart(2, "0")} min` : `απομένουν ${m}:${String(s).padStart(2, "0")}`;
   // Short-fuse quotes ("firm 10 mins") warn from the moment they arrive.
   return { text, level: ms < 15 * 60_000 ? "soon" : "ok" };
 }
 
 function bargingText(o: BunkerOfferDTO): string {
   const t = o.terms;
-  if (t.bargingType === "LUMP_SUM") return `${usd(t.bargingUsd ?? 0)} lump sum`;
+  if (t.bargingType === "LUMP_SUM") return `${usd(t.bargingUsd ?? 0)} εφάπαξ`;
   if (t.bargingType === "PER_MT") return `$${t.bargingUsd}/t`;
-  if (t.bargingType === "INCLUDED") return "included";
-  return "not stated";
+  if (t.bargingType === "INCLUDED") return "περιλαμβάνεται";
+  return "δεν αναφέρεται";
 }
 
 const WAYPOINT_LABEL: Record<BunkerWaypoint["kind"], (port: string, dest: string) => string> = {
-  SHIP: () => "Ship now",
-  TURN_OFF: () => "Leave the planned route",
-  BUNKER_ARRIVE: (port) => `Arrive ${port}`,
-  BUNKER_DEPART: (port) => `Leave ${port}`,
-  REJOIN: () => "Back on the planned route",
-  DESTINATION: (_, dest) => `Arrive ${dest}`,
+  SHIP: () => "Πλοίο τώρα",
+  TURN_OFF: () => "Έξοδος από την προγραμματισμένη διαδρομή",
+  BUNKER_ARRIVE: (port) => `Άφιξη ${port}`,
+  BUNKER_DEPART: (port) => `Αναχώρηση ${port}`,
+  REJOIN: () => "Επιστροφή στην προγραμματισμένη διαδρομή",
+  DESTINATION: (_, dest) => `Άφιξη ${dest}`,
 };
 
+const URGENCY_LABEL: Record<Urgency, string> = { LOW: "Χαμηλό", NORMAL: "Κανονικό", HIGH: "Υψηλό" };
+
 const OPTION_TITLE: Record<BunkerOption["key"], string> = {
-  ECO: "Bunker, then slow down to arrive just in time",
-  KEEP_SPEED: "Bunker and keep the current speed (time in hand)",
+  ECO: "Ανεφοδιασμός και μετά μείωση ταχύτητας για άφιξη ακριβώς στην ώρα",
+  KEEP_SPEED: "Ανεφοδιασμός με την ίδια ταχύτητα (με περιθώριο χρόνου)",
 };
 
 function OptionCard({ option, offer, chosen }: { option: BunkerOption; offer: BunkerOfferDTO; chosen: boolean }) {
@@ -76,33 +79,33 @@ function OptionCard({ option, offer, chosen }: { option: BunkerOption; offer: Bu
   const stop = c.portHours + (c.delayHours ?? 0);
   const speedText =
     c.speedAfterBunkerKn !== undefined && Math.abs(c.speedAfterBunkerKn - c.speedBunkerKn) >= 0.05
-      ? `${c.speedBunkerKn.toFixed(1)} kn to ${offer.port.name}, then ${c.speedAfterBunkerKn.toFixed(1)} kn`
+      ? `${c.speedBunkerKn.toFixed(1)} kn ως ${offer.port.name}, μετά ${c.speedAfterBunkerKn.toFixed(1)} kn`
       : `${c.speedBunkerKn.toFixed(1)} kn`;
   return (
     <div className={chosen ? "option-card option-card--chosen" : "option-card"}>
       <div className="option-card__head">
         <p className="option-card__title">{OPTION_TITLE[option.key]}</p>
-        {chosen && <span className="chip chip--ok">chosen</span>}
+        {chosen && <span className="chip chip--ok">επιλέχθηκε</span>}
         <span className={c.verdict === "WORTH_IT" ? "chip chip--ok" : "chip chip--no"}>
-          {c.verdict === "WORTH_IT" ? "pays off" : "doesn't pay off"}
+          {c.verdict === "WORTH_IT" ? "συμφέρει" : "δεν συμφέρει"}
         </span>
       </div>
       <dl className="option-card__facts">
-        <div><dt>Proposed speed</dt><dd>{speedText} <span className="muted">(now {c.v0.toFixed(1)} kn)</span></dd></div>
-        <div><dt>Detour</dt><dd>{c.detourNm.toFixed(0)} nm out and back</dd></div>
-        <div><dt>Time at {offer.port.name}</dt><dd>{stop.toFixed(1)} h{c.delayHours ? ` (incl. ${c.delayHours.toFixed(1)} h barge wait)` : ""}</dd></div>
-        <div><dt>Stem</dt><dd>{c.qtyT.toLocaleString("en-US")} t at ${c.priceUsdPerT}/t</dd></div>
-        <div><dt>Extra fuel vs. not bunkering</dt><dd>{c.extraFuelT.toFixed(1)} t ({c.extraCo2T.toFixed(1)} t CO₂)</dd></div>
-        <div><dt>Time in hand at the berth</dt><dd>{c.waitHoursBunker.toFixed(1)} h{c.lateHours > 0 ? `, ${Math.round(c.lateHours * 60)} min late (within tolerance)` : ""}</dd></div>
-        <div className="option-card__net"><dt>Net vs. our €{c.refPriceEurPerT}/t fuel</dt><dd>{eur(c.netEur)}</dd></div>
+        <div><dt>Προτεινόμενη ταχύτητα</dt><dd>{speedText} <span className="muted">(τώρα {c.v0.toFixed(1)} kn)</span></dd></div>
+        <div><dt>Παράκαμψη</dt><dd>{c.detourNm.toFixed(0)} nm πήγαινε-έλα</dd></div>
+        <div><dt>Χρόνος στο {offer.port.name}</dt><dd>{stop.toFixed(1)} h{c.delayHours ? ` (μαζί με ${c.delayHours.toFixed(1)} h αναμονή barge)` : ""}</dd></div>
+        <div><dt>Ποσότητα</dt><dd>{c.qtyT.toLocaleString("en-US")} t στα ${c.priceUsdPerT}/t</dd></div>
+        <div><dt>Επιπλέον καύσιμο σε σχέση με χωρίς ανεφοδιασμό</dt><dd>{c.extraFuelT.toFixed(1)} t ({c.extraCo2T.toFixed(1)} t CO₂)</dd></div>
+        <div><dt>Περιθώριο στην πρόσδεση</dt><dd>{c.waitHoursBunker.toFixed(1)} h{c.lateHours > 0 ? `, ${Math.round(c.lateHours * 60)} min καθυστέρηση (εντός ανοχής)` : ""}</dd></div>
+        <div className="option-card__net"><dt>Καθαρό έναντι της δικής μας τιμής €{c.refPriceEurPerT}/t</dt><dd>{eur(c.netEur)}</dd></div>
         {option.breakEvenUsdPerT !== null && (
-          <div><dt>Breaks even at</dt><dd>${option.breakEvenUsdPerT.toFixed(2)}/t</dd></div>
+          <div><dt>Νεκρό σημείο στα</dt><dd>${option.breakEvenUsdPerT.toFixed(2)}/t</dd></div>
         )}
       </dl>
       <table className="waypoints">
-        <caption className="visually-hidden">Reshaped route</caption>
+        <caption className="visually-hidden">Νέα διαδρομή</caption>
         <thead>
-          <tr><th scope="col">Route</th><th scope="col">Time (UTC)</th><th scope="col">Speed</th></tr>
+          <tr><th scope="col">Διαδρομή</th><th scope="col">Ώρα (UTC)</th><th scope="col">Ταχύτητα</th></tr>
         </thead>
         <tbody>
           {option.waypoints.map((w) => (
@@ -208,7 +211,7 @@ export function Bunkering() {
       const res = await api.simulateBunkerQuotes();
       await refresh();
       const matched = res.filter((r) => r.matchedVoyageId);
-      setNotice(`${res.length} supplier quotes arrived and were analysed${matched.length < res.length ? ` (${res.length - matched.length} matched no ship underway)` : ""}.`);
+      setNotice(`Ήρθαν και αναλύθηκαν ${res.length} προσφορές προμηθευτών${matched.length < res.length ? ` (${res.length - matched.length} δεν αντιστοιχούν σε πλοίο εν πλω)` : ""}.`);
       if (matched[0]?.matchedVoyageId) setVoyageId(matched[0].matchedVoyageId);
       setSelectedId(null);
     } catch (e) {
@@ -240,7 +243,7 @@ export function Bunkering() {
   if (loading) {
     return (
       <div className="page page--bunkering">
-        <div className="loading-state" role="status">Loading offers…</div>
+        <div className="loading-state" role="status">Φόρτωση προσφορών…</div>
       </div>
     );
   }
@@ -253,13 +256,13 @@ export function Bunkering() {
     <div className="page page--bunkering">
       <div className="bunkering-head">
         <div>
-          <p className="label">Bunkering</p>
-          <h2 className="bunkering-head__title">Supplier offers, compared on total cost</h2>
+          <p className="label">Ανεφοδιασμός</p>
+          <h2 className="bunkering-head__title">Προσφορές προμηθευτών, σε σύγκριση συνολικού κόστους</h2>
         </div>
         <div className="bunkering-head__actions">
           {voyages.length > 1 && (
             <label className="bunkering-head__select">
-              <span className="visually-hidden">Ship</span>
+              <span className="visually-hidden">Πλοίο</span>
               <select value={voyageId ?? ""} onChange={(e) => { setVoyageId(e.target.value); setSelectedId(null); setCharter(null); }}>
                 {voyages.map((v) => (
                   <option key={v.id} value={v.id}>{v.vesselName} · {v.originPortName} → {v.destPortName}</option>
@@ -268,14 +271,14 @@ export function Bunkering() {
             </label>
           )}
           <button className="btn btn-primary" onClick={handleSimulate} disabled={simulating}>
-            {simulating ? "Reading quotes…" : "Simulate supplier quotes"}
+            {simulating ? "Ανάγνωση προσφορών…" : "Προσομοίωση προσφορών προμηθευτών"}
           </button>
         </div>
       </div>
       <p className={provider?.configured ? "provider provider--ok" : "provider"}>
         {provider?.configured
-          ? `Replies are sent from ${provider.from}${provider.redirectTo ? `, redirected to ${provider.redirectTo} for testing` : ""}.`
-          : "Email provider not set up: replies can be read, edited and copied, but not sent. Fill in the SMTP_* and MAIL_FROM settings in .env."}
+          ? `Οι απαντήσεις στέλνονται από ${provider.from}${provider.redirectTo ? `, με ανακατεύθυνση στο ${provider.redirectTo} για δοκιμή` : ""}.`
+          : "Ο email provider δεν έχει ρυθμιστεί: οι απαντήσεις διαβάζονται, διορθώνονται και αντιγράφονται, αλλά δεν στέλνονται. Συμπληρώστε τα SMTP_* και MAIL_FROM στο .env."}
       </p>
 
       {error && <div className="error-state" role="alert">{error}</div>}
@@ -283,13 +286,13 @@ export function Bunkering() {
 
       {voyageOffers.length === 0 ? (
         <div className="empty-state">
-          <p>No fuel offers yet.</p>
+          <p>Δεν υπάρχουν ακόμα προσφορές καυσίμου.</p>
           <p className="muted">
-            "Simulate supplier quotes" drops four quotes for MV Aegean Star into the inbox and analyses them. Process the
-            Rotterdam berth delay in the Inbox first: without that slack the ship can't stop to bunker, and every offer
-            stops at the time check.
+            Η «Προσομοίωση προσφορών προμηθευτών» φέρνει τέσσερις προσφορές για το MV Aegean Star και τις αναλύει. Επεξεργαστείτε
+            πρώτα την καθυστέρηση στο Ρότερνταμ στα Εισερχόμενα: χωρίς αυτό το περιθώριο το πλοίο δεν προλαβαίνει να ανεφοδιαστεί
+            και κάθε προσφορά σταματά στον έλεγχο χρόνου.
           </p>
-          <button className="btn btn-primary" onClick={handleSimulate} disabled={simulating}>Simulate supplier quotes</button>
+          <button className="btn btn-primary" onClick={handleSimulate} disabled={simulating}>Προσομοίωση προσφορών προμηθευτών</button>
         </div>
       ) : (
         <>
@@ -298,7 +301,7 @@ export function Bunkering() {
               <AlertTriangle size={16} aria-hidden="true" />
               {urgentQuotes.map(({ o, c }) => (
                 <span key={o.recommendationId}>
-                  {o.supplier.name} ({o.port.name}): price firm {c!.text}.
+                  {o.supplier.name} ({o.port.name}): η τιμή ισχύει, {c!.text}.
                 </span>
               ))}
             </div>
@@ -306,31 +309,31 @@ export function Bunkering() {
 
           <div className="bunkering-grid">
             <section className="whatif" aria-labelledby="whatif-title">
-              <p className="label" id="whatif-title">What if</p>
+              <p className="label" id="whatif-title">Τι θα γινόταν αν</p>
               <label className="whatif__field">
-                <span>Charter rate <strong>{usd(assumptions.charterUsdPerDay)}/day</strong></span>
+                <span>Ναύλος (charter rate) <strong>{usd(assumptions.charterUsdPerDay)}/ημέρα</strong></span>
                 <input type="range" min={5000} max={60000} step={500} value={assumptions.charterUsdPerDay} onChange={(e) => setCharter(Number(e.target.value))} />
               </label>
               <label className="whatif__field">
-                <span>Stem <strong>{assumptions.stemQtyT.toLocaleString("en-US")} t</strong></span>
+                <span>Ποσότητα <strong>{assumptions.stemQtyT.toLocaleString("en-US")} t</strong></span>
                 <input type="range" min={300} max={1500} step={50} value={assumptions.stemQtyT} onChange={(e) => setStemQty(Number(e.target.value))} />
               </label>
               <fieldset className="whatif__field whatif__urgency">
-                <legend>Urgency (how much a delay hour costs)</legend>
+                <legend>Επείγον (πόσο κοστίζει μια ώρα καθυστέρησης)</legend>
                 {(["LOW", "NORMAL", "HIGH"] as Urgency[]).map((u) => (
                   <label key={u} className={urgency === u ? "seg seg--active" : "seg"}>
                     <input type="radio" name="urgency" value={u} checked={urgency === u} onChange={() => setUrgency(u)} />
-                    {u.charAt(0) + u.slice(1).toLowerCase()}
+                    {URGENCY_LABEL[u]}
                   </label>
                 ))}
               </fieldset>
               <label className="whatif__check">
                 <input type="checkbox" checked={etsEnabled} onChange={(e) => setEtsEnabled(e.target.checked)} />
-                Count EU ETS on the detour's extra CO₂
+                EU ETS στο επιπλέον CO₂ της παράκαμψης
               </label>
               {etsEnabled && (
                 <label className="whatif__field">
-                  <span>EUA price <strong>€{etsPrice}/t CO₂</strong></span>
+                  <span>Τιμή EUA <strong>€{etsPrice}/t CO₂</strong></span>
                   <input type="range" min={20} max={150} step={1} value={etsPrice} onChange={(e) => setEtsPrice(Number(e.target.value))} />
                 </label>
               )}
@@ -338,7 +341,7 @@ export function Bunkering() {
                 className="btn whatif__reset"
                 onClick={() => { setCharter(null); setStemQty(null); setUrgency(DEFAULT_TCO.urgency); setEtsEnabled(DEFAULT_TCO.etsEnabled); setEtsPrice(null); }}
               >
-                Reset
+                Επαναφορά
               </button>
               <p className="whatif__help">
                 Credit is valued at {DEFAULT_TCO.financeRatePct}%/yr against {DEFAULT_TCO.standardPaymentDays} days; each reliability
@@ -347,7 +350,7 @@ export function Bunkering() {
             </section>
 
             <section className="advice" aria-labelledby="advice-title">
-              <p className="label" id="advice-title">Recommendation</p>
+              <p className="label" id="advice-title">Σύσταση</p>
               <p className="advice__headline">{explanation.headline}</p>
               {explanation.reasons.length > 0 && (
                 <ul className="advice__reasons">
@@ -356,14 +359,14 @@ export function Bunkering() {
               )}
               {explanation.warnings.map((w) => <p key={w} className="advice__warning">{w}</p>)}
               {legacy.length > 0 && (
-                <p className="advice__warning">{legacy.length} older offer(s) were processed before the comparison existed and aren't in it.</p>
+                <p className="advice__warning">{legacy.length} παλαιότερες προσφορές επεξεργάστηκαν πριν υπάρξει η σύγκριση και δεν περιλαμβάνονται.</p>
               )}
               <div className="advice__ai">
                 <button className="btn" onClick={handleAskAi} disabled={ai.busy || rows.length === 0}>
                   <Sparkles size={14} aria-hidden="true" />
-                  {ai.busy ? "Asking…" : `Ask the AI (${meta?.llmProvider ?? "…"})`}
+                  {ai.busy ? "Ερώτηση…" : `Ρωτήστε το AI (${meta?.llmProvider ?? "…"})`}
                 </button>
-                <span className="muted">One model call with these numbers; the text above needs none.</span>
+                <span className="muted">Μία κλήση στο μοντέλο με αυτά τα νούμερα· το κείμενο πάνω δεν χρειάζεται καμία.</span>
               </div>
               {ai.text && <p className="advice__ai-text">{ai.text}</p>}
               {ai.error && <div className="error-state" role="alert">{ai.error}</div>}
@@ -372,19 +375,19 @@ export function Bunkering() {
 
           {rows.length > 0 && (
             <section aria-labelledby="compare-title">
-              <p className="label" id="compare-title">Side by side</p>
+              <p className="label" id="compare-title">Δίπλα-δίπλα</p>
               <div className="table-scroll">
                 <table className="compare">
                   <thead>
                     <tr>
-                      <th scope="col"><span className="visually-hidden">Item</span></th>
+                      <th scope="col"><span className="visually-hidden">Στοιχείο</span></th>
                       {rows.map((r) => {
                         const o = byId.get(r.offer.id)!;
                         const isSel = o.recommendationId === selected?.recommendationId;
                         return (
                           <th key={r.offer.id} scope="col" className={r.rank === 1 && r.feasible ? "compare__best" : undefined}>
                             <button className={isSel ? "compare__pick compare__pick--active" : "compare__pick"} onClick={() => selectOffer(o.recommendationId)} aria-pressed={isSel}>
-                              <span className="compare__rank">#{r.rank}{r.rank === 1 && r.feasible ? " best" : ""}</span>
+                              <span className="compare__rank">#{r.rank}{r.rank === 1 && r.feasible ? " καλύτερη" : ""}</span>
                               <span>{o.supplier.name}</span>
                               <span className="muted">{o.port.name}</span>
                             </button>
@@ -394,9 +397,9 @@ export function Bunkering() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><th scope="row">Reliability</th>{rows.map((r) => <td key={r.offer.id}>{r.offer.reliabilityScore}/10{r.offer.reliabilityKnown ? "" : " (assumed)"}</td>)}</tr>
+                    <tr><th scope="row">Αξιοπιστία</th>{rows.map((r) => <td key={r.offer.id}>{r.offer.reliabilityScore}/10{r.offer.reliabilityKnown ? "" : " (εκτίμηση)"}</td>)}</tr>
                     <tr>
-                      <th scope="row">Price firm</th>
+                      <th scope="row">Ισχύς τιμής</th>
                       {rows.map((r) => {
                         const c = countdown(r.offer.terms.quoteFirmUntil, now);
                         return (
@@ -406,33 +409,33 @@ export function Bunkering() {
                         );
                       })}
                     </tr>
-                    <tr><th scope="row">Price on paper</th>{rows.map((r) => <td key={r.offer.id}>{perT(r.offer.planInput.offer.priceUsdPerT)}/t</td>)}</tr>
+                    <tr><th scope="row">Τιμή στο χαρτί</th>{rows.map((r) => <td key={r.offer.id}>{perT(r.offer.planInput.offer.priceUsdPerT)}/t</td>)}</tr>
                     <tr><th scope="row">Barging</th>{rows.map((r) => <td key={r.offer.id}>{bargingText(byId.get(r.offer.id)!)}</td>)}</tr>
-                    <tr><th scope="row">Payment</th>{rows.map((r) => <td key={r.offer.id}>{r.offer.terms.paymentDays === null ? "not stated" : r.offer.terms.paymentDays === 0 ? "cash in advance" : `${r.offer.terms.paymentDays} days`}</td>)}</tr>
-                    <tr><th scope="row">Barge</th>{rows.map((r) => <td key={r.offer.id}>{r.screen.delayHours > 0 ? `${r.screen.delayHours} h after arrival` : "on arrival"}</td>)}</tr>
-                    <tr><th scope="row">Stem</th>{rows.map((r) => <td key={r.offer.id}>{r.qtyT.toLocaleString("en-US")} t</td>)}</tr>
+                    <tr><th scope="row">Πληρωμή</th>{rows.map((r) => <td key={r.offer.id}>{r.offer.terms.paymentDays === null ? "δεν αναφέρεται" : r.offer.terms.paymentDays === 0 ? "προπληρωμή" : `${r.offer.terms.paymentDays} μέρες`}</td>)}</tr>
+                    <tr><th scope="row">Barge</th>{rows.map((r) => <td key={r.offer.id}>{r.screen.delayHours > 0 ? `${r.screen.delayHours} h μετά την άφιξη` : "με την άφιξη"}</td>)}</tr>
+                    <tr><th scope="row">Ποσότητα</th>{rows.map((r) => <td key={r.offer.id}>{r.qtyT.toLocaleString("en-US")} t</td>)}</tr>
                     {breakdownKeys.map((k) => (
                       (k !== "etsUsd" || etsEnabled) && (
                         <tr key={k} className="compare__cost"><th scope="row">{TCO_LABELS[k]}</th>{rows.map((r) => <td key={r.offer.id}>{cell(r, k)}</td>)}</tr>
                       )
                     ))}
-                    <tr className="compare__total"><th scope="row">Total</th>{rows.map((r) => <td key={r.offer.id}>{r.totalUsd === null ? "—" : usd(r.totalUsd)}</td>)}</tr>
-                    <tr className="compare__total"><th scope="row">All-in per tonne</th>{rows.map((r) => <td key={r.offer.id}>{r.effectiveUsdPerT === null ? "—" : `${perT(r.effectiveUsdPerT)}/t`}</td>)}</tr>
+                    <tr className="compare__total"><th scope="row">Σύνολο</th>{rows.map((r) => <td key={r.offer.id}>{r.totalUsd === null ? "—" : usd(r.totalUsd)}</td>)}</tr>
+                    <tr className="compare__total"><th scope="row">Συνολικό κόστος ανά τόνο</th>{rows.map((r) => <td key={r.offer.id}>{r.effectiveUsdPerT === null ? "—" : `${perT(r.effectiveUsdPerT)}/t`}</td>)}</tr>
                     <tr>
-                      <th scope="row">Status</th>
+                      <th scope="row">Κατάσταση</th>
                       {rows.map((r) => {
                         const o = byId.get(r.offer.id)!;
                         return (
                           <td key={r.offer.id}>
                             {o.status === "APPROVED"
-                              ? "Accepted"
+                              ? "Έγινε αποδοχή"
                               : o.status === "REJECTED"
-                                ? o.rejectReason?.startsWith("Not taken") ? "Not taken (another option chosen)" : "Declined"
+                                ? o.rejectReason?.startsWith(NOT_TAKEN_PREFIX) ? "Δεν επιλέχθηκε (προτιμήθηκε άλλη)" : "Απορρίφθηκε"
                                 : !r.screen.passed
-                              ? `Not analysed: needs ${r.screen.neededHours.toFixed(1)} h, has ${Math.max(0, r.screen.slackHours).toFixed(1)} h`
+                              ? `Δεν αναλύθηκε: χρειάζεται ${r.screen.neededHours.toFixed(1)} h, υπάρχουν ${Math.max(0, r.screen.slackHours).toFixed(1)} h`
                                 : r.feasible
-                                  ? "Fits the schedule"
-                                  : "Misses berth or expiry"}
+                                  ? "Χωράει στο πρόγραμμα"
+                                  : "Χάνει την πρόσδεση ή τη λήξη"}
                             {r.flags.length > 0 && <span className="compare__flags">{r.flags.join("; ")}</span>}
                           </td>
                         );
@@ -443,9 +446,9 @@ export function Bunkering() {
               </div>
               {accepted && (
                 <p className="bunkering-notice">
-                  {accepted.supplier.name} ({accepted.port.name}) was accepted. One decision per ship: the other options for{" "}
-                  {accepted.voyage.vesselName} are closed, but you can still send them a polite decline. Undo the approval on
-                  Actions to choose again.
+                  Έγινε αποδοχή της {accepted.supplier.name} ({accepted.port.name}). Μία απόφαση ανά πλοίο: οι άλλες επιλογές για το{" "}
+                  {accepted.voyage.vesselName} έκλεισαν, αλλά μπορείτε ακόμα να τους στείλετε μια ευγενική άρνηση. Αναιρέστε την
+                  έγκριση στις Ενέργειες για να επιλέξετε ξανά.
                 </p>
               )}
             </section>
@@ -454,14 +457,14 @@ export function Bunkering() {
           {selected && (
             <section className="offer-detail" aria-labelledby="detail-title">
               <p className="label" id="detail-title">
-                {selected.supplier.name} · {selected.fuelGrade ?? "fuel"} at {selected.port.name} · {selected.voyage.vesselName}
+                {selected.supplier.name} · {selected.fuelGrade ?? "καύσιμο"} στο {selected.port.name} · {selected.voyage.vesselName}
               </p>
               <p className="offer-detail__rationale">{selected.rationale}</p>
               {selected.terms.lines.length > 1 && (
                 <p className="muted">
-                  Also quoted:{" "}
-                  {selected.terms.lines.slice(1).map((l) => `${l.fuelGrade} ${l.qtyMinT ?? "?"}–${l.qtyMaxT ?? "?"} t at $${l.priceUsdPerT}/t`).join(", ")}{" "}
-                  (compared on {selected.terms.lines[0].fuelGrade} only).
+                  Προσφέρεται επίσης:{" "}
+                  {selected.terms.lines.slice(1).map((l) => `${l.fuelGrade} ${l.qtyMinT ?? "?"}–${l.qtyMaxT ?? "?"} t στα $${l.priceUsdPerT}/t`).join(", ")}{" "}
+                  (η σύγκριση γίνεται μόνο στο {selected.terms.lines[0].fuelGrade}).
                 </p>
               )}
 
@@ -469,16 +472,16 @@ export function Bunkering() {
                 <div className="offer-detail__route">
                   <RouteSketch plan={selected.plan} portName={selected.port.name} />
                   <div className="offer-detail__screen">
-                    <p className="label">Time check</p>
+                    <p className="label">Έλεγχος χρόνου</p>
                     <p>
-                      Needs {selected.plan.screen.neededHours.toFixed(1)} h ({selected.plan.screen.bunkeringHours.toFixed(1)} h alongside
-                      {selected.plan.screen.delayHours > 0 ? ` + ${selected.plan.screen.delayHours.toFixed(1)} h barge wait` : ""} +{" "}
-                      {selected.plan.screen.detourHours.toFixed(1)} h detour) against {Math.max(0, selected.plan.screen.slackHours).toFixed(1)} h
-                      the ship has to spare before its {selected.voyage.destPortName} berth (+{Math.round(selected.plan.screen.toleranceHours * 60)} min
-                      tolerance): {selected.plan.screen.passed ? "analysed." : "stopped here, no further analysis."}
+                      Χρειάζεται {selected.plan.screen.neededHours.toFixed(1)} h ({selected.plan.screen.bunkeringHours.toFixed(1)} h ανεφοδιασμός
+                      {selected.plan.screen.delayHours > 0 ? ` + ${selected.plan.screen.delayHours.toFixed(1)} h αναμονή barge` : ""} +{" "}
+                      {selected.plan.screen.detourHours.toFixed(1)} h παράκαμψη) έναντι {Math.max(0, selected.plan.screen.slackHours).toFixed(1)} h
+                      περιθωρίου του πλοίου ως την πρόσδεση στο {selected.voyage.destPortName} (+{Math.round(selected.plan.screen.toleranceHours * 60)} min
+                      ανοχή): {selected.plan.screen.passed ? "αναλύθηκε." : "σταμάτησε εδώ, χωρίς περαιτέρω ανάλυση."}
                     </p>
-                    {selected.plan.input.delays.map((d) => <p key={d.note} className="muted">Delay: {d.note}</p>)}
-                    <p className="muted">Ship position at analysis: {selected.plan.input.shipPosition.lat.toFixed(2)}°, {selected.plan.input.shipPosition.lon.toFixed(2)}° · {selected.plan.input.offRouteNm.toFixed(1)} nm off the route.</p>
+                    {selected.plan.input.delays.map((d) => <p key={d.note} className="muted">Καθυστέρηση: {d.note}</p>)}
+                    <p className="muted">Θέση πλοίου κατά την ανάλυση: {selected.plan.input.shipPosition.lat.toFixed(2)}°, {selected.plan.input.shipPosition.lon.toFixed(2)}° · {selected.plan.input.offRouteNm.toFixed(1)} nm από τη διαδρομή.</p>
                   </div>
                 </div>
               )}
@@ -491,15 +494,15 @@ export function Bunkering() {
                 </div>
               )}
               {assumptions.stemQtyT !== defaultStem && (
-                <p className="muted">The options and replies below are for the {defaultStem.toLocaleString("en-US")} t stem the offer was analysed with; the table above uses your what-if stem.</p>
+                <p className="muted">Οι επιλογές και οι απαντήσεις παρακάτω είναι για τους {defaultStem.toLocaleString("en-US")} t με τους οποίους αναλύθηκε η προσφορά· ο πίνακας πάνω χρησιμοποιεί την ποσότητα του «τι θα γινόταν αν».</p>
               )}
 
-              <p className="label offer-detail__drafts-label">Replies to {selected.email.fromAddr}</p>
+              <p className="label offer-detail__drafts-label">Απαντήσεις προς {selected.email.fromAddr}</p>
               <EmailDraftEditor
                 drafts={selected.drafts}
                 provider={provider}
                 onChanged={refresh}
-                closedBecause={selected.rejectReason?.startsWith("Not taken") ? selected.rejectReason : null}
+                closedBecause={selected.rejectReason?.startsWith(NOT_TAKEN_PREFIX) ? selected.rejectReason : null}
               />
             </section>
           )}

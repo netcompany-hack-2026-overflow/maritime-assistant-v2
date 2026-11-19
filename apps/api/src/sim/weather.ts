@@ -20,10 +20,10 @@ function hash(text: string): number {
 }
 
 const SEA_STATES = [
-  { factor: 1.0, name: "calm sea" },
-  { factor: 1.03, name: "slight sea" },
-  { factor: 1.06, name: "moderate sea" },
-  { factor: 1.1, name: "rough sea" },
+  { factor: 1.0, name: "ήρεμη θάλασσα" },
+  { factor: 1.03, name: "λίγο κύμα" },
+  { factor: 1.06, name: "μέτριο κύμα" },
+  { factor: 1.1, name: "θαλασσοταραχή" },
 ];
 
 export function mockWeatherFor(destUnlocode: string, at: Date): MockWeather {
@@ -34,10 +34,10 @@ export function mockWeatherFor(destUnlocode: string, at: Date): MockWeather {
   const sea = SEA_STATES[(h >>> 8) % SEA_STATES.length];
   const currentText =
     headCurrentKn > 0
-      ? `${headCurrentKn.toFixed(1)} kn adverse current`
+      ? `${headCurrentKn.toFixed(1)} kn αντίθετο ρεύμα`
       : headCurrentKn < 0
-        ? `${Math.abs(headCurrentKn).toFixed(1)} kn following current`
-        : "no current";
+        ? `${Math.abs(headCurrentKn).toFixed(1)} kn ευνοϊκό ρεύμα`
+        : "χωρίς ρεύμα";
   return {
     headCurrentKn,
     seaStateFuelFactor: sea.factor,

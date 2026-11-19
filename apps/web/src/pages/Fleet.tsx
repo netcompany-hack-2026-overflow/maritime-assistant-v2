@@ -4,6 +4,7 @@ import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { FleetGlobe } from "../components/FleetGlobe.js";
 import { VesselDrawer } from "../components/VesselDrawer.js";
 import { SavingsTile } from "../components/SavingsTile.js";
+import { STATUS_LABEL } from "../lib/labels.js";
 import "./Fleet.css";
 
 const POLL_INTERVAL_MS = 2000;
@@ -70,10 +71,10 @@ export function Fleet() {
   return (
     <div className="page page--fleet">
       <div className="fleet-layout">
-        <div className="fleet-layout__globe" role="region" aria-label="Live fleet globe. Use the ship list to select a vessel with the keyboard.">
+        <div className="fleet-layout__globe" role="region" aria-label="Ζωντανή υδρόγειος του στόλου. Με το πληκτρολόγιο επιλέξτε πλοίο από τη λίστα.">
           <div className="fleet-layout__canvas">
           {loading ? (
-            <div className="loading-state" role="status">Loading fleet…</div>
+            <div className="loading-state" role="status">Φόρτωση στόλου…</div>
           ) : error ? (
             <div className="error-state" role="alert">{error}</div>
           ) : (
@@ -100,9 +101,9 @@ export function Fleet() {
           )}
         </div>
         <div className="fleet-layout__list">
-          <h2 className="label">Ships</h2>
+          <h2 className="label">Πλοία</h2>
           {vessels.length === 0 ? (
-            <div className="empty-state">No vessels yet.</div>
+            <div className="empty-state">Δεν υπάρχουν ακόμα πλοία.</div>
           ) : (
             <ul className="ship-list">
               {vessels.map((v) => {
@@ -139,7 +140,7 @@ export function Fleet() {
                         )}
                       </span>
                       <span className="ship-list__meta">
-                        {v.status} · {v.speedKn ? `${v.speedKn.toFixed(1)} kn` : "—"} ·{" "}
+                        {STATUS_LABEL[v.status] ?? v.status} · {v.speedKn ? `${v.speedKn.toFixed(1)} kn` : "—"} ·{" "}
                         {v.destPort ?? "—"}
                       </span>
                     </button>

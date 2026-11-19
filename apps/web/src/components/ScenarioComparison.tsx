@@ -7,7 +7,7 @@ export function CiiBadge({ cii, showRatio = false }: { cii: CiiAssessment | null
   if (!cii) return <span className="muted">—</span>;
   return (
     <span className="cii">
-      <span className={`cii-badge cii-badge--${cii.rating.toLowerCase()}`} title={`Attained ${cii.attained.toFixed(2)} vs required ${cii.required.toFixed(2)} gCO₂/dwt·nm`}>
+      <span className={`cii-badge cii-badge--${cii.rating.toLowerCase()}`} title={`Επιτευχθέν ${cii.attained.toFixed(2)} έναντι απαιτούμενου ${cii.required.toFixed(2)} gCO₂/dwt·nm`}>
         {cii.rating}
       </span>
       {showRatio && <span className="cii__ratio">{cii.ratio.toFixed(3)}</span>}
@@ -16,11 +16,11 @@ export function CiiBadge({ cii, showRatio = false }: { cii: CiiAssessment | null
 }
 
 const JIT_LABEL: Record<string, string> = {
-  NOT_APPLICABLE: "n/a",
-  COVERED: "Covered",
-  NEEDS_INSTRUCTION: "Covered, on instruction",
-  NOT_COVERED: "Not covered",
-  NO_CHARTER_PARTY: "No CP on file",
+  NOT_APPLICABLE: "δ/υ",
+  COVERED: "Καλύπτεται",
+  NEEDS_INSTRUCTION: "Καλύπτεται, με εντολή",
+  NOT_COVERED: "Δεν καλύπτεται",
+  NO_CHARTER_PARTY: "Χωρίς ναυλοσύμφωνο",
 };
 
 interface Row {
@@ -41,47 +41,47 @@ function groups(set: ScenarioSet): Group[] {
   const share = Math.round(set.etsCoveredShare * 100);
   return [
     {
-      title: "Arrival",
+      title: "Άφιξη",
       rows: [
-        { label: "Speed through water", render: (s) => `${s.speedKn.toFixed(1)} kn` },
-        { label: "Distance", render: (s) => `${Math.round(s.distanceNm).toLocaleString("en-US")} nm` },
+        { label: "Ταχύτητα στο νερό", render: (s) => `${s.speedKn.toFixed(1)} kn` },
+        { label: "Απόσταση", render: (s) => `${Math.round(s.distanceNm).toLocaleString("en-US")} nm` },
         {
           label: "ETA",
           render: (s) => (
             <>
               {utc(s.arrivalAt)}
-              {s.lateHours > 0.5 && <span className="scenario-flag scenario-flag--bad"> {s.lateHours.toFixed(0)} h late</span>}
+              {s.lateHours > 0.5 && <span className="scenario-flag scenario-flag--bad"> {s.lateHours.toFixed(0)} h καθυστέρηση</span>}
             </>
           ),
         },
-        { label: "Wait at anchor", render: (s) => `${s.waitHours.toFixed(1)} h`, best: (s) => s.waitHours },
+        { label: "Αναμονή στην άγκυρα", render: (s) => `${s.waitHours.toFixed(1)} h`, best: (s) => s.waitHours },
       ],
     },
     {
-      title: "Fuel & emissions",
+      title: "Καύσιμο & εκπομπές",
       rows: [
-        { label: "Fuel", render: (s) => `${s.fuelT.toFixed(1)} t`, best: (s) => s.fuelT },
+        { label: "Καύσιμο", render: (s) => `${s.fuelT.toFixed(1)} t`, best: (s) => s.fuelT },
         { label: "CO₂", render: (s) => `${s.co2T.toFixed(1)} t`, best: (s) => s.co2T },
       ],
     },
     {
-      title: "Cost",
+      title: "Κόστος",
       rows: [
-        { label: "Fuel cost", hint: `€${set.prices.fuelPriceEurPerT}/t`, render: (s) => eur(s.fuelCostEur), best: (s) => s.fuelCostEur },
+        { label: "Κόστος καυσίμου", hint: `€${set.prices.fuelPriceEurPerT}/t`, render: (s) => eur(s.fuelCostEur), best: (s) => s.fuelCostEur },
         {
           label: "EU ETS",
-          hint: `${share}% of CO₂ × €${set.prices.euaPriceEurPerT}/t EUA`,
+          hint: `${share}% του CO₂ × €${set.prices.euaPriceEurPerT}/t EUA`,
           render: (s) => eur(s.etsCostEur),
           best: (s) => s.etsCostEur,
         },
-        { label: <strong>Total</strong>, render: (s) => <strong>{eur(s.totalCostEur)}</strong>, best: (s) => s.totalCostEur },
+        { label: <strong>Σύνολο</strong>, render: (s) => <strong>{eur(s.totalCostEur)}</strong>, best: (s) => s.totalCostEur },
       ],
     },
     {
-      title: "Charter party",
+      title: "Ναυλοσύμφωνο",
       rows: [
         {
-          label: "Laytime used",
+          label: "Laytime που χρησιμοποιείται",
           render: (s) => {
             const lt = s.contract.laytime;
             if (!lt) return <span className="muted">—</span>;
@@ -89,7 +89,7 @@ function groups(set: ScenarioSet): Group[] {
               <>
                 {lt.usedHours.toFixed(0)} / {lt.allowedHours} h{" "}
                 <span className={`scenario-flag ${lt.withinLaytime ? "scenario-flag--ok" : "scenario-flag--bad"}`}>
-                  {lt.withinLaytime ? "within" : `+${lt.demurrageHours.toFixed(0)} h`}
+                  {lt.withinLaytime ? "εντός" : `+${lt.demurrageHours.toFixed(0)} h`}
                 </span>
               </>
             );
@@ -102,7 +102,7 @@ function groups(set: ScenarioSet): Group[] {
           best: (s) => s.contract.laytime?.demurrageAmount ?? 0,
         },
         {
-          label: "JIT clause",
+          label: "Ρήτρα JIT",
           render: (s) => (
             <span className={`scenario-flag scenario-flag--jit-${s.contract.jit.status.toLowerCase()}`} title={s.contract.jit.note}>
               {JIT_LABEL[s.contract.jit.status] ?? s.contract.jit.status}
@@ -114,20 +114,20 @@ function groups(set: ScenarioSet): Group[] {
     {
       title: `CII ${set.year}`,
       rows: [
-        { label: "This leg", hint: "CII method on this leg only", render: (s) => <CiiBadge cii={s.cii.voyage} /> },
+        { label: "Αυτό το σκέλος", hint: "μέθοδος CII μόνο για αυτό το σκέλος", render: (s) => <CiiBadge cii={s.cii.voyage} /> },
         {
-          label: "Year to date incl. leg",
-          hint: "attained / required",
+          label: "Από αρχή έτους, μαζί με το σκέλος",
+          hint: "επιτευχθέν / απαιτούμενο",
           render: (s) => <CiiBadge cii={s.cii.annual} showRatio />,
           best: (s) => s.cii.annual?.ratio ?? 0,
         },
       ],
     },
     {
-      title: "Weather",
+      title: "Καιρός",
       rows: [
         {
-          label: "Along the route",
+          label: "Κατά μήκος της διαδρομής",
           render: (s) => (
             <span className="scenario-weather">
               {s.weather.description}
@@ -152,12 +152,12 @@ export function ScenarioComparison({ set, selected, onSelect }: Props) {
   const source = set.scenarios[0]?.weather.source;
   return (
     <div className="scenarios">
-      <div className="table-scroll" role="region" aria-label="Scenario comparison" tabIndex={0}>
+      <div className="table-scroll" role="region" aria-label="Σύγκριση σεναρίων" tabIndex={0}>
         <table className="scenario-table">
           <thead>
             <tr>
               <th scope="col" className="scenario-table__corner">
-                <span className="label">Scenario</span>
+                <span className="label">Σενάριο</span>
               </th>
               {set.scenarios.map((s) => (
                 <th
@@ -177,7 +177,7 @@ export function ScenarioComparison({ set, selected, onSelect }: Props) {
                     <span className="scenario-head__id">{s.id}</span>
                     <span className="scenario-head__label">{s.label}</span>
                   </label>
-                  {s.id === set.recommendedId && <span className="scenario-recommended">Recommended</span>}
+                  {s.id === set.recommendedId && <span className="scenario-recommended">Προτείνεται</span>}
                 </th>
               ))}
             </tr>
@@ -218,9 +218,9 @@ export function ScenarioComparison({ set, selected, onSelect }: Props) {
         </table>
       </div>
       <p className="scenarios__foot">
-        Weather: {source === "open-meteo" ? "Open-Meteo marine forecast (waves, ocean currents)" : "offline mock (Open-Meteo unavailable)"} ·
-        EU ETS {Math.round(set.etsCoveredShare * 100)}% ({set.etsVoyageScope === 1 ? "intra-EU voyage" : set.etsVoyageScope === 0.5 ? "voyage to/from the EU" : "outside EU ETS scope"},{" "}
-        {set.year} phase-in) · computed {utc(set.generatedAt)}
+        Καιρός: {source === "open-meteo" ? "θαλάσσια πρόγνωση Open-Meteo (κύμα, ρεύματα)" : "offline προσομοίωση (το Open-Meteo δεν απαντά)"} ·
+        EU ETS {Math.round(set.etsCoveredShare * 100)}% ({set.etsVoyageScope === 1 ? "ταξίδι εντός ΕΕ" : set.etsVoyageScope === 0.5 ? "ταξίδι από/προς την ΕΕ" : "εκτός EU ETS"},{" "}
+        ποσοστό {set.year}) · υπολογίστηκε {utc(set.generatedAt)}
       </p>
     </div>
   );

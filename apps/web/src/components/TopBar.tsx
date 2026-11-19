@@ -5,14 +5,14 @@ import { api, type MetaResponse } from "../lib/api.js";
 import "./TopBar.css";
 
 const NAV_ITEMS = [
-  { to: "/fleet", label: "Fleet", end: true },
-  { to: "/voyages", label: "Voyages", end: false },
-  { to: "/inbox", label: "Inbox", end: false },
-  { to: "/actions", label: "Actions", end: false },
-  { to: "/bunkering", label: "Bunkering", end: false },
-  { to: "/ask", label: "Ask", end: false },
-  { to: "/value", label: "Value", end: false },
-  { to: "/settings", label: "Settings", end: false },
+  { to: "/fleet", label: "Στόλος", end: true },
+  { to: "/voyages", label: "Ταξίδια", end: false },
+  { to: "/inbox", label: "Εισερχόμενα", end: false },
+  { to: "/actions", label: "Ενέργειες", end: false },
+  { to: "/bunkering", label: "Ανεφοδιασμός", end: false },
+  { to: "/ask", label: "Ερωτήσεις", end: false },
+  { to: "/value", label: "Αξία", end: false },
+  { to: "/settings", label: "Ρυθμίσεις", end: false },
 ];
 
 interface TopBarProps {
@@ -39,11 +39,11 @@ export function TopBar({ pendingActionCount }: TopBarProps) {
 
   return (
     <header className="top-bar">
-      <Link to="/" className="top-bar__wordmark" aria-label="Tidewise home">
+      <Link to="/" className="top-bar__wordmark" aria-label="Αρχική Tidewise">
         <Monogram className="top-bar__monogram" />
         <span className="top-bar__name">Tidewise</span>
       </Link>
-      <nav className="top-bar__nav" aria-label="Main">
+      <nav className="top-bar__nav" aria-label="Κύριο μενού">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -63,7 +63,7 @@ export function TopBar({ pendingActionCount }: TopBarProps) {
           </NavLink>
         ))}
       </nav>
-      <div className="top-bar__llm" title="Language model in use">
+      <div className="top-bar__llm" title="Γλωσσικό μοντέλο σε χρήση">
         LLM: {meta ? meta.llmProvider : "..."}
       </div>
     </header>

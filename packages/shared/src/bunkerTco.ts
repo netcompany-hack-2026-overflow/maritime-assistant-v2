@@ -67,15 +67,15 @@ export interface TcoBreakdown {
 }
 
 export const TCO_LABELS: Record<keyof TcoBreakdown, string> = {
-  fuelUsd: "Fuel (price × quantity)",
+  fuelUsd: "Καύσιμο (τιμή × ποσότητα)",
   bargingUsd: "Barging",
-  otherFeesUsd: "Other fees (overtime, agency)",
-  portCallUsd: "Port call (our agency & dues)",
-  extraFuelUsd: "Extra fuel for detour & speed",
-  delayRiskUsd: "Delay risk (charter time)",
-  paymentTermsUsd: "Payment terms (cost of credit)",
-  reliabilityUsd: "Supplier reliability risk",
-  etsUsd: "EU ETS on extra CO₂",
+  otherFeesUsd: "Λοιπά έξοδα (overtime, πράκτορας)",
+  portCallUsd: "Προσέγγιση λιμανιού (πράκτορας & τέλη)",
+  extraFuelUsd: "Επιπλέον καύσιμο για παράκαμψη & ταχύτητα",
+  delayRiskUsd: "Κίνδυνος καθυστέρησης (χρόνος ναύλωσης)",
+  paymentTermsUsd: "Όροι πληρωμής (κόστος πίστωσης)",
+  reliabilityUsd: "Κίνδυνος αξιοπιστίας προμηθευτή",
+  etsUsd: "EU ETS στο επιπλέον CO₂",
 };
 
 export interface TcoRow {
@@ -107,10 +107,10 @@ export function assessOffer(offer: TcoOffer, a: TcoAssumptions): TcoRow {
   const { qtyT, adjusted } = stemQty(a.stemQtyT, planInput.offer.qtyMinT, planInput.offer.qtyMaxT);
   const t = offer.terms;
   const flags: string[] = [];
-  if (adjusted) flags.push(`stem set to ${qtyT.toLocaleString("en-US")} t to fit the supplier's range`);
-  if (t.bargingType === null) flags.push("barging not stated: assumed included");
-  if (t.paymentDays === null) flags.push(`payment terms not stated: assumed ${a.standardPaymentDays} days`);
-  if (!offer.reliabilityKnown) flags.push(`no history with this supplier: reliability assumed ${offer.reliabilityScore}/10`);
+  if (adjusted) flags.push(`ποσότητα ${qtyT.toLocaleString("en-US")} t ώστε να χωράει στο εύρος του προμηθευτή`);
+  if (t.bargingType === null) flags.push("το barging δεν αναφέρεται: θεωρείται ότι περιλαμβάνεται");
+  if (t.paymentDays === null) flags.push(`οι όροι πληρωμής δεν αναφέρονται: θεωρούνται ${a.standardPaymentDays} μέρες`);
+  if (!offer.reliabilityKnown) flags.push(`χωρίς ιστορικό με τον προμηθευτή: αξιοπιστία ${offer.reliabilityScore}/10 (εκτίμηση)`);
 
   const option = options[0] ?? null;
   if (!screen.passed || !option) {
@@ -144,7 +144,7 @@ export function assessOffer(offer: TcoOffer, a: TcoAssumptions): TcoRow {
       : 0,
   };
   const totalUsd = Object.values(breakdown).reduce((s, v) => s + v, 0);
-  if (c.lateHours > 1e-6) flags.push(`reaches the berth ${Math.round(c.lateHours * 60)} min late (within the tolerance)`);
+  if (c.lateHours > 1e-6) flags.push(`φτάνει στην πρόσδεση ${Math.round(c.lateHours * 60)} min αργότερα (εντός ανοχής)`);
   return {
     offer,
     screen,
@@ -176,14 +176,14 @@ const perT = (v: number) => `$${Math.abs(v).toFixed(2)}/t`;
 const h = (v: number) => `${v < 10 ? v.toFixed(1) : Math.round(v)} h`;
 
 function bargingWords(t: OfferTerms, qtyT: number): string {
-  if (t.bargingType === "LUMP_SUM") return `${usd(t.bargingUsd ?? 0)} barging on top`;
-  if (t.bargingType === "PER_MT") return `${usd(bargingCost(t.bargingType, t.bargingUsd, qtyT))} barging on top`;
-  return "barging included";
+  if (t.bargingType === "LUMP_SUM") return `${usd(t.bargingUsd ?? 0)} barging επιπλέον`;
+  if (t.bargingType === "PER_MT") return `${usd(bargingCost(t.bargingType, t.bargingUsd, qtyT))} barging επιπλέον`;
+  return "barging μέσα στην τιμή";
 }
 
 function delayWords(r: TcoRow): string {
   const d = r.option?.calc.delayHours ?? 0;
-  return d > 0 ? `barge ${h(d)} after arrival` : "barge on arrival";
+  return d > 0 ? `barge ${h(d)} μετά την άφιξη` : "barge με την άφιξη";
 }
 
 /** One plain sentence per cost line where `win` beats `other`, biggest first. */
@@ -194,21 +194,21 @@ function drivers(win: TcoRow, other: TcoRow): string[] {
   const add = (gain: number, text: string) => {
     if (gain > 250) out.push({ gain, text });
   };
-  add(o.bargingUsd - w.bargingUsd, `${bargingWords(win.offer.terms, win.qtyT)} vs ${bargingWords(other.offer.terms, other.qtyT)} (${usd(o.bargingUsd - w.bargingUsd)})`);
+  add(o.bargingUsd - w.bargingUsd, `${bargingWords(win.offer.terms, win.qtyT)} έναντι ${bargingWords(other.offer.terms, other.qtyT)} (${usd(o.bargingUsd - w.bargingUsd)})`);
   // The ETS here is on the extra fuel itself, so it belongs to the same reason.
   const etsGain = o.etsUsd - w.etsUsd;
   const fuelAndDelay = o.extraFuelUsd - w.extraFuelUsd + (o.delayRiskUsd - w.delayRiskUsd) + etsGain;
   add(
     fuelAndDelay,
-    `${delayWords(win)} vs ${delayWords(other)}: ${usd(fuelAndDelay)} less in extra fuel${Math.abs(etsGain) > 1 ? " (incl. EU ETS)" : ""} to make up the time and delay risk`
+    `${delayWords(win)} έναντι ${delayWords(other)}: ${usd(fuelAndDelay)} λιγότερα σε επιπλέον καύσιμο${Math.abs(etsGain) > 1 ? " (μαζί με EU ETS)" : ""} για να καλυφθεί ο χρόνος και σε κίνδυνο καθυστέρησης`
   );
-  add(o.reliabilityUsd - w.reliabilityUsd, `reliability ${win.offer.reliabilityScore}/10 vs ${other.offer.reliabilityScore}/10 (${usd(o.reliabilityUsd - w.reliabilityUsd)} less supply risk)`);
+  add(o.reliabilityUsd - w.reliabilityUsd, `αξιοπιστία ${win.offer.reliabilityScore}/10 έναντι ${other.offer.reliabilityScore}/10 (${usd(o.reliabilityUsd - w.reliabilityUsd)} λιγότερος κίνδυνος προμήθειας)`);
   add(
     o.paymentTermsUsd - w.paymentTermsUsd,
-    `${win.offer.terms.paymentDays ?? 30}-day vs ${other.offer.terms.paymentDays ?? 30}-day credit (${usd(o.paymentTermsUsd - w.paymentTermsUsd)})`
+    `πίστωση ${win.offer.terms.paymentDays ?? 30} ημερών έναντι ${other.offer.terms.paymentDays ?? 30} (${usd(o.paymentTermsUsd - w.paymentTermsUsd)})`
   );
-  add(o.otherFeesUsd - w.otherFeesUsd, `${usd(o.otherFeesUsd - w.otherFeesUsd)} less in overtime/agency fees`);
-  add(o.fuelUsd - w.fuelUsd, `${perT((o.fuelUsd - w.fuelUsd) / win.qtyT)} cheaper fuel`);
+  add(o.otherFeesUsd - w.otherFeesUsd, `${usd(o.otherFeesUsd - w.otherFeesUsd)} λιγότερα σε overtime/έξοδα πράκτορα`);
+  add(o.fuelUsd - w.fuelUsd, `φθηνότερο καύσιμο κατά ${perT((o.fuelUsd - w.fuelUsd) / win.qtyT)}`);
   return out.sort((x, y) => y.gain - x.gain).slice(0, 3).map((x) => x.text);
 }
 
@@ -228,16 +228,16 @@ export function explainComparison(rows: TcoRow[]): TcoExplanation {
     .filter((r) => !r.screen.passed)
     .map((r) =>
       r.screen.stoppedBecause === "EXPIRED"
-        ? `${r.offer.supplier} (${r.offer.portName}) not analysed further: the ship can't get there before the offer expires.`
-        : `${r.offer.supplier} (${r.offer.portName}) not analysed further: the call needs ${h(r.screen.neededHours)} but the ship has ${h(Math.max(0, r.screen.slackHours))} to spare.`
+        ? `${r.offer.supplier} (${r.offer.portName}): δεν αναλύθηκε περαιτέρω, το πλοίο δεν προλαβαίνει να φτάσει πριν λήξει η προσφορά.`
+        : `${r.offer.supplier} (${r.offer.portName}): δεν αναλύθηκε περαιτέρω, η προσέγγιση χρειάζεται ${h(r.screen.neededHours)} αλλά το πλοίο έχει περιθώριο ${h(Math.max(0, r.screen.slackHours))}.`
     );
   for (const r of rows) {
-    if (r.screen.passed && !r.feasible) warnings.push(`${r.offer.supplier} (${r.offer.portName}) would miss the berth or the offer's expiry.`);
+    if (r.screen.passed && !r.feasible) warnings.push(`${r.offer.supplier} (${r.offer.portName}): θα έχανε την πρόσδεση ή τη λήξη της προσφοράς.`);
   }
 
   if (feasible.length === 0) {
     return {
-      headline: rows.length === 0 ? "No offers to compare yet." : `None of the ${rows.length} offers fits the ship's schedule.`,
+      headline: rows.length === 0 ? "Δεν υπάρχουν ακόμα προσφορές για σύγκριση." : `Καμία από τις ${rows.length} προσφορές δεν χωράει στο πρόγραμμα του πλοίου.`,
       reasons: [],
       warnings,
     };
@@ -250,7 +250,7 @@ export function explainComparison(rows: TcoRow[]): TcoExplanation {
 
   if (feasible.length === 1) {
     return {
-      headline: `${label(best)} is the only offer that fits: ${perT(best.effectiveUsdPerT!)} all-in.`,
+      headline: `Η ${label(best)} είναι η μόνη προσφορά που χωράει: ${perT(best.effectiveUsdPerT!)} συνολικά.`,
       reasons: [],
       warnings,
     };
@@ -260,8 +260,8 @@ export function explainComparison(rows: TcoRow[]): TcoExplanation {
     const saving = cheapestOnPaper.totalUsd! - best.totalUsd!;
     return {
       headline:
-        `${label(best)} is ${perT(bestPrice - cheapestOnPaper.offer.planInput.offer.priceUsdPerT)} dearer on paper than ` +
-        `${label(cheapestOnPaper)}, but ${usd(saving)} cheaper overall (${perT(best.effectiveUsdPerT!)} vs ${perT(cheapestOnPaper.effectiveUsdPerT!)} all-in).`,
+        `Η ${label(best)} είναι ${perT(bestPrice - cheapestOnPaper.offer.planInput.offer.priceUsdPerT)} ακριβότερη στο χαρτί από την ` +
+        `${label(cheapestOnPaper)}, αλλά ${usd(saving)} φθηνότερη συνολικά (${perT(best.effectiveUsdPerT!)} έναντι ${perT(cheapestOnPaper.effectiveUsdPerT!)} με όλα τα κόστη).`,
       reasons: drivers(best, cheapestOnPaper),
       warnings,
     };
@@ -270,8 +270,8 @@ export function explainComparison(rows: TcoRow[]): TcoExplanation {
   const runnerUp = feasible[1];
   return {
     headline:
-      `${label(best)} is the best buy: ${perT(best.effectiveUsdPerT!)} all-in, ` +
-      `${usd(runnerUp.totalUsd! - best.totalUsd!)} less than ${label(runnerUp)}.`,
+      `Η ${label(best)} είναι η καλύτερη αγορά: ${perT(best.effectiveUsdPerT!)} με όλα τα κόστη, ` +
+      `${usd(runnerUp.totalUsd! - best.totalUsd!)} λιγότερα από την ${label(runnerUp)}.`,
     reasons: drivers(best, runnerUp),
     warnings,
   };

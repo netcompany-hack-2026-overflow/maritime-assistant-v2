@@ -20,7 +20,7 @@ const updateSchema = z
   })
   .refine(
     (v) => v.fuelPriceEurPerT !== undefined || v.usdEurRate !== undefined || v.euaPriceEurPerT !== undefined,
-    { message: "Nothing to update" }
+    { message: "Δεν υπάρχει τίποτα για αλλαγή" }
   );
 
 settingsRouter.put("/", async (req, res, next) => {
@@ -29,7 +29,7 @@ settingsRouter.put("/", async (req, res, next) => {
     if (!parsed.success) {
       return res.status(400).json({
         error:
-          "Fuel price must be between 0 and 5000 €/t, the USD→EUR rate between 0.5 and 2, and the EUA price between 0 and 1000 €/t.",
+          "Η τιμή καυσίμου πρέπει να είναι 0–5000 €/t, η ισοτιμία USD→EUR 0,5–2 και η τιμή EUA 0–1000 €/t.",
         details: parsed.error.issues,
       });
     }

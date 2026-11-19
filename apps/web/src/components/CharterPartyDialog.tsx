@@ -11,7 +11,7 @@ interface Props {
 }
 
 function yesNo(v: boolean | null): string {
-  return v === true ? "yes" : v === false ? "no" : "not stated";
+  return v === true ? "ναι" : v === false ? "όχι" : "δεν αναφέρεται";
 }
 
 /** Upload or paste a voyage charter party; shows the terms read from it, each with its source words. */
@@ -46,8 +46,8 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
     setMode("view");
     setMessage(
       res.recomputedRecommendations > 0
-        ? `Saved. ${res.recomputedRecommendations} pending recommendation${res.recomputedRecommendations === 1 ? "" : "s"} recalculated with these terms.`
-        : "Saved."
+        ? `Αποθηκεύτηκε. ${res.recomputedRecommendations === 1 ? "Μία σύσταση σε αναμονή ξαναϋπολογίστηκε" : `${res.recomputedRecommendations} συστάσεις σε αναμονή ξαναϋπολογίστηκαν`} με αυτούς τους όρους.`
+        : "Αποθηκεύτηκε."
     );
   };
 
@@ -74,19 +74,19 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
 
   const rows: Array<[string, string, string | undefined]> = t
     ? [
-        ["Reference", t.reference ?? "not stated", spanFor("reference")],
-        ["Charterers", [t.chartererName, t.chartererEmail].filter(Boolean).join(" · ") || "not stated", spanFor("chartererName")],
-        ["Agents (discharge)", t.agentEmail ?? "not stated", spanFor("agentEmail")],
-        ["Laytime", t.laytimeHours != null ? `${t.laytimeHours} h${t.laytimeBasis ? ` ${t.laytimeBasis}` : ""}` : "not stated", spanFor("laytimeHours")],
-        ["NOR turn time", t.norNoticeHours != null ? `${t.norNoticeHours} h` : "not stated (6 h assumed)", spanFor("norNoticeHours")],
-        ["Waiting for berth counts", yesNo(t.waitingTimeCounts), spanFor("waitingTimeCounts")],
-        ["Demurrage", t.demurrageRatePerDay != null ? `${money(t.demurrageRatePerDay, t.currency)} / day` : "not stated", spanFor("demurrageRatePerDay")],
-        ["Despatch", t.despatchRatePerDay != null ? `${money(t.despatchRatePerDay, t.currency)} / day` : "not stated", spanFor("despatchRatePerDay")],
+        ["Αναφορά", t.reference ?? "δεν αναφέρεται", spanFor("reference")],
+        ["Ναυλωτές", [t.chartererName, t.chartererEmail].filter(Boolean).join(" · ") || "δεν αναφέρεται", spanFor("chartererName")],
+        ["Πράκτορες (εκφόρτωση)", t.agentEmail ?? "δεν αναφέρεται", spanFor("agentEmail")],
+        ["Laytime", t.laytimeHours != null ? `${t.laytimeHours} h${t.laytimeBasis ? ` ${t.laytimeBasis}` : ""}` : "δεν αναφέρεται", spanFor("laytimeHours")],
+        ["Χρόνος NOR", t.norNoticeHours != null ? `${t.norNoticeHours} h` : "δεν αναφέρεται (θεωρούνται 6 h)", spanFor("norNoticeHours")],
+        ["Μετράει η αναμονή για θέση", yesNo(t.waitingTimeCounts), spanFor("waitingTimeCounts")],
+        ["Demurrage", t.demurrageRatePerDay != null ? `${money(t.demurrageRatePerDay, t.currency)} / ημέρα` : "δεν αναφέρεται", spanFor("demurrageRatePerDay")],
+        ["Despatch", t.despatchRatePerDay != null ? `${money(t.despatchRatePerDay, t.currency)} / ημέρα` : "δεν αναφέρεται", spanFor("despatchRatePerDay")],
         [
-          "JIT clause",
+          "Ρήτρα JIT",
           t.jitClause.present
-            ? `${t.jitClause.name ?? "present"} — speed reduction ${t.jitClause.speedReductionPermitted ? "permitted" : "not stated"}${t.jitClause.requiresChartererInstruction ? ", on charterers' instruction" : ""}`
-            : "none: utmost despatch applies",
+            ? `${t.jitClause.name ?? "υπάρχει"} — μείωση ταχύτητας ${t.jitClause.speedReductionPermitted ? "επιτρέπεται" : "δεν αναφέρεται"}${t.jitClause.requiresChartererInstruction ? ", με εντολή των ναυλωτών" : ""}`
+            : "καμία: ισχύει το utmost despatch",
           spanFor("jitClause"),
         ],
       ]
@@ -97,39 +97,39 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
       <div className="modal cp-dialog" role="dialog" aria-modal="true" aria-labelledby="cp-dialog-title">
         <div className="cp-dialog__head">
           <div>
-            <p className="label">Charter party</p>
+            <p className="label">Ναυλοσύμφωνο</p>
             <h2 id="cp-dialog-title" className="cp-dialog__title">
               {voyage.vesselName} · {voyage.originPortName} → {voyage.destPortName}
             </h2>
           </div>
-          <button className="vessel-drawer__close" onClick={() => onClose(changed)} aria-label="Close">
+          <button className="vessel-drawer__close" onClick={() => onClose(changed)} aria-label="Κλείσιμο">
             <X size={18} aria-hidden="true" />
           </button>
         </div>
 
         {loading ? (
-          <div className="loading-state" role="status">Loading…</div>
+          <div className="loading-state" role="status">Φόρτωση…</div>
         ) : mode === "paste" ? (
           <>
             <textarea
               className="cp-dialog__paste"
-              aria-label="Charter party text"
+              aria-label="Κείμενο ναυλοσυμφώνου"
               autoFocus
               rows={14}
-              placeholder="Paste the full charter party text (Part I boxes and additional clauses)…"
+              placeholder="Επικολλήστε όλο το κείμενο του ναυλοσυμφώνου (πλαίσια Part I και πρόσθετες ρήτρες)…"
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
             <div className="modal__actions">
               <button className="btn" onClick={() => setMode("view")} disabled={busy}>
-                Cancel
+                Ακύρωση
               </button>
               <button
                 className="btn btn-primary"
                 disabled={busy || text.trim().length < 50}
                 onClick={() => run(async () => done(await api.saveCharterPartyText(voyage.id, text)))}
               >
-                {busy ? "Reading…" : "Read terms"}
+                {busy ? "Ανάγνωση…" : "Ανάγνωση όρων"}
               </button>
             </div>
           </>
@@ -138,7 +138,7 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
             {cp ? (
               <>
                 <p className="cp-dialog__source">
-                  From <strong>{cp.sourceName}</strong> · confidence {Math.round(cp.terms.confidence * 100)}%
+                  Από <strong>{cp.sourceName}</strong> · βεβαιότητα {Math.round(cp.terms.confidence * 100)}%
                 </p>
                 <dl className="cp-dialog__terms">
                   {rows.map(([k, v, src]) => (
@@ -156,24 +156,24 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
                   onSubmit={(e) => {
                     e.preventDefault();
                     const n = opsHours.trim() === "" ? null : Number(opsHours);
-                    if (n !== null && (!Number.isFinite(n) || n < 0)) return setError("Cargo-operations hours must be a positive number.");
+                    if (n !== null && (!Number.isFinite(n) || n < 0)) return setError("Οι ώρες φορτοεκφόρτωσης πρέπει να είναι θετικός αριθμός.");
                     run(async () => done(await api.updateCharterParty(voyage.id, { expectedOpsHours: n })));
                   }}
                 >
                   <label>
-                    <span>Expected cargo operations at the berth</span>
+                    <span>Αναμενόμενη φορτοεκφόρτωση στη θέση</span>
                     <input type="number" min={0} step="1" value={opsHours} onChange={(e) => setOpsHours(e.target.value)} />
                     <span>h</span>
                   </label>
                   <button className="btn" type="submit" disabled={busy || String(cp.expectedOpsHours ?? "") === opsHours}>
-                    Update
+                    Ενημέρωση
                   </button>
                 </form>
               </>
             ) : (
               <p className="empty-state">
-                No charter party yet. Upload the PDF (or paste the text) and Tidewise reads laytime, NOR, demurrage/despatch
-                and any just-in-time arrival clause, then checks every scenario against them.
+                Δεν υπάρχει ακόμα ναυλοσύμφωνο. Ανεβάστε το PDF (ή επικολλήστε το κείμενο) και το Tidewise διαβάζει laytime,
+                NOR, demurrage/despatch και τυχόν ρήτρα άφιξης just-in-time, και ελέγχει κάθε σενάριο απέναντί τους.
               </p>
             )}
 
@@ -182,13 +182,13 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
 
             <div className="modal__actions cp-dialog__actions">
               <a className="cp-dialog__sample" href="/samples/cycladic-wind-charter-party.pdf" download>
-                Sample CP (PDF)
+                Δείγμα ναυλοσυμφώνου (PDF)
               </a>
               <button className="btn" onClick={() => setMode("paste")} disabled={busy}>
-                Paste text
+                Επικόλληση κειμένου
               </button>
               <button className="btn btn-primary" onClick={() => fileRef.current?.click()} disabled={busy}>
-                <FileUp size={14} aria-hidden="true" /> {busy ? "Reading…" : cp ? "Replace PDF" : "Upload PDF"}
+                <FileUp size={14} aria-hidden="true" /> {busy ? "Ανάγνωση…" : cp ? "Αντικατάσταση PDF" : "Ανέβασμα PDF"}
               </button>
               <input
                 ref={fileRef}

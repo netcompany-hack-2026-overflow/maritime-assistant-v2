@@ -39,7 +39,7 @@ export function RouteSketch({ plan, portName }: RouteSketchProps) {
       viewBox={`${-half} ${-half} ${2 * half} ${2 * half}`}
       preserveAspectRatio="xMidYMid meet"
       role="img"
-      aria-label={`Route change: leave the planned track ${offRouteNm.toFixed(0)} nm from ${portName}, call there, and rejoin at the same point.`}
+      aria-label={`Αλλαγή διαδρομής: έξοδος από την πορεία ${offRouteNm.toFixed(0)} nm από ${portName}, προσέγγιση εκεί και επιστροφή στο ίδιο σημείο.`}
     >
       <polyline className="route-sketch__track" points={pts(plan.route.before)} vectorEffect="non-scaling-stroke" />
       <polyline className="route-sketch__track route-sketch__track--ahead" points={pts(plan.route.after)} vectorEffect="non-scaling-stroke" />
@@ -53,7 +53,7 @@ export function RouteSketch({ plan, portName }: RouteSketchProps) {
         <>
           <circle className="route-sketch__ship" cx={ship.x} cy={ship.y} r={r} />
           <text className="route-sketch__label" x={ship.x + r * 2} y={ship.y + font / 3} fontSize={font}>
-            Ship
+            Πλοίο
           </text>
         </>
       )}

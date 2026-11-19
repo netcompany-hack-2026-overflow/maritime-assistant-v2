@@ -64,13 +64,13 @@ vesselsRouter.put("/:id/ais", async (req, res, next) => {
     const raw = req.body?.mmsi;
     const mmsi = raw === null || raw === "" ? null : String(raw ?? "").trim();
     if (mmsi !== null && !/^\d{9}$/.test(mmsi)) {
-      return res.status(400).json({ error: "An MMSI is 9 digits, e.g. 240123000." });
+      return res.status(400).json({ error: "Το MMSI έχει 9 ψηφία, π.χ. 240123000." });
     }
     const vessel = await prisma.vessel.findUnique({ where: { id: req.params.id } });
-    if (!vessel) return res.status(404).json({ error: "Vessel not found" });
+    if (!vessel) return res.status(404).json({ error: "Το πλοίο δεν βρέθηκε" });
     if (mmsi) {
       const taken = await prisma.vessel.findFirst({ where: { mmsi, id: { not: vessel.id } } });
-      if (taken) return res.status(409).json({ error: `MMSI ${mmsi} is already linked to ${taken.name}.` });
+      if (taken) return res.status(409).json({ error: `Το MMSI ${mmsi} είναι ήδη συνδεδεμένο με το ${taken.name}.` });
     }
     const updated = await prisma.vessel.update({
       where: { id: vessel.id },

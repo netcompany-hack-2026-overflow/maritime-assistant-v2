@@ -5,14 +5,14 @@ export const money = (n: number, currency: string | null | undefined) =>
 
 export const fixed = (n: number, digits = 1) => n.toFixed(digits);
 
-/** "Sat 21 Nov, 16:08 UTC" — shipping talks UTC. */
+/** "Σάβ 21 Νοε, 16:08 UTC": η ναυτιλία μιλά σε UTC. */
 export function utc(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return (
-    d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) +
+    d.toLocaleDateString("el-GR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) +
     ", " +
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) +
+    d.toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) +
     " UTC"
   );
 }

@@ -72,7 +72,7 @@ export async function sendMail(mail: OutgoingMail): Promise<{ messageId: string;
   if (!status.configured) {
     throw new MailerError(
       503,
-      `The email provider isn't set up. Fill in ${status.missing.join(", ")} in .env and restart the API.`
+      `Ο email provider δεν έχει ρυθμιστεί. Συμπληρώστε ${status.missing.join(", ")} στο .env και κάντε restart το API.`
     );
   }
   const deliveredTo = mailEnv.redirectTo || mail.to;
@@ -93,6 +93,6 @@ export async function sendMail(mail: OutgoingMail): Promise<{ messageId: string;
   } catch (err) {
     // Auth failures, refused recipients, timeouts: say what the provider said, never the credentials.
     const reason = err instanceof Error ? err.message : String(err);
-    throw new MailerError(502, `The email provider didn't accept the message: ${reason}`);
+    throw new MailerError(502, `Ο email provider δεν δέχτηκε το μήνυμα: ${reason}`);
   }
 }

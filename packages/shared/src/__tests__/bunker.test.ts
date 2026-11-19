@@ -149,10 +149,10 @@ describe("bunkerVerdictReason", () => {
   it("is null when worth it and names every reason otherwise", () => {
     expect(bunkerVerdictReason(calculateBunker(baseInput()), "Rotterdam")).toBeNull();
     const late = calculateBunker(baseInput({ speedKn: 14, deadline: hours(1700 / 14) }));
-    expect(bunkerVerdictReason(late, "Rotterdam")).toMatch(/^the ship would miss the Rotterdam berth by \d+ h/);
+    expect(bunkerVerdictReason(late, "Rotterdam")).toMatch(/^το πλοίο θα έχανε την πρόσδεση στο Rotterdam κατά \d+ h/);
     const far = calculateBunker(
       baseInput({ offRouteNm: 480, deadline: hours(10), offer: { priceUsdPerT: 565, qtyMinT: null, qtyMaxT: 500, validUntil: hours(5) } })
     );
-    expect(bunkerVerdictReason(far, "Rotterdam")).toMatch(/costs €\d+k more.*, the ship would miss.* and the offer expires/);
+    expect(bunkerVerdictReason(far, "Rotterdam")).toMatch(/κοστίζει €\d+k περισσότερα.*, το πλοίο θα έχανε.* και η προσφορά λήγει/);
   });
 });

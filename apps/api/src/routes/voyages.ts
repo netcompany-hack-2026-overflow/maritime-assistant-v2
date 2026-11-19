@@ -62,14 +62,14 @@ voyagesRouter.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: "Invalid request", details: errors.array() });
+        return res.status(400).json({ error: "Μη έγκυρο αίτημα", details: errors.array() });
       }
       const vesselId = req.body?.vesselId as string;
       const originPortId = req.body?.originPortId as string;
       const destPortId = req.body?.destPortId as string;
 
       if (originPortId === destPortId) {
-        return res.status(400).json({ error: "Origin and destination ports must be different." });
+        return res.status(400).json({ error: "Τα λιμάνια αναχώρησης και προορισμού πρέπει να διαφέρουν." });
       }
 
       const [vessel, originPort, destPort] = await Promise.all([
@@ -77,14 +77,14 @@ voyagesRouter.post(
         prisma.port.findUnique({ where: { id: originPortId } }),
         prisma.port.findUnique({ where: { id: destPortId } }),
       ]);
-      if (!vessel) return res.status(404).json({ error: "Vessel not found" });
-      if (!originPort || !destPort) return res.status(404).json({ error: "Port not found" });
+      if (!vessel) return res.status(404).json({ error: "Το πλοίο δεν βρέθηκε" });
+      if (!originPort || !destPort) return res.status(404).json({ error: "Το λιμάνι δεν βρέθηκε" });
 
       const activeVoyage = await prisma.voyage.findFirst({
         where: { vesselId, status: { in: ["UNDERWAY", "PLANNED"] } },
       });
       if (activeVoyage) {
-        return res.status(400).json({ error: `${vessel.name} already has an active voyage.` });
+        return res.status(400).json({ error: `Το ${vessel.name} έχει ήδη ενεργό ταξίδι.` });
       }
 
       const speedKn = req.body?.speedKn ? Number(req.body.speedKn) : vessel.designSpeedKn;
@@ -137,12 +137,12 @@ voyagesRouter.patch(
   async (req, res, next) => {
     try {
       const id = req.params?.id;
-      if (!id) return res.status(400).json({ error: "Invalid request" });
+      if (!id) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
 
       const voyage = await prisma.voyage.findUnique({ where: { id } });
-      if (!voyage) return res.status(404).json({ error: "Voyage not found" });
+      if (!voyage) return res.status(404).json({ error: "Το ταξίδι δεν βρέθηκε" });
       if (voyage.status !== "UNDERWAY" && voyage.status !== "PLANNED") {
-        return res.status(400).json({ error: "Only underway or planned voyages can be cancelled." });
+        return res.status(400).json({ error: "Ακυρώνονται μόνο ταξίδια σε εξέλιξη ή προγραμματισμένα." });
       }
 
       const updated = await prisma.voyage.update({

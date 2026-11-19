@@ -41,7 +41,7 @@ bunkerOffersRouter.post("/explain", async (req, res, next) => {
   try {
     const parsed = assumptionsSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid assumptions", details: parsed.error.issues });
+      return res.status(400).json({ error: "Μη έγκυρες παραδοχές", details: parsed.error.issues });
     }
     const { voyageId, ...assumptions } = parsed.data;
     res.json(await explainOffersWithAi(voyageId, assumptions));
@@ -58,13 +58,13 @@ const editSchema = z
     subject: z.string().trim().min(1).max(500).optional(),
     body: z.string().trim().min(1).max(20_000).optional(),
   })
-  .refine((v) => v.toAddr !== undefined || v.subject !== undefined || v.body !== undefined, { message: "Nothing to update" });
+  .refine((v) => v.toAddr !== undefined || v.subject !== undefined || v.body !== undefined, { message: "Δεν υπάρχει τίποτα για αλλαγή" });
 
 emailDraftsRouter.patch("/:id", async (req, res, next) => {
   try {
     const parsed = editSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Check the recipient address, subject and text.", details: parsed.error.issues });
+      return res.status(400).json({ error: "Ελέγξτε τη διεύθυνση παραλήπτη, το θέμα και το κείμενο.", details: parsed.error.issues });
     }
     res.json(await updateDraft(req.params.id, parsed.data));
   } catch (err) {

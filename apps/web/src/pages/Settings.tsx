@@ -37,7 +37,7 @@ function PriceForm({ title, help, fieldLabel, unit, saved, max, preview, onSave 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid) {
-      setError(`Enter a price between 0 and ${max} ${unit}.`);
+      setError(`Δώστε τιμή μεταξύ 0 και ${max} ${unit}.`);
       return;
     }
     setSaving(true);
@@ -82,7 +82,7 @@ function PriceForm({ title, help, fieldLabel, unit, saved, max, preview, onSave 
       {message && <div className="settings-card__ok" role="status">{message}</div>}
       <div className="settings-card__actions">
         <button className="btn btn-primary" type="submit" disabled={saving || !dirty}>
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Αποθήκευση…" : "Αποθήκευση"}
         </button>
       </div>
     </form>
@@ -90,7 +90,9 @@ function PriceForm({ title, help, fieldLabel, unit, saved, max, preview, onSave 
 }
 
 function repricedMessage(n: number): string {
-  return n > 0 ? `Saved. ${n} pending recommendation${n === 1 ? "" : "s"} recalculated at the new price.` : "Saved.";
+  return n > 0
+    ? `Αποθηκεύτηκε. ${n === 1 ? "Μία σύσταση σε αναμονή ξαναϋπολογίστηκε" : `${n} συστάσεις σε αναμονή ξαναϋπολογίστηκαν`} με τη νέα τιμή.`
+    : "Αποθηκεύτηκε.";
 }
 
 export function Settings() {
@@ -112,14 +114,14 @@ export function Settings() {
   if (loading) {
     return (
       <div className="page page--settings">
-        <div className="loading-state" role="status">Loading settings…</div>
+        <div className="loading-state" role="status">Φόρτωση ρυθμίσεων…</div>
       </div>
     );
   }
   if (!meta) {
     return (
       <div className="page page--settings">
-        <div className="error-state" role="alert">{error ?? "Could not load settings."}</div>
+        <div className="error-state" role="alert">{error ?? "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων."}</div>
       </div>
     );
   }
@@ -128,18 +130,18 @@ export function Settings() {
 
   return (
     <div className="page page--settings">
-      <p className="label">Settings</p>
+      <p className="label">Ρυθμίσεις</p>
 
       <PriceForm
-        title="Fuel price"
-        help="Turns fuel saved into euros on every scenario. Pending recommendations are recalculated when you save; approved and rejected ones keep the price they were decided at."
-        fieldLabel="Bunker price (VLSFO), € per tonne"
+        title="Τιμή καυσίμου"
+        help="Μετατρέπει το καύσιμο που γλιτώνεται σε ευρώ σε κάθε σενάριο. Οι συστάσεις σε αναμονή ξαναϋπολογίζονται με την αποθήκευση· οι εγκεκριμένες και οι απορριφθείσες κρατούν την τιμή με την οποία αποφασίστηκαν."
+        fieldLabel="Τιμή bunker (VLSFO), € ανά τόνο"
         unit="€/t"
         saved={meta.fuelPriceEurPerT}
         max={5000}
         preview={(p) => (
           <>
-            At this price, saving {EXAMPLE_SAVING_T} t of fuel is worth <strong>{eur.format(EXAMPLE_SAVING_T * p)}</strong>.
+            Με αυτή την τιμή, {EXAMPLE_SAVING_T} t καυσίμου που γλιτώνονται αξίζουν <strong>{eur.format(EXAMPLE_SAVING_T * p)}</strong>.
           </>
         )}
         onSave={async (p) => {
@@ -150,16 +152,16 @@ export function Settings() {
       />
 
       <PriceForm
-        title="EU carbon price (EUA)"
-        help={`Each scenario's CO₂ is priced as EU ETS allowances: tonnes CO₂ × share covered × EUA price. For ${YEAR} shipping surrenders allowances for ${phaseIn}% of its emissions (2024: 40%, 2025: 70%, from 2026: 100%), on 100% of voyages between EU/EEA ports and 50% of voyages into or out of the EU.`}
-        fieldLabel="EUA price, € per tonne CO₂"
+        title="Τιμή άνθρακα ΕΕ (EUA)"
+        help={`Το CO₂ κάθε σεναρίου τιμολογείται ως δικαιώματα EU ETS: τόνοι CO₂ × ποσοστό κάλυψης × τιμή EUA. Για το ${YEAR} η ναυτιλία παραδίδει δικαιώματα για το ${phaseIn}% των εκπομπών της (2024: 40%, 2025: 70%, από 2026: 100%), στο 100% των ταξιδιών μεταξύ λιμανιών ΕΕ/ΕΟΧ και στο 50% των ταξιδιών προς ή από την ΕΕ. Η ίδια τιμή χρησιμοποιείται και στη σύγκριση προσφορών καυσίμου.`}
+        fieldLabel="Τιμή EUA, € ανά τόνο CO₂"
         unit="€/t"
         saved={meta.euaPriceEurPerT}
         max={1000}
         preview={(p) => (
           <>
-            1 t of fuel (≈ {meta.co2Factor} t CO₂) on an intra-EU voyage costs{" "}
-            <strong>{eur.format(meta.co2Factor * p * etsPhaseInForYear(YEAR))}</strong> in allowances.
+            1 t καυσίμου (≈ {meta.co2Factor} t CO₂) σε ταξίδι εντός ΕΕ κοστίζει{" "}
+            <strong>{eur.format(meta.co2Factor * p * etsPhaseInForYear(YEAR))}</strong> σε δικαιώματα.
           </>
         )}
         onSave={async (p) => {
@@ -170,36 +172,36 @@ export function Settings() {
       />
 
       <section className="settings-card">
-        <h2 className="settings-card__title">Data sources</h2>
+        <h2 className="settings-card__title">Πηγές δεδομένων</h2>
         <dl className="settings-status">
           <div>
-            <dt>Weather</dt>
+            <dt>Καιρός</dt>
             <dd>
               {meta.weatherProvider === "open-meteo"
                 ? meta.weatherError
-                  ? `Open-Meteo unreachable (${meta.weatherError}); using offline mock weather`
-                  : "Open-Meteo Marine API: wave height and ocean currents, hourly forecast"
-                : "Offline mock (WEATHER_PROVIDER=mock)"}
+                  ? `Το Open-Meteo δεν απαντά (${meta.weatherError})· χρησιμοποιείται offline προσομοίωση καιρού`
+                  : "Open-Meteo Marine API: ύψος κύματος και θαλάσσια ρεύματα, ωριαία πρόγνωση"
+                : "Offline προσομοίωση (WEATHER_PROVIDER=mock)"}
             </dd>
           </div>
           <div>
             <dt>Live AIS</dt>
             <dd>
               {!meta.ais.enabled
-                ? "Off. Add AISSTREAM_API_KEY to .env (never commit it) and restart the API."
+                ? "Ανενεργό. Προσθέστε AISSTREAM_API_KEY στο .env (ποτέ στο git) και κάντε restart το API."
                 : meta.ais.trackedMmsi.length === 0
-                  ? "Key set. Link a vessel's MMSI from its panel on the Fleet page."
-                  : `${meta.ais.connected ? "Connected" : "Reconnecting"} · ${meta.ais.trackedMmsi.length} vessel(s) · ${meta.ais.messagesReceived} position reports${meta.ais.lastError ? ` · last error: ${meta.ais.lastError}` : ""}`}
+                  ? "Υπάρχει κλειδί. Συνδέστε το MMSI ενός πλοίου από το πλαίσιό του στη σελίδα Στόλος."
+                  : `${meta.ais.connected ? "Συνδεδεμένο" : "Επανασύνδεση"} · ${meta.ais.trackedMmsi.length} πλοία · ${meta.ais.messagesReceived} αναφορές θέσης${meta.ais.lastError ? ` · τελευταίο σφάλμα: ${meta.ais.lastError}` : ""}`}
             </dd>
           </div>
           <div>
             <dt>CII {YEAR}</dt>
             <dd>
-              Required CII is {ciiReductionFactor(YEAR)}% below the 2019 reference line (MEPC.400(83): 13.625% in 2027 rising to 21.5% in 2030).
+              Το απαιτούμενο CII είναι {ciiReductionFactor(YEAR)}% κάτω από τη γραμμή αναφοράς του 2019 (MEPC.400(83): 13,625% το 2027, αυξανόμενο σε 21,5% το 2030).
             </dd>
           </div>
         </dl>
-        {updatedAt && <p className="settings-card__meta">Prices last changed {new Date(updatedAt).toLocaleString()}</p>}
+        {updatedAt && <p className="settings-card__meta">Τελευταία αλλαγή τιμών {new Date(updatedAt).toLocaleString("el-GR")}</p>}
       </section>
     </div>
   );

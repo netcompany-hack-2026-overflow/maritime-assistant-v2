@@ -431,3 +431,6 @@ export interface EmailProviderStatus {
   redirectTo: string | null;
   missing: string[];
 }
+
+/** Start of the reason given to options closed because another option for the same ship was approved. */
+export const NOT_TAKEN_PREFIX = "Δεν επιλέχθηκε: ";

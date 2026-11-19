@@ -15,14 +15,14 @@ import { api } from "./lib/api.js";
 const PENDING_POLL_MS = 5000;
 
 const PAGE_TITLES: Record<string, string> = {
-  "/fleet": "Fleet",
-  "/voyages": "Voyages",
-  "/inbox": "Inbox",
-  "/actions": "Actions",
-  "/bunkering": "Bunkering",
-  "/ask": "Ask",
-  "/value": "Business value",
-  "/settings": "Settings",
+  "/fleet": "Στόλος",
+  "/voyages": "Ταξίδια",
+  "/inbox": "Εισερχόμενα",
+  "/actions": "Ενέργειες",
+  "/bunkering": "Ανεφοδιασμός",
+  "/ask": "Ερωτήσεις",
+  "/value": "Επιχειρηματική αξία",
+  "/settings": "Ρυθμίσεις",
 };
 
 /** Shell for the operational pages: top bar + scrollable main region. */
@@ -58,7 +58,7 @@ function ConsoleLayout() {
   return (
     <div className="console">
       <a className="skip-link" href="#main">
-        Skip to content
+        Μετάβαση στο περιεχόμενο
       </a>
       <TopBar pendingActionCount={pendingActionCount} />
       <main id="main" className="console__main" tabIndex={-1}>

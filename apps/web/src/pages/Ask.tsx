@@ -4,9 +4,10 @@ import { api, type AskResponse, type Citation, type RecordResponse } from "../li
 import "./Ask.css";
 
 const EXAMPLE_QUESTIONS = [
-  "How much fuel have we saved from approved recommendations?",
-  "What's MV Aegean Star's ETA?",
-  "Which vessels are affected by port delays?",
+  "Πόσο καύσιμο έχουμε γλιτώσει από τις εγκεκριμένες συστάσεις;",
+  "Ποιο είναι το ETA του MV Aegean Star;",
+  "Ποια πλοία επηρεάζονται από καθυστερήσεις λιμανιών;",
+  "Γιατί δεν πήραμε την προσφορά της Γένοβας;",
 ];
 
 interface Exchange {
@@ -39,7 +40,7 @@ function CitationChip({ citation }: { citation: Citation }) {
         {citation.table} · {citation.id.slice(0, 8)}
       </button>
       {expanded && (
-        <pre className="citation-chip__data">{loading ? "Loading…" : JSON.stringify(record?.data, null, 2)}</pre>
+        <pre className="citation-chip__data">{loading ? "Φόρτωση…" : JSON.stringify(record?.data, null, 2)}</pre>
       )}
     </div>
   );
@@ -93,15 +94,15 @@ export function Ask() {
         <input
           className="ask-form__input"
           type="text"
-          placeholder="Ask a question about the fleet…"
-          aria-label="Question about the fleet"
+          placeholder="Κάντε μια ερώτηση για τον στόλο…"
+          aria-label="Ερώτηση για τον στόλο"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={busy}
         />
         <button className="btn btn-primary" type="submit" disabled={busy || !question.trim()}>
           <Send size={14} />
-          Ask
+          Ρώτα
         </button>
       </form>
 
@@ -115,9 +116,9 @@ export function Ask() {
 
       {usingMock && (
         <p className="ask-notice" role="note">
-          Offline mode: no LLM API key is configured, so Ask understands only the example
-          questions above. Set <code>LLM_PROVIDER</code> and an API key in <code>.env</code> to ask
-          anything about the fleet.
+          Offline λειτουργία: δεν έχει οριστεί κλειδί LLM, οπότε καταλαβαίνω μόνο ερωτήσεις σαν τα
+          παραδείγματα. Ορίστε <code>LLM_PROVIDER</code> και κλειδί API στο <code>.env</code> για
+          οποιαδήποτε ερώτηση για τον στόλο.
         </p>
       )}
 
@@ -125,8 +126,8 @@ export function Ask() {
 
       {exchanges.length === 0 ? (
         <div className="empty-state">
-          <p className="label">Ask</p>
-          <p>Try one of the example questions above, or ask your own.</p>
+          <p className="label">Ερωτήσεις</p>
+          <p>Δοκιμάστε ένα από τα παραδείγματα παραπάνω ή κάντε τη δική σας ερώτηση.</p>
         </div>
       ) : (
         <div className="ask-exchanges" aria-live="polite">

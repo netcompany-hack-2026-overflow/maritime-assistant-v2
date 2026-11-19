@@ -61,6 +61,6 @@ describe("bunker offer approval", () => {
 
   it("can't approve twice", async () => {
     await approveRecommendation("r1");
-    await expect(approveRecommendation("r1")).rejects.toThrow(/already approved/);
+    await expect(approveRecommendation("r1")).rejects.toThrow(/έχει ήδη εγκριθεί/);
   });
 });
