@@ -1,5 +1,5 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
-import { ciiRequired, ciiShipClass } from "@maritime/shared";
+import { assessWarRisk, ciiRequired, ciiShipClass, DEFAULT_PORT_OPS_HOURS } from "@maritime/shared";
 import { routeBetweenPorts } from "../src/services/seaRoute.js";
 import { AEGEAN_STAR_CP } from "../src/demo/charterParties.js";
 import { mockExtractCharterParty } from "../src/llm/charterParty.js";
@@ -56,17 +56,19 @@ interface VesselSeed {
   ytdCiiRatio: number;
   /** Indicative time-charter rate, prices delays in the bunker-offer comparison. */
   charterRateUsdPerDay: number;
+  /** Agreed hull & machinery value (indicative 2026 market value): the base for war risks premiums. */
+  hullValueUsd: number;
 }
 
 const VESSELS: VesselSeed[] = [
-  { imo: "9000001", name: "MV Aegean Star", type: "Bulk Carrier", dwt: 45000, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3, ytdCiiRatio: 1.04, charterRateUsdPerDay: 18000 },
-  { imo: "9000002", name: "MV Cycladic Wind", type: "Bulk Carrier", dwt: 38000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 32, auxFuelTPerDay: 2.5, ytdCiiRatio: 1.07, charterRateUsdPerDay: 14000 },
-  { imo: "9000003", name: "MV Ionian Trader", type: "Container", dwt: 52000, designSpeedKn: 15, minSpeedKn: 10, fuelTPerDayAtDesign: 45, auxFuelTPerDay: 3.5, ytdCiiRatio: 0.97, charterRateUsdPerDay: 21000 },
-  { imo: "9000004", name: "MV Hellenic Pioneer", type: "Tanker", dwt: 60000, designSpeedKn: 14.5, minSpeedKn: 9.5, fuelTPerDayAtDesign: 42, auxFuelTPerDay: 3, ytdCiiRatio: 1.06, charterRateUsdPerDay: 26000 },
-  { imo: "9000005", name: "MV Aegean Breeze", type: "Bulk Carrier", dwt: 41000, designSpeedKn: 13.5, minSpeedKn: 9, fuelTPerDayAtDesign: 35, auxFuelTPerDay: 2.8, ytdCiiRatio: 0.95, charterRateUsdPerDay: 15000 },
-  { imo: "9000006", name: "MV Poseidon Glory", type: "Container", dwt: 48000, designSpeedKn: 16, minSpeedKn: 10, fuelTPerDayAtDesign: 48, auxFuelTPerDay: 4, ytdCiiRatio: 0.9, charterRateUsdPerDay: 22000 },
-  { imo: "9000007", name: "MV Marathon Spirit", type: "General Cargo", dwt: 30000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 28, auxFuelTPerDay: 2, ytdCiiRatio: 1.02, charterRateUsdPerDay: 12000 },
-  { imo: "9000008", name: "MV Olympic Horizon", type: "Tanker", dwt: 65000, designSpeedKn: 14, minSpeedKn: 9.5, fuelTPerDayAtDesign: 44, auxFuelTPerDay: 3.2, ytdCiiRatio: 1.12, charterRateUsdPerDay: 27000 },
+  { imo: "9000001", name: "MV Aegean Star", type: "Bulk Carrier", dwt: 45000, designSpeedKn: 14, minSpeedKn: 9, fuelTPerDayAtDesign: 40, auxFuelTPerDay: 3, ytdCiiRatio: 1.04, charterRateUsdPerDay: 18000, hullValueUsd: 25_000_000 },
+  { imo: "9000002", name: "MV Cycladic Wind", type: "Bulk Carrier", dwt: 38000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 32, auxFuelTPerDay: 2.5, ytdCiiRatio: 1.07, charterRateUsdPerDay: 14000, hullValueUsd: 20_000_000 },
+  { imo: "9000003", name: "MV Ionian Trader", type: "Container", dwt: 52000, designSpeedKn: 15, minSpeedKn: 10, fuelTPerDayAtDesign: 45, auxFuelTPerDay: 3.5, ytdCiiRatio: 0.97, charterRateUsdPerDay: 21000, hullValueUsd: 35_000_000 },
+  { imo: "9000004", name: "MV Hellenic Pioneer", type: "Tanker", dwt: 60000, designSpeedKn: 14.5, minSpeedKn: 9.5, fuelTPerDayAtDesign: 42, auxFuelTPerDay: 3, ytdCiiRatio: 1.06, charterRateUsdPerDay: 26000, hullValueUsd: 45_000_000 },
+  { imo: "9000005", name: "MV Aegean Breeze", type: "Bulk Carrier", dwt: 41000, designSpeedKn: 13.5, minSpeedKn: 9, fuelTPerDayAtDesign: 35, auxFuelTPerDay: 2.8, ytdCiiRatio: 0.95, charterRateUsdPerDay: 15000, hullValueUsd: 22_000_000 },
+  { imo: "9000006", name: "MV Poseidon Glory", type: "Container", dwt: 48000, designSpeedKn: 16, minSpeedKn: 10, fuelTPerDayAtDesign: 48, auxFuelTPerDay: 4, ytdCiiRatio: 0.9, charterRateUsdPerDay: 22000, hullValueUsd: 32_000_000 },
+  { imo: "9000007", name: "MV Marathon Spirit", type: "General Cargo", dwt: 30000, designSpeedKn: 13, minSpeedKn: 9, fuelTPerDayAtDesign: 28, auxFuelTPerDay: 2, ytdCiiRatio: 1.02, charterRateUsdPerDay: 12000, hullValueUsd: 15_000_000 },
+  { imo: "9000008", name: "MV Olympic Horizon", type: "Tanker", dwt: 65000, designSpeedKn: 14, minSpeedKn: 9.5, fuelTPerDayAtDesign: 44, auxFuelTPerDay: 3.2, ytdCiiRatio: 1.12, charterRateUsdPerDay: 27000, hullValueUsd: 48_000_000 },
 ];
 
 interface VoyageSeed {
@@ -185,6 +187,23 @@ async function main() {
         status: "UNDERWAY",
         ciiAttained: cii.attained,
         ciiRating: cii.rating,
+        // War-risk policy as issued at departure (services/insurance.ts reads this shape).
+        insurance: {
+          atDeparture: assessWarRisk({
+            route: route.coords,
+            speedKn: v.speedKn,
+            sailedNm: 0,
+            now: departedAt,
+            hullValueUsd: vessel.hullValueUsd,
+            originCountry: origin.country,
+            destCountry: dest.country,
+            destPortStayHours: DEFAULT_PORT_OPS_HOURS,
+          }),
+          quotes: {},
+          analysis: null,
+          notice: null,
+          sentNotices: [],
+        } as unknown as Prisma.InputJsonValue,
       },
     });
     createdVoyages[v.vesselImo] = { id: voyage.id, plannedEta };

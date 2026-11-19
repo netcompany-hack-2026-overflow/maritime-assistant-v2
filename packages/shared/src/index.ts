@@ -11,3 +11,4 @@ export * from "./cii.js";
 export * from "./charterParty.js";
 export * from "./laytime.js";
 export * from "./scenarios.js";
+export * from "./warRisk.js";

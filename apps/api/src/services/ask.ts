@@ -1,6 +1,7 @@
 import { bunkerVerdictReason, type Answer, type BunkerCalc } from "@maritime/shared";
 import { prisma } from "../lib/prisma.js";
 import type { CitableRow } from "../llm/types.js";
+import { assessVoyage, readStoredInsurance } from "./insurance.js";
 
 /**
  * Flattens every table the Q&A feature can answer from into a single
@@ -11,7 +12,7 @@ export async function buildCitableRows(): Promise<CitableRow[]> {
   const [vessels, ports, voyages, emails, portEvents, recommendations] = await Promise.all([
     prisma.vessel.findMany(),
     prisma.port.findMany(),
-    prisma.voyage.findMany({ include: { vessel: true, originPort: true, destPort: true } }),
+    prisma.voyage.findMany({ include: { vessel: true, originPort: true, destPort: true, charterParty: true } }),
     prisma.email.findMany(),
     prisma.portEvent.findMany({ include: { port: true, voyage: { include: { vessel: true } } } }),
     prisma.recommendation.findMany({
@@ -50,6 +51,37 @@ export async function buildCitableRows(): Promise<CitableRow[]> {
         status: voyage.status,
         ciiRating: voyage.ciiRating ?? null,
         ciiAttained: voyage.ciiAttained ?? null,
+      },
+    });
+  }
+
+  // War-risk exposure of voyages still under way: listed areas, days inside, additional premium.
+  for (const voyage of voyages) {
+    if (voyage.status !== "UNDERWAY") continue;
+    const stored = readStoredInsurance(voyage.insurance);
+    const a = assessVoyage(voyage, stored.quotes);
+    rows.push({
+      table: "voyageInsurance",
+      id: voyage.id,
+      data: {
+        vesselName: voyage.vessel.name,
+        route: `${voyage.originPort.name} → ${voyage.destPort.name}`,
+        inJwcListedAreaNow: a.insideNow,
+        currentArea: a.currentAreaLabel,
+        listedAreasOnRoute: a.exposures.map((e) => ({
+          area: e.label,
+          status: e.status,
+          enterAt: e.enterAt,
+          exitAt: e.exitAt,
+          daysInArea: e.daysInArea,
+          periodsOf7Days: e.periods,
+          ratePct: e.ratePct,
+          additionalPremiumUsd: e.premiumUsd,
+        })),
+        notifyUnderwritersBy: a.notifyBy,
+        kidnapAndRansomAdvised: a.kidnapAndRansomAdvised,
+        crewBonusUsd: a.totals.crewBonusUsd,
+        noticeStatus: stored.notice?.status ?? null,
       },
     });
   }

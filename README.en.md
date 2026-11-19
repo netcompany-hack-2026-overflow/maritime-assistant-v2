@@ -159,7 +159,16 @@ The four demo emails are in [apps/api/prisma/mock_demo_data.json](apps/api/prism
    and compares them on total cost in the same group (see the pitch below).
 7. **Voyages → Charter party** — upload `apps/web/public/samples/cycladic-wind-charter-party.pdf`
    to MV Cycladic Wind's voyage, then process the Singapore congestion email: that CP has
-   **no** JIT clause, so scenario B is flagged "Not covered" (utmost despatch applies).
+   **no** JIT clause, so scenario B is flagged "Not covered" (utmost despatch applies). It
+   does have a war risks clause (VOYWAR 2013): the voyage's insurance shows that charterers
+   reimburse the Red Sea/Aden additional premium.
+7b. **Voyages → New voyage** — e.g. Piraeus → Jebel Ali: the preview already shows the
+   additional war premium. Creating the voyage opens its insurance:
+   - Red Sea → Hormuz: 9.6 days with the port stay, so 2 periods of 7 days × 3%
+   - the IBF crew bonus
+   - the K&R advice
+   - the AI analysis
+   - the notice to the underwriters, ready to send
 8. **Value** — the business-value section: the customer, a per-ship and per-fleet savings
    calculator (fuel, ETS, demurrage, CII) and "why now", with sources.
 9. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
@@ -198,6 +207,69 @@ A plain JIT calculator says "slow down, save fuel". Tidewise also answers charte
    (sea-route distance from the AIS position / SOG) and pending scenarios are recomputed. The
    key lives **only** in `.env` as `AISSTREAM_API_KEY` (git-ignored) and never reaches the
    browser. [apps/api/src/services/ais.ts](apps/api/src/services/ais.ts)
+6. **War-risk insurance in high-risk areas.** With the route, ETA and CII, every voyage gets
+   its insurance at departure (Voyages → "Ασφάλιση" column). Details below.
+
+### War-risk insurance: how it works
+
+**How the market works** (research, November 2026):
+
+- Hull & machinery and P&I do **not** cover war. The separate war-risks policy covers the
+  world **except** the areas listed by the Joint War Committee
+  ([JWLA-035, 16 Sep 2026](https://lmalloyds.com/specialist-areas/underwriting/listed-areas/)):
+  southern Red Sea below 25.5°N, Gulf of Aden, Persian Gulf, Gulf of Oman and western Indian
+  Ocean, Gulf of Guinea, Black Sea/Azov, Cabo Delgado, and countries such as Iran, Israel,
+  Russia, UAE and Saudi Arabia.
+- Before entering such an area the owner **notifies** the war underwriters and pays an
+  **additional premium (AP)**: a % of the hull value, usually for **7 days**. A longer stay
+  (slow steaming, waiting for a berth, cargo work) needs **another period**. Without notice
+  there is no cover inside the area (held covered only with prompt notice and payment).
+- In piracy areas (Aden, Indian Ocean, Guinea) a separate **K&R** (kidnap & ransom) cover is
+  advised; war loss of hire is optional.
+- **Crew** ([IBF/ITF list](https://imec.org.uk/the-international-bargaining-forum-ibf/ibf-risk-areas),
+  7 May 2026). Zones come in three categories:
+  - **Warlike Operations Area** (southern Red Sea/Aden, Gulf/Hormuz/Oman, northern Black
+    Sea): a bonus equal to the basic wage for at least 5 days, double death/disability
+    compensation and the right to refuse.
+  - **High Risk Area**: the bonus is paid for the actual days.
+  - **Extended Risk Zone**: the bonus is paid only on the day of an attack.
+- **Who pays**: with a BIMCO VOYWAR/CONWARTIME clause in the charter party, charterers
+  reimburse the AP (and usually the crew bonus) when they send the ship into the area.
+
+**What the app does:**
+
+- **Code checks the route** ([warRisk.ts](packages/shared/src/warRisk.ts)). It samples the sea
+  route every 5 nm against the JWLA-035 and IBF boundaries. Out come:
+  - entry/exit times and positions
+  - days inside (passage plus destination port)
+  - 7-day periods, and AP = value × rate × periods: one charge per transit, at the rate of
+    the riskiest part crossed
+  - the crew bonus, and whether K&R is advised
+- **The LLM writes** ([warRisk.ts](apps/api/src/llm/warRisk.ts)). It reads those numbers and
+  the charter party's war risks clause (also extracted by the LLM). It writes the analysis in
+  Greek and the notice to the underwriters in English. It never decides the numbers; without
+  an LLM a template writes the same facts.
+- **At departure** the policy as issued is kept ([insurance.ts](apps/api/src/services/insurance.ts))
+  and compared with the current one. If a speed change or berth delay takes the days past 7,
+  it shows "extend cover by 7 days (+$…)". If the notice was already sent, an update is drafted.
+- **Broker quote**: the rate per part can be changed in the dialog; the AP is recomputed.
+- **Ask**: "Which ships are in a high-risk area?"
+
+**Assumptions** (also shown in the dialog):
+
+- **Market rates (indicative):**
+  - Hormuz/Gulf 3% (3–10% reported, Sep–Oct 2026)
+  - southern Red Sea/Aden 1% (1–2%, July 2026)
+  - Black Sea 1%
+  - no recent figure, flagged as assumptions: western Indian Ocean 0.05%, Guinea 0.1%,
+    countries 0.5%
+- **Hull values:** set per vessel in the seed.
+- **Destination port:** 48 h when the charter party gives none.
+- **Crew:** 20 crew × $45/day average basic wage.
+- **Not modelled:**
+  - the excluded territorial waters of Egypt (Red Sea) and Turkey, Bulgaria, Romania and
+    Georgia (Black Sea)
+  - countries listed as a whole, which are checked by port of call only (12 nm)
 
 ## Business value
 

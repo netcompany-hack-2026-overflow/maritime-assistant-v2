@@ -13,13 +13,19 @@ export const CHARTER_PARTY_SYSTEM_PROMPT =
   '"demurrageRatePerDay":number|null,"despatchRatePerDay":number|null,"currency":string|null,' +
   '"jitClause":{"present":boolean,"name":string|null,"text":string|null,' +
   '"speedReductionPermitted":boolean|null,"requiresChartererInstruction":boolean|null},' +
+  '"warRisksClause":{"present":boolean,"name":string|null,"text":string|null,' +
+  '"additionalPremiumForCharterers":boolean|null,"crewBonusForCharterers":boolean|null},' +
   '"confidence":number (0-1),"sourceSpans":[{"field":string,"text":string}]}. ' +
   "laytimeHours is the laytime allowed at the DISCHARGE port in hours (days × 24). " +
   "norNoticeHours is the turn time after Notice of Readiness before laytime counts. " +
   "waitingTimeCounts is true for WIBON / 'berth or no berth' / 'time lost waiting for berth to count'. " +
   "despatchRatePerDay: 'half demurrage' means half the demurrage rate; 'free despatch' means 0. " +
   "currency is ISO 4217 (USD, EUR). jitClause covers Just-In-Time Arrival or Virtual Arrival clauses; " +
-  "jitClause.text is the clause wording copied exactly. Use null for anything the text does not state; " +
+  "jitClause.text is the clause wording copied exactly. warRisksClause covers a war risks clause (BIMCO VOYWAR " +
+  "or CONWARTIME incorporated, or own wording): additionalPremiumForCharterers is true when charterers reimburse " +
+  "additional war risks premiums for Listed/war areas, crewBonusForCharterers when they reimburse the crew war " +
+  "bonus or additional wages; warRisksClause.text is the clause wording copied exactly. " +
+  "Use null for anything the text does not state; " +
   "never guess. Each sourceSpans[].text must be an exact substring of the charter party.";
 
 const EMPTY_TERMS: CharterPartyTerms = {
@@ -36,6 +42,7 @@ const EMPTY_TERMS: CharterPartyTerms = {
   despatchRatePerDay: null,
   currency: null,
   jitClause: { present: false, name: null, text: null, speedReductionPermitted: null, requiresChartererInstruction: null },
+  warRisksClause: { present: false, name: null, text: null, additionalPremiumForCharterers: null, crewBonusForCharterers: null },
   confidence: 0.5,
   sourceSpans: [],
 };
@@ -44,7 +51,13 @@ const EMPTY_TERMS: CharterPartyTerms = {
 export function parseCharterPartyTerms(raw: unknown): CharterPartyTerms {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const jit = (r.jitClause && typeof r.jitClause === "object" ? r.jitClause : {}) as Record<string, unknown>;
-  const merged = { ...EMPTY_TERMS, ...r, jitClause: { ...EMPTY_TERMS.jitClause, ...jit } };
+  const war = (r.warRisksClause && typeof r.warRisksClause === "object" ? r.warRisksClause : {}) as Record<string, unknown>;
+  const merged = {
+    ...EMPTY_TERMS,
+    ...r,
+    jitClause: { ...EMPTY_TERMS.jitClause, ...jit },
+    warRisksClause: { ...EMPTY_TERMS.warRisksClause, ...war },
+  };
   if (typeof merged.currency === "string") merged.currency = merged.currency.trim().toUpperCase().replace("$", "USD");
   return charterPartyTermsSchema.parse(merged);
 }
@@ -162,6 +175,28 @@ export async function mockExtractCharterParty(text: string): Promise<CharterPart
     span("jitClause", jitHead[0].trim());
   }
 
+  const warHead = text.match(/^[^\n]*(?:war\s+risks?\s+clause|\bVOYWAR\b|\bCONWARTIME\b)[^\n]*$/im);
+  let warRisksClause: CharterPartyTerms["warRisksClause"] = {
+    present: false,
+    name: null,
+    text: null,
+    additionalPremiumForCharterers: null,
+    crewBonusForCharterers: null,
+  };
+  if (warHead && warHead.index !== undefined) {
+    const clause = paragraphFrom(text, warHead.index);
+    const premium = /additional\s+(?:war\s+risks?\s+)?premiums?[^.]*\breimbursed\s+by\s+(?:the\s+)?charterers|charterers\s+shall\s+reimburse[^.]*premium/i.test(clause);
+    const crew = /(?:bonus|additional\s+wages)[^.]*\breimbursed\s+by\s+(?:the\s+)?charterers|charterers\s+shall\s+reimburse[^.]*(?:bonus|wages)/i.test(clause);
+    warRisksClause = {
+      present: true,
+      name: warHead[0].trim().replace(/[\s—–:-]+$/, ""),
+      text: clause,
+      additionalPremiumForCharterers: premium ? true : null,
+      crewBonusForCharterers: crew ? true : null,
+    };
+    span("warRisksClause", warHead[0].trim());
+  }
+
   const found = [laytimeHours, nor, demurrageRatePerDay].filter((v) => v != null).length;
   return charterPartyTermsSchema.parse({
     reference: refLine,
@@ -177,6 +212,7 @@ export async function mockExtractCharterParty(text: string): Promise<CharterPart
     despatchRatePerDay,
     currency: dem ? currencyCode(dem[1]) : null,
     jitClause,
+    warRisksClause,
     confidence: found === 3 ? 0.9 : found === 0 ? 0.2 : 0.6,
     sourceSpans: spans,
   });

@@ -204,3 +204,41 @@
   font-weight: 600;
   color: var(--navy);
 }
+
+/* War-risk insurance: preview tile in the new-voyage form and the column in the table. */
+.voyage-sim-metric--wide {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.voyage-sim-metric__value--risk {
+  color: #9a3412;
+}
+
+.voyage-ins-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.voyage-ins-btn:hover .jit-badge,
+.voyage-ins-btn:focus-visible .jit-badge {
+  text-decoration: underline;
+}
+
+.voyage-ins {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.voyage-ins__sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}

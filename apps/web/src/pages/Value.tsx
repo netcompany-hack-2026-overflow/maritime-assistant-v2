@@ -111,6 +111,7 @@ export function Value() {
       laytimeHours: 72, laytimeBasis: "SHINC", norNoticeHours: 6, waitingTimeCounts: true,
       demurrageRatePerDay: demRate, despatchRatePerDay: null, currency: "USD",
       jitClause: { present: true, name: null, text: null, speedReductionPermitted: true, requiresChartererInstruction: true },
+      warRisksClause: { present: false, name: null, text: null, additionalPremiumForCharterers: null, crewBonusForCharterers: null },
       confidence: 1, sourceSpans: [],
     };
     const set = buildScenarios({

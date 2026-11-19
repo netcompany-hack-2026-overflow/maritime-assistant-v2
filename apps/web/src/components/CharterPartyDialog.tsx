@@ -89,6 +89,15 @@ export function CharterPartyDialog({ voyage, onClose }: Props) {
             : "καμία: ισχύει το utmost despatch",
           spanFor("jitClause"),
         ],
+        [
+          "Ρήτρα πολέμου",
+          t.warRisksClause?.present
+            ? `${t.warRisksClause.name ?? "υπάρχει"} — επασφάλιστρο πολέμου: ${
+                t.warRisksClause.additionalPremiumForCharterers ? "το επιστρέφουν οι ναυλωτές" : "δεν αναφέρεται ποιος πληρώνει"
+              }${t.warRisksClause.crewBonusForCharterers ? "· μπόνους πληρώματος: οι ναυλωτές" : ""}`
+            : "καμία: το επασφάλιστρο πολέμου μένει στον πλοιοκτήτη",
+          spanFor("warRisksClause"),
+        ],
       ]
     : [];
 

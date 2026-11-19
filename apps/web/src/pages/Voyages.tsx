@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { assessCii, type PortDTO, type SeaRouteDTO } from "@maritime/shared";
+import { assessCii, type PortDTO, type SeaRouteDTO, type WarRiskAssessment } from "@maritime/shared";
 import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { PortPickerGlobe } from "../components/PortPickerGlobe.js";
 import { CharterPartyDialog } from "../components/CharterPartyDialog.js";
+import { InsuranceDialog } from "../components/InsuranceDialog.js";
 import { STATUS_LABEL } from "../lib/labels.js";
 import "./Voyages.css";
 
@@ -39,6 +40,27 @@ const CII_BADGE_STYLES: Record<string, React.CSSProperties> = {
   D: { backgroundColor: "#ffedd5", color: "#9a3412", border: "1px solid #fdba74" },
   E: { backgroundColor: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" },
 };
+
+const usdShort = (n: number) =>
+  n >= 1_000_000 ? `$${(n / 1_000_000).toLocaleString("el-GR", { maximumFractionDigits: 2 })}M` : `$${Math.round(n / 1000)}k`;
+
+/** War-risk insurance at a glance: normal cover, or the listed areas and the additional premium. */
+function InsuranceBadge({ v }: { v: VoyageListItem }) {
+  const ins = v.insurance;
+  if (!ins) return <>—</>;
+  if (!ins.listed) return <span className="jit-badge jit-badge--optimized">Κανονική</span>;
+  const label = ins.insideNow ? "Σε περιοχή JWC" : "Επασφάλιστρο πολέμου";
+  return (
+    <span className="voyage-ins">
+      <span className="jit-badge jit-badge--risk">{label}</span>
+      <span className="voyage-ins__sub">
+        {usdShort(ins.premiumUsd)} · {ins.periods}×7 ημ.
+        {ins.extraPeriods > 0 ? ` · +${ins.extraPeriods} περίοδος` : ""}
+        {ins.noticeStatus === "SENT" ? " · δηλώθηκε" : ""}
+      </span>
+    </span>
+  );
+}
 
 function CiiBadge({ rating, attained }: { rating?: string | null; attained?: number | null }) {
   if (!rating) return <span>—</span>;
@@ -80,6 +102,8 @@ export function Voyages() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cpVoyage, setCpVoyage] = useState<VoyageListItem | null>(null);
+  const [insVoyage, setInsVoyage] = useState<{ id: string; title: string } | null>(null);
+  const [insPreview, setInsPreview] = useState<WarRiskAssessment | null>(null);
 
   const refresh = () =>
     Promise.all([api.getVoyages(), api.getVessels(), api.getPorts()])
@@ -124,6 +148,24 @@ export function Voyages() {
       cancelled = true;
     };
   }, [originPort, destPort]);
+
+  // War-risk insurance the voyage would get (JWC listed areas on the route, additional premium).
+  useEffect(() => {
+    setInsPreview(null);
+    if (!vesselId || !originPortId || !destPortId || originPortId === destPortId) return;
+    let cancelled = false;
+    api
+      .previewVoyageInsurance({ vesselId, originPortId, destPortId, speedKn: Number(speedKn) || undefined })
+      .then((a) => {
+        if (!cancelled) setInsPreview(a);
+      })
+      .catch(() => {
+        /* preview only */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vesselId, originPortId, destPortId, speedKn]);
 
   // Estimate for the voyage being created: the sea route, the vessel's own fuel curve, IMO CII.
   const preview = useMemo(() => {
@@ -171,7 +213,7 @@ export function Voyages() {
     setSubmitting(true);
     setFormError(null);
     try {
-      await api.createVoyage({
+      const created = await api.createVoyage({
         vesselId,
         originPortId,
         destPortId,
@@ -180,6 +222,11 @@ export function Voyages() {
       await refresh();
       resetForm();
       setShowForm(false);
+      // The voyage's insurance is handed over with the rest at departure.
+      setInsVoyage({
+        id: created.id,
+        title: `${created.vesselName} · ${created.originPortName} → ${created.destPortName}`,
+      });
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -305,6 +352,29 @@ export function Voyages() {
                   <div>{preview.cii ? <CiiBadge rating={preview.cii.rating} attained={preview.cii.attained} /> : "—"}</div>
                   <span className="voyage-sim-metric__sub">μέθοδος IMO, {YEAR}</span>
                 </div>
+                <div className="voyage-sim-metric voyage-sim-metric--wide">
+                  <span className="voyage-sim-metric__label">Ασφάλιση πολέμου</span>
+                  {!insPreview ? (
+                    <span className="voyage-sim-metric__value">—</span>
+                  ) : insPreview.needsEndorsement ? (
+                    <>
+                      <span className="voyage-sim-metric__value voyage-sim-metric__value--risk">
+                        +{usdShort(insPreview.totals.premiumUsd)} επασφάλιστρο
+                      </span>
+                      <span className="voyage-sim-metric__sub">
+                        {insPreview.exposures
+                          .map((e) => `${e.label}: ${e.daysInArea.toLocaleString("el-GR")} ημ. → ${e.periods}×7 ημ. × ${e.ratePct}%`)
+                          .join(" · ")}
+                        {insPreview.kidnapAndRansomAdvised ? " · προτείνεται K&R" : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="voyage-sim-metric__value">Κανονική κάλυψη</span>
+                      <span className="voyage-sim-metric__sub">καμία περιοχή JWC ({insPreview.circular.ref})</span>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="voyage-form__preview">
@@ -351,6 +421,7 @@ export function Voyages() {
               <th>Πρόσδεση</th>
               <th>ETA</th>
               <th>Ναυλοσύμφωνο</th>
+              <th>Ασφάλιση</th>
               <th>Κατάσταση</th>
               <th></th>
             </tr>
@@ -391,6 +462,15 @@ export function Voyages() {
                   )}
                 </td>
                 <td>
+                  <button
+                    className="voyage-ins-btn"
+                    onClick={() => setInsVoyage({ id: v.id, title: `${v.vesselName} · ${v.originPortName} → ${v.destPortName}` })}
+                    aria-label={`Ασφάλιση ταξιδιού του ${v.vesselName}`}
+                  >
+                    <InsuranceBadge v={v} />
+                  </button>
+                </td>
+                <td>
                   <span className={`voyage-status voyage-status--${v.status.toLowerCase()}`}>
                     {STATUS_LABEL[v.status] ?? v.status}
                   </span>
@@ -413,6 +493,17 @@ export function Voyages() {
           </tbody>
         </table>
         </div>
+      )}
+
+      {insVoyage && (
+        <InsuranceDialog
+          voyageId={insVoyage.id}
+          title={insVoyage.title}
+          onClose={(changed) => {
+            setInsVoyage(null);
+            if (changed) refresh();
+          }}
+        />
       )}
 
       {cpVoyage && (
