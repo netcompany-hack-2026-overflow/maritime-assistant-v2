@@ -35,6 +35,24 @@ export const charterPartyTermsSchema = z.object({
     /** Speed reduction needs a charterers' instruction / agreement first. */
     requiresChartererInstruction: z.boolean().nullable(),
   }),
+  /**
+   * War risks clause (BIMCO VOYWAR / CONWARTIME or own wording): who pays the
+   * additional war premium and the crew war bonus when the vessel is ordered
+   * into a JWC Listed Area. Defaulted so terms stored before it was added still parse.
+   */
+  warRisksClause: z
+    .object({
+      present: z.boolean(),
+      /** e.g. "VOYWAR 2013 (Clause 34)". */
+      name: z.string().nullable(),
+      /** Exact clause wording from the CP. */
+      text: z.string().nullable(),
+      /** Charterers reimburse the additional war risks premium. */
+      additionalPremiumForCharterers: z.boolean().nullable(),
+      /** Charterers reimburse the crew war bonus / additional wages. */
+      crewBonusForCharterers: z.boolean().nullable(),
+    })
+    .default({ present: false, name: null, text: null, additionalPremiumForCharterers: null, crewBonusForCharterers: null }),
   confidence: z.number().min(0).max(1),
   sourceSpans: z.array(z.object({ field: z.string(), text: z.string() })),
 });

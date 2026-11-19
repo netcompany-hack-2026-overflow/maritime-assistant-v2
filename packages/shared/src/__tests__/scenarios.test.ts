@@ -28,6 +28,7 @@ const CP: CharterPartyTerms = {
     speedReductionPermitted: true,
     requiresChartererInstruction: true,
   },
+  warRisksClause: { present: false, name: null, text: null, additionalPremiumForCharterers: null, crewBonusForCharterers: null },
   confidence: 0.9,
   sourceSpans: [],
 };

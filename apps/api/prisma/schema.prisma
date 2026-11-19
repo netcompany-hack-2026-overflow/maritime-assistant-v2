@@ -88,6 +88,8 @@ model Vessel {
   aisAt               DateTime?
   /// Time-charter (or demurrage) rate, used to price delays when comparing bunker offers.
   charterRateUsdPerDay Float   @default(15000)
+  /// Agreed hull & machinery value, USD: the base for additional war risks premiums.
+  hullValueUsd        Float    @default(25000000)
   voyages             Voyage[]
 }
 
@@ -112,6 +114,9 @@ model Voyage {
   status           VoyageStatus @default(UNDERWAY)
   ciiAttained      Float?    
   ciiRating        CiiRating?
+  /// War-risk insurance for the voyage: the assessment issued at departure, broker quotes,
+  /// the AI analysis and the notice to the war underwriters (StoredInsurance in services/insurance.ts).
+  insurance        Json?
   createdAt        DateTime     @default(now())
 
   portEvents      PortEvent[] @relation("VoyagePortEvents")

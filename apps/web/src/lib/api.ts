@@ -15,7 +15,10 @@ import type {
   SeaRouteDTO,
   SettingsDTO,
   VesselPositionDTO,
+  VoyageInsuranceDTO,
+  VoyageInsuranceSummary,
   VoyageStatus,
+  WarRiskAssessment,
 } from "@maritime/shared";
 
 export interface AisStatus {
@@ -97,6 +100,8 @@ export interface VoyageListItem {
   berthTime: string | null;
   routeNm: number | null;
   charterParty: { id: string; sourceName: string } | null;
+  /** War-risk insurance at a glance (listed areas, additional premium, notice). */
+  insurance?: VoyageInsuranceSummary;
   status: VoyageStatus;
   ciiAttained?: number | null;
   ciiRating?: "A" | "B" | "C" | "D" | "E" | null;
@@ -244,6 +249,20 @@ export const api = {
     request<VoyageListItem>("/voyages", { method: "POST", body: JSON.stringify(input) }),
   cancelVoyage: (id: string) =>
     request<VoyageListItem>(`/voyages/${id}/cancel`, { method: "PATCH" }),
+  previewVoyageInsurance: (input: CreateVoyageInput) =>
+    request<WarRiskAssessment>("/voyages/insurance-preview", { method: "POST", body: JSON.stringify(input) }),
+  getVoyageInsurance: (voyageId: string) => request<VoyageInsuranceDTO>(`/voyages/${voyageId}/insurance`),
+  regenerateInsuranceAnalysis: (voyageId: string) =>
+    request<VoyageInsuranceDTO>(`/voyages/${voyageId}/insurance/analysis`, { method: "POST" }),
+  setInsuranceQuote: (voyageId: string, zoneId: string, pct: number | null) =>
+    request<VoyageInsuranceDTO>(`/voyages/${voyageId}/insurance/quotes`, {
+      method: "PUT",
+      body: JSON.stringify({ zoneId, pct }),
+    }),
+  saveInsuranceNotice: (voyageId: string, input: { to: string; subject: string; body: string }) =>
+    request<VoyageInsuranceDTO>(`/voyages/${voyageId}/insurance/notice`, { method: "PUT", body: JSON.stringify(input) }),
+  sendInsuranceNotice: (voyageId: string) =>
+    request<VoyageInsuranceDTO>(`/voyages/${voyageId}/insurance/notice/send`, { method: "POST" }),
   getEmails: () => request<EmailListItem[]>("/emails"),
   simulateEmail: () => request<EmailListItem>("/emails/simulate", { method: "POST" }),
   createEmail: (input: { fromAddr: string; subject: string; body: string }) =>

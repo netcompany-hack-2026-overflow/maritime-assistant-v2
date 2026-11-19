@@ -5,12 +5,20 @@ import { prisma } from "../lib/prisma.js";
 import { routeBetweenPorts } from "../services/seaRoute.js";
 import { calculateVoyageCII } from "../services/cii.js";
 import { charterPartyRouter } from "./charter-parties.js";
+import { insuranceRouter } from "./insurance.js";
+import { assessAtDeparture, initialInsurance, insuranceSummary } from "../services/insurance.js";
 
 export const voyagesRouter = Router();
 
 voyagesRouter.use("/:voyageId/charter-party", charterPartyRouter);
+voyagesRouter.use("/:voyageId/insurance", insuranceRouter);
 
-const include = { vessel: true, originPort: true, destPort: true, charterParty: { select: { id: true, sourceName: true } } } as const;
+const include = {
+  vessel: true,
+  originPort: true,
+  destPort: true,
+  charterParty: { select: { id: true, sourceName: true, terms: true, expectedOpsHours: true } },
+} as const;
 
 type VoyageWithRelations = Prisma.VoyageGetPayload<{ include: typeof include }>;
 
@@ -32,7 +40,8 @@ function serializeVoyage(v: VoyageWithRelations) {
     plannedEta: v.plannedEta.toISOString(),
     berthTime: v.berthTime ? v.berthTime.toISOString() : null,
     routeNm: v.routeNm,
-    charterParty: v.charterParty,
+    charterParty: v.charterParty ? { id: v.charterParty.id, sourceName: v.charterParty.sourceName } : null,
+    insurance: insuranceSummary(v),
     status: v.status,
     ciiAttained: v.ciiAttained,
     ciiRating: v.ciiRating,
@@ -93,6 +102,21 @@ voyagesRouter.post(
       const route = routeBetweenPorts(originPort, destPort);
       const plannedEta = new Date(departedAt.getTime() + (route.lengthNm / speedKn) * 3_600_000);
 
+      // The war-risk policy is issued with the voyage, like the route, ETA and CII.
+      const insurance = initialInsurance({
+        routeCoords: route.coords,
+        routeNm: route.lengthNm,
+        speedKn,
+        plannedEta,
+        berthTime: null,
+        status: "UNDERWAY",
+        departedAt,
+        vessel,
+        originPort,
+        destPort,
+        charterParty: null,
+      });
+
       const cii = calculateVoyageCII({
         dwt: vessel.dwt,
         distanceNm: route.lengthNm,
@@ -120,11 +144,53 @@ voyagesRouter.post(
           status: "UNDERWAY",
           ciiAttained: cii.attained,
           ciiRating: cii.rating,
+          insurance,
         },
         include,
       });
 
       res.status(201).json(serializeVoyage(voyage));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** The war-risk policy a voyage would get, for the new-voyage form (no model call). */
+voyagesRouter.post(
+  "/insurance-preview",
+  body("vesselId").isString().trim().notEmpty(),
+  body("originPortId").isString().trim().notEmpty(),
+  body("destPortId").isString().trim().notEmpty(),
+  body("speedKn").optional().isFloat({ gt: 0 }),
+  async (req, res, next) => {
+    try {
+      if (!validationResult(req).isEmpty()) return res.status(400).json({ error: "Μη έγκυρο αίτημα" });
+      const [vessel, originPort, destPort] = await Promise.all([
+        prisma.vessel.findUnique({ where: { id: req.body.vesselId as string } }),
+        prisma.port.findUnique({ where: { id: req.body.originPortId as string } }),
+        prisma.port.findUnique({ where: { id: req.body.destPortId as string } }),
+      ]);
+      if (!vessel) return res.status(404).json({ error: "Το πλοίο δεν βρέθηκε" });
+      if (!originPort || !destPort) return res.status(404).json({ error: "Το λιμάνι δεν βρέθηκε" });
+      const speedKn = req.body.speedKn ? Number(req.body.speedKn) : vessel.designSpeedKn;
+      const route = routeBetweenPorts(originPort, destPort);
+      const departedAt = new Date();
+      res.json(
+        assessAtDeparture({
+          routeCoords: route.coords,
+          routeNm: route.lengthNm,
+          speedKn,
+          plannedEta: new Date(departedAt.getTime() + (route.lengthNm / speedKn) * 3_600_000),
+          berthTime: null,
+          status: "UNDERWAY",
+          departedAt,
+          vessel,
+          originPort,
+          destPort,
+          charterParty: null,
+        })
+      );
     } catch (err) {
       next(err);
     }

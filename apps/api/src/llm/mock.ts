@@ -531,6 +531,28 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     }
   }
 
+  if (has(q, ["κίνδυν", "risk", "ασφάλ", "ασφαλ", "insur", "πόλεμ", "πειρατ", "jwc", "επασφάλ"])) {
+    const ins = rows.filter((r) => r.table === "voyageInsurance");
+    const exposed = ins.filter((r) => Array.isArray(r.data.listedAreasOnRoute) && r.data.listedAreasOnRoute.length > 0);
+    if (ins.length > 0) {
+      if (exposed.length === 0) {
+        return { answer: "Κανένα πλοίο σε ταξίδι δεν περνά από περιοχή της λίστας JWC.", citations: [] };
+      }
+      const lines = exposed.map((r) => {
+        const areas = r.data.listedAreasOnRoute as Array<{ area: string; status: string; additionalPremiumUsd: number; periodsOf7Days: number }>;
+        const where = r.data.inJwcListedAreaNow
+          ? `είναι τώρα μέσα (${r.data.currentArea})`
+          : areas.some((a) => a.status === "AHEAD")
+            ? "θα μπει"
+            : "έχει περάσει";
+        const ap = areas.reduce((s, a) => s + a.additionalPremiumUsd, 0);
+        const periods = areas.reduce((s, a) => s + a.periodsOf7Days, 0);
+        return `${r.data.vesselName} (${r.data.route}) ${where}: ${areas.map((a) => a.area).join(", ")}, ${periods} περίοδος/οι 7 ημερών, επασφάλιστρο ≈ $${Math.round(ap).toLocaleString("en-US")}.`;
+      });
+      return { answer: lines.join(" "), citations: exposed.map((r) => ({ table: r.table, id: r.id })) };
+    }
+  }
+
   if (q.includes("cii")) {
     const atSea = rows.filter((r) => r.table === "voyage" && r.data.status === "UNDERWAY" && typeof r.data.ciiRating === "string");
     const poor = atSea.filter((r) => r.data.ciiRating === "D" || r.data.ciiRating === "E");

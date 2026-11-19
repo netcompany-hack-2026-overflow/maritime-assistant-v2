@@ -16,7 +16,10 @@ import type {
   NoticeDraft,
   NoticeFacts,
   RecommendationFacts,
+  WarRiskAnalysis,
+  WarRiskFacts,
 } from "./types.js";
+import { WAR_RISK_SYSTEM_PROMPT, mockAnalyseWarRisk, warRiskAnalysisSchema } from "./warRisk.js";
 import { mockExplainBunkerComparison } from "./mock.js";
 
 export const BUNKER_COMPARISON_SYSTEM =
@@ -135,6 +138,19 @@ export class AnthropicProvider implements LlmProvider {
       // An approval must never fail because the email draft did: use the template.
       console.warn(`Notice draft via LLM failed, using template: ${(err as Error).message}`);
       return mockDraftNotice(facts);
+    }
+  }
+
+  async analyseWarRisk(facts: WarRiskFacts): Promise<WarRiskAnalysis> {
+    // Nothing to declare: the template's one sentence is all there is to say.
+    if (facts.exposures.length === 0) return mockAnalyseWarRisk(facts);
+    try {
+      const raw = await this.completeJson(WAR_RISK_SYSTEM_PROMPT, JSON.stringify(facts));
+      return { ...warRiskAnalysisSchema.parse(raw), source: "llm" };
+    } catch (err) {
+      // The insurance page must never fail because the model did: use the template.
+      console.warn(`War-risk analysis via LLM failed, using template: ${(err as Error).message}`);
+      return mockAnalyseWarRisk(facts);
     }
   }
 }

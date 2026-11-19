@@ -99,6 +99,70 @@ export interface BunkerComparisonFacts {
   draft: { headline: string; reasons: string[]; warnings: string[] };
 }
 
+/** A voyage's war-risk exposure, all computed by assessWarRisk; the model only writes about it. */
+export interface WarRiskFacts {
+  vesselName: string;
+  imo: string;
+  vesselType: string;
+  originPortName: string;
+  destPortName: string;
+  nowUtc: string;
+  speedKn: number;
+  hullValueUsd: number;
+  circular: string;
+  ibfList: string;
+  insideNow: boolean;
+  currentArea: string | null;
+  /** Notice to the war underwriters is due before this (null when already inside or passed). */
+  notifyByUtc: string | null;
+  exposures: Array<{
+    area: string;
+    areaEn: string;
+    jwcName: string;
+    status: "AHEAD" | "INSIDE" | "PASSED";
+    enterUtc: string;
+    exitUtc: string;
+    enterPosition: string;
+    sailingDays: number;
+    portStayDays: number;
+    daysInArea: number;
+    periods: number;
+    coveredDays: number;
+    ratePct: number;
+    /** The part of the area whose rate applies. */
+    riskiestPart: string;
+    parts: string[];
+    rateSource: string;
+    rateIsAssumption: boolean;
+    quotedByBroker: boolean;
+    premiumUsd: number;
+    threats: string[];
+    kidnapRisk: boolean;
+    reporting: string[];
+  }>;
+  crew: Array<{ zone: string; category: "WOA" | "HRA" | "ERZ"; status: string; days: number; bonusDays: number; bonusUsd: number }>;
+  kidnapAndRansomAdvised: boolean;
+  totals: { premiumUsd: number; crewBonusUsd: number; totalUsd: number };
+  changeSinceDeparture: string[];
+  charterParty: null | {
+    reference: string | null;
+    chartererName: string | null;
+    /** e.g. "VOYWAR 2013 (Clause 34)"; null when the CP has no war risks clause. */
+    warClause: string | null;
+    additionalPremiumForCharterers: boolean | null;
+    crewBonusForCharterers: boolean | null;
+  };
+}
+
+export interface WarRiskAnalysis {
+  /** Greek, for the operator. */
+  summary: string;
+  /** English, to the war risks underwriters; empty when there is nothing to declare. */
+  notice: { subject: string; body: string };
+  /** "llm" when the model wrote it, "template" for the offline template or its fallback. */
+  source: "llm" | "template";
+}
+
 export interface LlmProvider {
   extractEmail(text: string): Promise<PortEventExtraction>;
   explainRecommendation(facts: RecommendationFacts): Promise<string>;
@@ -107,4 +171,6 @@ export interface LlmProvider {
   answerQuestion(question: string, rows: CitableRow[]): Promise<Answer>;
   extractCharterParty(text: string): Promise<CharterPartyTerms>;
   draftNotice(facts: NoticeFacts): Promise<NoticeDraft>;
+  /** Write the war-risk summary and the notice to the war underwriters; never throws (falls back to the template). */
+  analyseWarRisk(facts: WarRiskFacts): Promise<WarRiskAnalysis>;
 }

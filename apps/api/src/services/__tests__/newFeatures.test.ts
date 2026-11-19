@@ -37,11 +37,24 @@ describe("charter party extraction (offline)", () => {
     expect(t.jitClause.present).toBe(false);
   });
 
+  it("reads the war risks clause and who pays the additional premium", async () => {
+    const t = await mockExtractCharterParty(CYCLADIC_WIND_CP);
+    expect(t.warRisksClause.present).toBe(true);
+    expect(t.warRisksClause.name).toBe("Clause 34 — War Risks Clause (VOYWAR 2013)");
+    expect(t.warRisksClause.additionalPremiumForCharterers).toBe(true);
+    expect(t.warRisksClause.crewBonusForCharterers).toBe(true);
+    for (const s of t.sourceSpans) expect(CYCLADIC_WIND_CP).toContain(s.text);
+    const aegean = await mockExtractCharterParty(AEGEAN_STAR_CP);
+    expect(aegean.warRisksClause.present).toBe(false);
+    expect(aegean.warRisksClause.additionalPremiumForCharterers).toBeNull();
+  });
+
   it("tolerates a model leaving keys out", () => {
     const t = parseCharterPartyTerms({ laytimeHours: 48, currency: "usd", confidence: 0.7 });
     expect(t.laytimeHours).toBe(48);
     expect(t.currency).toBe("USD");
     expect(t.jitClause.present).toBe(false);
+    expect(t.warRisksClause.present).toBe(false);
     expect(t.demurrageRatePerDay).toBeNull();
   });
 });

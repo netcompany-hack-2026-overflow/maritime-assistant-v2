@@ -9,6 +9,7 @@ import {
   mockExtractCharterParty,
   mockExtractEmail,
 } from "./mock.js";
+import { mockAnalyseWarRisk } from "./warRisk.js";
 import type { LlmProvider } from "./types.js";
 
 export type {
@@ -18,6 +19,8 @@ export type {
   NoticeDraft,
   NoticeFacts,
   RecommendationFacts,
+  WarRiskAnalysis,
+  WarRiskFacts,
 } from "./types.js";
 
 class MockProvider implements LlmProvider {
@@ -27,6 +30,7 @@ class MockProvider implements LlmProvider {
   explainBunkerComparison = mockExplainBunkerComparison;
   extractCharterParty = mockExtractCharterParty;
   draftNotice = mockDraftNotice;
+  analyseWarRisk = mockAnalyseWarRisk;
 }
 
 let cached: LlmProvider | null = null;

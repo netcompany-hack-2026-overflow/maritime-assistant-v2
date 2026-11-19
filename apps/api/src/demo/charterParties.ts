@@ -51,4 +51,7 @@ ADDITIONAL CLAUSES
 
 Clause 19 — Speed
 The Vessel shall proceed with utmost despatch at about 13 knots, weather and safe navigation permitting.
+
+Clause 34 — War Risks Clause (VOYWAR 2013)
+The BIMCO War Risks Clause for Voyage Chartering 2013 (VOYWAR 2013) is incorporated in this Charter Party. Owners may insure the Vessel against war risks; the basic war risks premium is for Owners' account. Additional premiums charged by Owners' war risks underwriters because the Vessel, on Charterers' orders, enters or passes through an area listed by the Joint War Committee (including the Southern Red Sea and the Gulf of Aden) shall be reimbursed by Charterers together with the next payment of freight or upon discharge, whichever occurs first. Any bonus or additional wages paid to the crew for sailing into such an area shall likewise be reimbursed by Charterers.
 `;
