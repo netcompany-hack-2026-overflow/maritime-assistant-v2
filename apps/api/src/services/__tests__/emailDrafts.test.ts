@@ -66,6 +66,15 @@ const planInput: BunkerPlanInput = {
 const plan = { ...planBunkerOptions(planInput), input: planInput } as unknown as BunkerPlan;
 const keep = plan.options.find((o) => o.key === "KEEP_SPEED")!;
 
+/** A voyage still at sea: underway, 48 h from its destination. */
+const atSeaVoyage = () => ({
+  status: "UNDERWAY",
+  speedKn: 14,
+  plannedEta: new Date(Date.now() + 48 * 3_600_000),
+  vessel: {},
+  destPort: { lat: 51.95, lon: 4.15 },
+});
+
 const draft = (id: string, kind: string, optionKey: string | null) => ({
   id, recommendationId: "r1", kind, optionKey, toAddr: "trading@strait-bunkering.example",
   subject: `Re: offer (${id})`, body: `Body ${id}`, status: "DRAFT", edited: false,
@@ -73,7 +82,7 @@ const draft = (id: string, kind: string, optionKey: string | null) => ({
 });
 
 beforeEach(() => {
-  db.rec = { id: "r1", status: "PENDING", bunkerPlan: plan, voyage: { status: "UNDERWAY" }, costSavedEur: plan.options[0].calc.netEur };
+  db.rec = { id: "r1", status: "PENDING", bunkerPlan: plan, voyage: atSeaVoyage(), costSavedEur: plan.options[0].calc.netEur };
   db.drafts = [draft("d-eco", "ACCEPT", "ECO"), draft("d-keep", "ACCEPT", "KEEP_SPEED"), draft("d-counter", "COUNTER", "ECO"), draft("d-no", "DECLINE", null)];
   db.audit = [];
   db.sent = [];
@@ -113,10 +122,19 @@ describe("sendDraft", () => {
     expect(db.sent).toHaveLength(1);
   });
 
-  it("won't accept for a voyage that's no longer underway (and sends nothing)", async () => {
-    db.rec!.voyage = { status: "ARRIVED" };
-    await expect(sendDraft("d-eco")).rejects.toThrow(/δεν είναι πλέον σε εξέλιξη/);
+  it("sends nothing about a voyage that has been closed", async () => {
+    db.rec!.voyage = { ...atSeaVoyage(), status: "ARRIVED" };
+    await expect(sendDraft("d-eco")).rejects.toThrow(/δεν είναι πλέον σε ταξίδι/);
     expect(db.sent).toHaveLength(0);
+  });
+
+  it("sends nothing, not even a decline, about a ship that has already reached its destination", async () => {
+    // Still UNDERWAY in the database, but its planned arrival has passed.
+    db.rec!.voyage = { ...atSeaVoyage(), plannedEta: new Date(Date.now() - 3_600_000) };
+    await expect(sendDraft("d-no")).rejects.toThrow(/δεν είναι πλέον σε ταξίδι/);
+    await expect(sendDraft("d-eco")).rejects.toThrow(/δεν είναι πλέον σε ταξίδι/);
+    expect(db.sent).toHaveLength(0);
+    expect(db.rec!.status).toBe("PENDING");
   });
 
   it("when the provider fails, nothing changes except the error shown on the draft", async () => {

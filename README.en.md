@@ -118,6 +118,12 @@ be sent, though a polite decline still can. "Undo approval" reopens them, except
 have had a reply since. A recommendation that arrives *after* the approval is a new decision
 ([alternatives.ts](apps/api/src/services/alternatives.ts)).
 
+**Emails only for ships at sea.** A ship counts as on its voyage when the voyage is underway **and** it still has
+distance to go (live AIS when available); the stored status alone stays "underway" after arrival. For a ship that has
+arrived or whose voyage was cancelled, emails are not matched to it, no replies are drafted, nothing can be approved and
+nothing is sent, not even a decline or a notice. The Bunkering page lists only ships at sea
+([atSea.ts](apps/api/src/services/atSea.ts)).
+
 Code: [bunkerPlan.ts](packages/shared/src/bunkerPlan.ts) (time check, options, route),
 [bunkerTco.ts](packages/shared/src/bunkerTco.ts) (comparison, explanation),
 [bunkerEmails.ts](packages/shared/src/bunkerEmails.ts) (replies), all pure and unit-tested.

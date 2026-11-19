@@ -20,6 +20,7 @@ import { getLlmProvider } from "../llm/index.js";
 import { voyageProgressNow } from "./voyagePosition.js";
 import { crossesLand } from "./land.js";
 import { syncBunkerDrafts } from "./bunkerDrafts.js";
+import { isAtSea } from "./atSea.js";
 import { computeScenarios, rationaleFor, voyageInclude, type VoyageForScenarios } from "./scenarios.js";
 import { recommendationFields } from "./scenarioFields.js";
 
@@ -372,16 +373,21 @@ export async function processEmail(emailId: string) {
   let matchedVoyage: VoyageForScenarios | null = null;
 
   if (port && extraction.eventType === "BUNKER_OFFER") {
-    const candidates = await prisma.voyage.findMany({
-      where: { status: "UNDERWAY" },
-      include: voyageInclude,
-    });
+    // Only ships actually at sea: an offer for a ship that has arrived goes nowhere.
+    const candidates = (
+      await prisma.voyage.findMany({
+        where: { status: "UNDERWAY" },
+        include: voyageInclude,
+      })
+    ).filter((v) => isAtSea(v));
     matchedVoyage = matchBunkerVoyage(candidates, port, extraction.vesselNameMentioned, extraction.vesselImo ?? null) as VoyageForScenarios | null;
   } else if (port && extraction.eventType !== "NONE") {
-    const candidates = await prisma.voyage.findMany({
-      where: { destPortId: port.id, status: "UNDERWAY" },
-      include: voyageInclude,
-    });
+    const candidates = (
+      await prisma.voyage.findMany({
+        where: { destPortId: port.id, status: "UNDERWAY" },
+        include: voyageInclude,
+      })
+    ).filter((v) => isAtSea(v));
     if (candidates.length === 1) {
       matchedVoyage = candidates[0];
     } else if (candidates.length > 1) {

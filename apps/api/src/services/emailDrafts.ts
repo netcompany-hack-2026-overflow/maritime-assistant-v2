@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { sendMail } from "./mailer.js";
 import { draftToDTO } from "./bunkerOffers.js";
 import { NOT_TAKEN_PREFIX, closeAlternatives, describeOption, openAlternatives } from "./alternatives.js";
+import { NOT_AT_SEA_MESSAGE, isAtSea } from "./atSea.js";
 
 class HttpError extends Error {
   status: number;
@@ -38,7 +39,11 @@ export async function updateDraft(id: string, edit: DraftEdit) {
 export async function sendDraft(id: string) {
   const draft = await prisma.emailDraft.findUnique({
     where: { id },
-    include: { recommendation: { include: { voyage: true, portEvent: { include: { port: true } } } } },
+    include: {
+      recommendation: {
+        include: { voyage: { include: { vessel: true, destPort: true } }, portEvent: { include: { port: true } } },
+      },
+    },
   });
   if (!draft) throw new HttpError(404, "Το πρόχειρο δεν βρέθηκε");
   if (draft.status === "SENT") throw new HttpError(409, "Αυτό το email έχει ήδη σταλεί");
@@ -51,9 +56,8 @@ export async function sendDraft(id: string) {
         : "Έχει ήδη σταλεί άλλη απάντηση σε αυτή την προσφορά"
     );
   }
-  if (draft.kind === "ACCEPT" && rec.status === "PENDING" && rec.voyage.status !== "UNDERWAY") {
-    throw new HttpError(409, "Το ταξίδι δεν είναι πλέον σε εξέλιξη, οπότε η προσφορά δεν μπορεί να γίνει δεκτή");
-  }
+  // No email of any kind about a ship that is no longer at sea.
+  if (!isAtSea(rec.voyage)) throw new HttpError(409, NOT_AT_SEA_MESSAGE);
 
   let result: { messageId: string; deliveredTo: string };
   try {

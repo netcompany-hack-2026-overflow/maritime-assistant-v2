@@ -6,6 +6,7 @@ import { env } from "../lib/env.js";
 import { parseScenarioSet, recommendationFields } from "./scenarioFields.js";
 import { draftNoticeForApproval } from "./notices.js";
 import { calculateVoyageCII } from "./cii.js";
+import { NOT_AT_SEA_MESSAGE, isAtSea } from "./atSea.js";
 import {
   NOT_TAKEN_PREFIX,
   closeAlternatives,
@@ -41,8 +42,8 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
     include: { vessel: true, originPort: true, destPort: true },
   });
   if (!voyage) throw new HttpError(404, "Το ταξίδι δεν βρέθηκε");
-  if (voyage.status !== "UNDERWAY") {
-    throw new HttpError(409, "Το ταξίδι δεν είναι πλέον σε εξέλιξη");
+  if (!isAtSea(voyage)) {
+    throw new HttpError(409, NOT_AT_SEA_MESSAGE);
   }
 
   // The ship's other open options are alternatives to this one: approving it closes them.

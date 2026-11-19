@@ -116,13 +116,15 @@ const draftsFor = (recId: string) =>
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
+/** Underway and 48 h from the destination: a ship at sea. */
+const atSea = { speedKn: 14, plannedEta: new Date(Date.now() + 48 * 3_600_000), vessel: {}, destPort: { lat: 51.95, lon: 4.15 } };
 const rec = (id: string) => db.recs.find((r) => r.id === id)!;
 const draft = (id: string) => db.drafts.find((d) => d.id === id)!;
 
 beforeEach(() => {
   db.voyages = [
-    { id: "v1", status: "UNDERWAY" },
-    { id: "v2", status: "UNDERWAY" },
+    { id: "v1", status: "UNDERWAY", ...atSea },
+    { id: "v2", status: "UNDERWAY", ...atSea },
   ];
   db.recs = [
     offer("algeciras", "Algeciras", "Strait Bunkering Ltd"),

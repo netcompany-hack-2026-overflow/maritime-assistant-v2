@@ -89,6 +89,7 @@ const route = routeBetweenPorts(PIRAEUS, ROTTERDAM);
 function aegeanStar() {
   return {
     id: "v1",
+    status: "UNDERWAY",
     speedKn: 14,
     plannedEta: new Date(Date.now() + (1700 / 14) * 3_600_000),
     berthTime: null,
@@ -298,5 +299,24 @@ describe("the four demo supplier quotes, end to end (parser → ship → plan �
     const messy = offers.find((o) => o.id === "messy-two-grades")!;
     expect(messy.planInput.offer.priceUsdPerT).toBe(529);
     expect(messy.terms.lines.map((l) => l.fuelGrade)).toEqual(["VLSFO", "LSMGO"]);
+  });
+});
+
+describe("only ships at sea get offers and replies", () => {
+  it("a named ship that has already reached its destination gets no recommendation and no emails", async () => {
+    // Still UNDERWAY in the database, but its planned arrival is behind it.
+    db.voyages = [{ ...aegeanStar(), plannedEta: new Date(Date.now() - 2 * 3_600_000) }];
+    const { matchedVoyage, recommendation } = await processEmail("e-Algeciras");
+    expect(matchedVoyage).toBeNull();
+    expect(recommendation).toBeNull();
+    expect(db.drafts).toEqual([]);
+    expect(db.portEvents[0]).toMatchObject({ eventType: "BUNKER_OFFER", voyageId: null });
+  });
+
+  it("a cancelled voyage gets nothing either", async () => {
+    db.voyages = [{ ...aegeanStar(), status: "CANCELLED" }];
+    const { recommendation } = await processEmail("e-Algeciras");
+    expect(recommendation).toBeNull();
+    expect(db.drafts).toEqual([]);
   });
 });

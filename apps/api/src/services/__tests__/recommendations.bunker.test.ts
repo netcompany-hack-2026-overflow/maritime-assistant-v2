@@ -38,7 +38,15 @@ const { approveRecommendation, undoApproval } = await import("../recommendations
 
 beforeEach(() => {
   db.rec = { id: "r1", voyageId: "v1", portEventId: "ev1", actionType: "BUNKER_DETOUR", status: "PENDING", costSavedEur: 109_000, decidedAt: null };
-  db.voyage = { id: "v1", status: "UNDERWAY", speedKn: 12, plannedEta: new Date(), berthTime: null };
+  db.voyage = {
+    id: "v1",
+    status: "UNDERWAY",
+    speedKn: 12,
+    plannedEta: new Date(Date.now() + 48 * 3_600_000),
+    berthTime: null,
+    vessel: {},
+    destPort: { lat: 51.95, lon: 4.15 },
+  };
   db.voyageUpdates = 0;
   db.audit = [];
 });

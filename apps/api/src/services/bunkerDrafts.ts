@@ -7,7 +7,9 @@ type Db = Pick<PrismaClient, "emailDraft"> | Pick<Prisma.TransactionClient, "ema
  * Write the reply drafts for a bunker plan. Drafts a person has edited are
  * kept as they are; once any reply has been sent nothing is touched.
  */
-export async function syncBunkerDrafts(db: Db, recommendationId: string, plan: BunkerPlan) {
+export async function syncBunkerDrafts(db: Db, recommendationId: string, plan: BunkerPlan, atSea = true) {
+  // No replies are written for a ship that is no longer on its voyage.
+  if (!atSea) return;
   const existing = await db.emailDraft.findMany({ where: { recommendationId } });
   if (existing.some((d) => d.status === "SENT")) return;
 

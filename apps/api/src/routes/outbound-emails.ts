@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { sendMail } from "../services/mailer.js";
+import { NOT_AT_SEA_MESSAGE, isAtSea } from "../services/atSea.js";
 
 /**
  * Notices drafted on approval. Edit, then either send them through the email
@@ -44,6 +45,11 @@ outboundEmailsRouter.post("/:id/send", async (req, res, next) => {
     if (!existing) return res.status(404).json({ error: "Το email δεν βρέθηκε" });
     if (existing.status !== "DRAFT") return res.status(409).json({ error: `Το email έχει ήδη ${existing.status === "SENT" ? "σταλεί" : "αποσυρθεί"}` });
     if (!existing.toAddrs.trim()) return res.status(400).json({ error: "Συμπληρώστε τη διεύθυνση των ναυλωτών στο «Προς» πριν την αποστολή." });
+    const rec = await prisma.recommendation.findUnique({
+      where: { id: existing.recommendationId },
+      include: { voyage: { include: { vessel: true, destPort: true } } },
+    });
+    if (!rec || !isAtSea(rec.voyage)) return res.status(409).json({ error: NOT_AT_SEA_MESSAGE });
     const result = await sendMail({ to: existing.toAddrs, cc: existing.ccAddrs, subject: existing.subject, text: existing.body });
     const [updated] = await prisma.$transaction([
       prisma.outboundEmail.update({ where: { id: existing.id }, data: { status: "SENT", sentAt: new Date() } }),

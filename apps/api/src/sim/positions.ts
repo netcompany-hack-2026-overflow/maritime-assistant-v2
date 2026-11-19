@@ -64,7 +64,13 @@ export function voyageGeometry(voyage: VoyageForGeometry, simSpeed: number, now:
  * sea route from the reported position. Otherwise: what the planned speed
  * covers until the planned ETA, as the original model did.
  */
-export function remainingDistanceNm(voyage: VoyageForGeometry, now: Date = new Date()): number {
+/** What remainingDistanceNm needs from a voyage (a full Prisma voyage fits). */
+export type VoyageForDistance = Pick<VoyageForGeometry, "speedKn" | "plannedEta"> & {
+  vessel: AisFields;
+  destPort: { lat: number; lon: number };
+};
+
+export function remainingDistanceNm(voyage: VoyageForDistance, now: Date = new Date()): number {
   const fix = freshAisFix(voyage.vessel, now);
   if (fix) {
     return getSeaRoute({ lat: fix.lat, lon: fix.lon }, { lat: voyage.destPort.lat, lon: voyage.destPort.lon }).lengthNm;

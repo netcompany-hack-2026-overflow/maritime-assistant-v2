@@ -12,6 +12,7 @@ import {
 import { prisma } from "./prisma.js";
 import { env } from "./env.js";
 import { syncBunkerDrafts } from "../services/bunkerDrafts.js";
+import { isAtSea } from "../services/atSea.js";
 import { parseScenarioSet, recommendationFields } from "../services/scenarioFields.js";
 
 const SETTINGS_ID = 1;
@@ -102,7 +103,10 @@ export async function updatePriceSettings(
 
     let repriced = 0;
     if (fuelChanged || rateChanged || euaChanged) {
-      const pending = await tx.recommendation.findMany({ where: { status: "PENDING" } });
+      const pending = await tx.recommendation.findMany({
+        where: { status: "PENDING" },
+        include: { voyage: { include: { vessel: true, destPort: true } } },
+      });
       for (const rec of pending) {
         // Bunker offers don't use the EUA price.
         if (rec.actionType === "BUNKER_DETOUR" && !fuelChanged && !rateChanged) continue;
@@ -122,7 +126,7 @@ export async function updatePriceSettings(
               bunkerPlan: plan as unknown as Prisma.InputJsonValue,
             },
           });
-          await syncBunkerDrafts(tx, rec.id, plan);
+          await syncBunkerDrafts(tx, rec.id, plan, rec.voyage ? isAtSea(rec.voyage) : true);
         } else if (rec.actionType === "BUNKER_DETOUR") {
           const calc = repriceBunker(rec.calc as unknown as BunkerCalc, fuelPriceEurPerT, usdEurRate);
           await tx.recommendation.update({

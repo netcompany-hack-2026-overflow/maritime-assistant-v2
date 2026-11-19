@@ -17,6 +17,7 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { getLlmProvider } from "../llm/index.js";
 import { processEmail } from "./emailProcessing.js";
+import { isAtSea } from "./atSea.js";
 
 const include = {
   voyage: { include: { vessel: true, originPort: true, destPort: true } },
@@ -119,7 +120,8 @@ export async function listBunkerOffers(voyageId?: string): Promise<BunkerOfferDT
     }),
     prisma.supplier.findMany(),
   ]);
-  return rows.map((r) => toDTO(r, suppliers));
+  // Only ships still on their voyage: replies about a ship that has arrived would make no sense.
+  return rows.filter((r) => isAtSea(r.voyage)).map((r) => toDTO(r, suppliers));
 }
 
 interface DemoEmail {
