@@ -100,6 +100,32 @@ export function Settings() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const handleResetDemo = async () => {
+    if (
+      !window.confirm(
+        "Επαναφορά του demo; Διαγράφονται όλα τα emails, οι συστάσεις, οι απαντήσεις και τα ταξίδια, και ξαναφτιάχνονται από την αρχή με τα πλοία στη θέση εκκίνησης."
+      )
+    ) {
+      return;
+    }
+    setResetting(true);
+    setResetMessage(null);
+    setResetError(null);
+    try {
+      const res = await api.resetDemo();
+      setResetMessage(
+        `Έγινε επαναφορά: ${res.voyages} ταξίδια σε εξέλιξη και ${res.queuedEmails} emails έτοιμα για «Προσομοίωση εισερχόμενου email».`
+      );
+    } catch (e) {
+      setResetError((e as Error).message);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([api.getMeta(), api.getSettings()])
@@ -202,6 +228,22 @@ export function Settings() {
           </div>
         </dl>
         {updatedAt && <p className="settings-card__meta">Τελευταία αλλαγή τιμών {new Date(updatedAt).toLocaleString("el-GR")}</p>}
+      </section>
+
+      <section className="settings-card settings-card--danger">
+        <h2 className="settings-card__title">Έλεγχος παρουσίασης</h2>
+        <p className="settings-card__help">
+          Επαναφέρει το demo στην αρχή: διαγράφει emails, συστάσεις, απαντήσεις και ταξίδια, και τα ξαναφτιάχνει με τα πλοία
+          στη θέση εκκίνησης (το MV Aegean Star πριν από το Γιβραλτάρ). Πλοία, λιμάνια, προμηθευτές και τιμές μένουν ως έχουν.
+          Κάντε το λίγο πριν την παρουσίαση.
+        </p>
+        {resetError && <div className="error-state" role="alert">{resetError}</div>}
+        {resetMessage && <div className="settings-card__ok" role="status">{resetMessage}</div>}
+        <div className="settings-card__actions">
+          <button type="button" className="btn btn-danger" onClick={handleResetDemo} disabled={resetting}>
+            {resetting ? "Επαναφορά…" : "Επαναφορά demo"}
+          </button>
+        </div>
       </section>
     </div>
   );

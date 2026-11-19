@@ -248,6 +248,12 @@ export const api = {
   simulateEmail: () => request<EmailListItem>("/emails/simulate", { method: "POST" }),
   createEmail: (input: { fromAddr: string; subject: string; body: string }) =>
     request<EmailListItem>("/emails", { method: "POST", body: JSON.stringify(input) }),
+  deleteEmail: (id: string) => request<void>(`/emails/${id}`, { method: "DELETE" }),
+  resetDemo: () =>
+    request<{ voyages: number; queuedEmails: number }>("/demo/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirm: "RESET" }),
+    }),
   uploadDocument: async (file: File): Promise<EmailListItem> => {
     const res = await fetch(`/api/emails/document?filename=${encodeURIComponent(file.name)}`, {
       method: "POST",

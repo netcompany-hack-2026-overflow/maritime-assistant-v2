@@ -27,6 +27,12 @@ import { recommendationFields } from "./scenarioFields.js";
 type VoyageWithPorts = Prisma.VoyageGetPayload<{ include: { vessel: true; originPort: true; destPort: true } }>;
 type PortRow = { id: string; name: string; lat: number; lon: number };
 
+/** "MV Marathon Spirit" = "Marathon Spirit" = "M/V MARATHON SPIRIT": models don't always keep the prefix. */
+export function sameShipName(a: string, b: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/^m\s*[/.]?\s*v\.?\s+/, "").replace(/\s+/g, " ");
+  return norm(a) === norm(b);
+}
+
 /** Offers further off a ship's remaining route than this aren't matched to it. */
 const BUNKER_MATCH_MAX_OFF_ROUTE_NM = 500;
 
@@ -42,7 +48,7 @@ function matchBunkerVoyage(candidates: VoyageWithPorts[], port: PortRow, vesselN
   const byImo = vesselImo ? candidates.find((c) => c.vessel.imo === vesselImo) : undefined;
   if (byImo) return byImo;
   const named = vesselName
-    ? candidates.find((c) => c.vessel.name.toLowerCase() === vesselName.toLowerCase())
+    ? candidates.find((c) => sameShipName(c.vessel.name, vesselName))
     : undefined;
   if (named) return named;
   let best: { voyage: VoyageWithPorts; offRouteNm: number } | null = null;
@@ -394,7 +400,7 @@ export async function processEmail(emailId: string) {
       matchedVoyage =
         (extraction.vesselNameMentioned &&
           candidates.find(
-            (c) => c.vessel.name.toLowerCase() === extraction.vesselNameMentioned!.toLowerCase()
+            (c) => sameShipName(c.vessel.name, extraction.vesselNameMentioned!)
           )) ||
         candidates[0];
     }

@@ -82,3 +82,13 @@ describe("parseExtraction", () => {
     expect(delay.priceUsdPerT).toBeNull();
   });
 });
+
+describe("normalizeFuelGrade", async () => {
+  const { normalizeFuelGrade } = await import("../extraction.js");
+  it("keeps the grade and drops the spec, so offers compare by grade", () => {
+    expect(normalizeFuelGrade("VLSFO 0.5%")).toBe("VLSFO");
+    expect(normalizeFuelGrade("lsmgo 0.1% (DMA)")).toBe("LSMGO");
+    expect(normalizeFuelGrade("Bio-blend B30")).toBe("BIO-BLEND B30");
+    expect(normalizeFuelGrade("  ")).toBeNull();
+  });
+});

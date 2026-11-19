@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ScenarioId } from "@maritime/shared";
 import { api, type RecommendationRecord } from "../lib/api.js";
 import { RecommendationCard } from "../components/RecommendationCard.js";
@@ -61,8 +61,21 @@ export function Actions() {
 
   const visible = tab === "pending" ? pending : history;
 
+  // What the approved recommendations add up to (bunker calls count their extra fuel as negative).
+  const approvedTotals = useMemo(
+    () =>
+      recommendations
+        .filter((r) => r.status === "APPROVED")
+        .reduce(
+          (acc, r) => ({ count: acc.count + 1, fuel: acc.fuel + r.fuelSavedT, cost: acc.cost + r.costSavedEur, co2: acc.co2 + r.co2SavedT }),
+          { count: 0, fuel: 0, cost: 0, co2: 0 }
+        ),
+    [recommendations]
+  );
+
   return (
     <div className="page page--actions">
+      <div className="actions-head">
       <div className="actions-tabs" role="tablist" aria-label="Συστάσεις">
         <button
           className={tab === "pending" ? "actions-tab actions-tab--active" : "actions-tab"}
@@ -78,8 +91,21 @@ export function Actions() {
           role="tab"
           aria-selected={tab === "history"}
         >
-          Ιστορικό
+          Ιστορικό{history.length > 0 ? ` (${history.length})` : ""}
         </button>
+      </div>
+      {approvedTotals.count > 0 && (
+        <p className="actions-impact">
+          Από εγκεκριμένες:{" "}
+          {approvedTotals.fuel >= 0
+            ? `${approvedTotals.fuel.toFixed(1)} t καύσιμο λιγότερο`
+            : `${Math.abs(approvedTotals.fuel).toFixed(1)} t επιπλέον καύσιμο`}{" "}
+          · {approvedTotals.cost < 0 ? "−" : ""}€{Math.abs(Math.round(approvedTotals.cost)).toLocaleString("en-US")} καθαρό ·{" "}
+          {approvedTotals.co2 >= 0
+            ? `${approvedTotals.co2.toFixed(1)} t CO₂ λιγότερο`
+            : `${Math.abs(approvedTotals.co2).toFixed(1)} t επιπλέον CO₂`}
+        </p>
+      )}
       </div>
 
       {loading ? (
@@ -89,7 +115,7 @@ export function Actions() {
       ) : visible.length === 0 ? (
         <div className="empty-state">
           {tab === "pending"
-            ? "Δεν υπάρχουν συστάσεις σε αναμονή. Επεξεργαστείτε ένα email καθυστέρησης στα Εισερχόμενα για να δημιουργηθεί μία."
+            ? "Δεν υπάρχουν συστάσεις σε αναμονή. Επεξεργαστείτε ένα email καθυστέρησης ή προσφοράς καυσίμου στα Εισερχόμενα για να δημιουργηθεί μία."
             : "Δεν υπάρχουν ακόμα αποφασισμένες συστάσεις."}
         </div>
       ) : (

@@ -48,6 +48,8 @@ export async function buildCitableRows(): Promise<CitableRow[]> {
         plannedEta: voyage.plannedEta.toISOString(),
         berthTime: voyage.berthTime?.toISOString() ?? null,
         status: voyage.status,
+        ciiRating: voyage.ciiRating ?? null,
+        ciiAttained: voyage.ciiAttained ?? null,
       },
     });
   }

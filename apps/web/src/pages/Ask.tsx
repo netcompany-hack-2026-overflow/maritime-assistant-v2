@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, Send } from "lucide-react";
+import { ChevronDown, ChevronUp, Send, Sparkles } from "lucide-react";
 import { api, type AskResponse, type Citation, type RecordResponse } from "../lib/api.js";
 import "./Ask.css";
 
@@ -8,7 +8,40 @@ const EXAMPLE_QUESTIONS = [
   "Ποιο είναι το ETA του MV Aegean Star;",
   "Ποια πλοία επηρεάζονται από καθυστερήσεις λιμανιών;",
   "Γιατί δεν πήραμε την προσφορά της Γένοβας;",
+  "Ποια πλοία έχουν κακό βαθμό CII;",
 ];
+
+const STATUS_WORDS: Record<string, string> = {
+  PENDING: "Σε αναμονή",
+  APPROVED: "Εγκρίθηκε",
+  REJECTED: "Απορρίφθηκε",
+  UNDERWAY: "Σε εξέλιξη",
+  ARRIVED: "Έφτασε",
+  CANCELLED: "Ακυρώθηκε",
+};
+
+/** A cited record in words; the raw JSON stays one click away. */
+function citationFacts(table: string, data: Record<string, unknown>): Array<{ k: string; v: string }> {
+  if (table === "recommendation") {
+    return [
+      { k: "Είδος", v: data.actionType === "BUNKER_DETOUR" ? "Προσφορά καυσίμου" : "Αλλαγή ταχύτητας" },
+      { k: "Κατάσταση", v: STATUS_WORDS[String(data.status)] ?? String(data.status ?? "—") },
+      { k: "Καύσιμο", v: data.fuelSavedT != null ? `${Number(data.fuelSavedT).toFixed(1)} t` : "—" },
+      { k: "Καθαρό", v: data.costSavedEur != null ? `€${Math.round(Number(data.costSavedEur)).toLocaleString("en-US")}` : "—" },
+    ];
+  }
+  if (table === "voyage") {
+    return [
+      { k: "Κατάσταση", v: STATUS_WORDS[String(data.status)] ?? String(data.status ?? "—") },
+      { k: "Ταχύτητα", v: data.speedKn != null ? `${Number(data.speedKn).toFixed(1)} kn` : "—" },
+      { k: "ETA", v: data.plannedEta ? new Date(String(data.plannedEta)).toLocaleString("el-GR") : "—" },
+    ];
+  }
+  return Object.entries(data)
+    .filter(([k]) => !k.endsWith("Id") && k !== "id")
+    .slice(0, 4)
+    .map(([k, v]) => ({ k, v: String(v ?? "—") }));
+}
 
 interface Exchange {
   id: number;
@@ -18,6 +51,7 @@ interface Exchange {
 
 function CitationChip({ citation }: { citation: Citation }) {
   const [expanded, setExpanded] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
   const [record, setRecord] = useState<RecordResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -36,11 +70,32 @@ function CitationChip({ citation }: { citation: Citation }) {
   return (
     <div className="citation-chip">
       <button className="citation-chip__toggle" onClick={toggle} aria-expanded={expanded}>
+        <span>
+          {citation.table} · {citation.id.slice(0, 8)}
+        </span>
         {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        {citation.table} · {citation.id.slice(0, 8)}
       </button>
       {expanded && (
-        <pre className="citation-chip__data">{loading ? "Φόρτωση…" : JSON.stringify(record?.data, null, 2)}</pre>
+        <div className="citation-card">
+          {loading || !record ? (
+            <span>Φόρτωση…</span>
+          ) : (
+            <>
+              <div className="citation-kv-list">
+                {citationFacts(citation.table, record.data as Record<string, unknown>).map((item) => (
+                  <div key={item.k} className="citation-kv-row">
+                    <span className="citation-kv-key">{item.k}</span>
+                    <span className="citation-kv-val">{item.v}</span>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="citation-raw-toggle" onClick={() => setShowRaw((v) => !v)}>
+                {showRaw ? "Απόκρυψη JSON" : "Προβολή JSON"}
+              </button>
+              {showRaw && <pre className="citation-chip__data">{JSON.stringify(record.data, null, 2)}</pre>}
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -51,14 +106,15 @@ export function Ask() {
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usingMock, setUsingMock] = useState(false);
+  const [provider, setProvider] = useState<string | null>(null);
+  const usingMock = provider === "mock";
 
   useEffect(() => {
     let cancelled = false;
     api
       .getMeta()
       .then((m) => {
-        if (!cancelled) setUsingMock(m.llmProvider === "mock");
+        if (!cancelled) setProvider(m.llmProvider);
       })
       .catch(() => {});
     return () => {
@@ -84,6 +140,12 @@ export function Ask() {
 
   return (
     <div className="page page--ask">
+      {provider && !usingMock && (
+        <p className="ask-notice" role="note">
+          <Sparkles size={16} aria-hidden="true" />
+          <span>Απαντά το γλωσσικό μοντέλο ({provider}) μόνο από τα δεδομένα του στόλου, με παραπομπή σε κάθε εγγραφή.</span>
+        </p>
+      )}
       <form
         className="ask-form"
         onSubmit={(e) => {

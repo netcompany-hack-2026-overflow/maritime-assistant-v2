@@ -26,3 +26,28 @@
   color: var(--text);
   border-bottom-color: var(--blue);
 }
+
+/* Tabs and the approved-impact pill on one row. */
+.actions-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.actions-head .actions-tabs {
+  margin-bottom: 0;
+}
+
+.actions-impact {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+}

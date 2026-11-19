@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { PortDTO, SeaRouteDTO } from "@maritime/shared";
+import { assessCii, type PortDTO, type SeaRouteDTO } from "@maritime/shared";
 import { api, type VesselListItem, type VoyageListItem } from "../lib/api.js";
 import { PortPickerGlobe } from "../components/PortPickerGlobe.js";
 import { CharterPartyDialog } from "../components/CharterPartyDialog.js";
@@ -9,7 +9,27 @@ import "./Voyages.css";
 const ACTIVE_STATUSES = new Set(["UNDERWAY", "PLANNED"]);
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("el-GR");
+  return new Date(iso).toLocaleString("el-GR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+const CO2_FACTOR = 3.114;
+const YEAR = new Date().getUTCFullYear();
+
+/** Fuel for a passage at a steady speed, from the vessel's own curve (cube law + auxiliary), t. */
+function passageFuelT(distanceNm: number, speedKn: number, vessel: VesselListItem): number {
+  const days = distanceNm / speedKn / 24;
+  return (vessel.fuelTPerDayAtDesign * (speedKn / vessel.designSpeedKn) ** 3 + vessel.auxFuelTPerDay) * days;
+}
+
+/** Berth time against planned arrival: will the ship wait at anchor, be late, or arrive just in time? */
+function berthStatus(v: VoyageListItem): { label: string; className: string } {
+  if (v.status === "CANCELLED") return { label: "Ακυρώθηκε", className: "jit-badge jit-badge--neutral" };
+  if (v.status === "ARRIVED") return { label: "Έφτασε", className: "jit-badge jit-badge--neutral" };
+  if (!v.berthTime) return { label: "Κατά πρόγραμμα", className: "jit-badge jit-badge--schedule" };
+  const diffH = (new Date(v.berthTime).getTime() - new Date(v.plannedEta).getTime()) / 3_600_000;
+  if (diffH > 2) return { label: `Αναμονή ${Math.round(diffH)} h στην άγκυρα`, className: "jit-badge jit-badge--risk" };
+  if (diffH < -2) return { label: `Αργεί ${Math.round(-diffH)} h για τη θέση`, className: "jit-badge jit-badge--risk" };
+  return { label: "Άφιξη just-in-time", className: "jit-badge jit-badge--optimized" };
 }
 
 const CII_BADGE_STYLES: Record<string, React.CSSProperties> = {
@@ -105,13 +125,18 @@ export function Voyages() {
     };
   }, [originPort, destPort]);
 
+  // Estimate for the voyage being created: the sea route, the vessel's own fuel curve, IMO CII.
   const preview = useMemo(() => {
     if (!route || previewSpeedKn <= 0) return null;
     const distanceNm = route.distanceNm;
     const hours = distanceNm / previewSpeedKn;
     const eta = new Date(Date.now() + hours * 3_600_000);
-    return { distanceNm, eta };
-  }, [route, previewSpeedKn]);
+    const fuelT = selectedVessel ? passageFuelT(distanceNm, previewSpeedKn, selectedVessel) : null;
+    const co2T = fuelT !== null ? fuelT * CO2_FACTOR : null;
+    const cii =
+      selectedVessel && co2T !== null ? assessCii(selectedVessel.type, selectedVessel.dwt, co2T, distanceNm, YEAR) : null;
+    return { distanceNm, hours, eta, fuelT, co2T, cii };
+  }, [route, previewSpeedKn, selectedVessel]);
 
   const handlePickPort = (portId: string) => {
     if (originPortId === portId) {
@@ -192,6 +217,7 @@ export function Voyages() {
       {showForm && (
         <form className="voyage-form" onSubmit={handleSubmit}>
           <div className="voyage-form__fields">
+            <div className="voyage-form__grid">
             <label>
               Πλοίο
               <select value={vesselId} onChange={(e) => setVesselId(e.target.value)} required>
@@ -253,10 +279,37 @@ export function Voyages() {
                 onChange={(e) => setSpeedKn(e.target.value)}
               />
             </label>
+            </div>
 
-            {preview && (
+            {preview ? (
+              <div className="voyage-sim-card">
+                <div className="voyage-sim-metric">
+                  <span className="voyage-sim-metric__label">Θαλάσσια απόσταση</span>
+                  <span className="voyage-sim-metric__value">{Math.round(preview.distanceNm).toLocaleString("en-US")} nm</span>
+                  <span className="voyage-sim-metric__sub">
+                    {Math.floor(preview.hours / 24)} μ. {Math.round(preview.hours % 24)} ώ. · ETA {formatDate(preview.eta.toISOString())}
+                  </span>
+                </div>
+                <div className="voyage-sim-metric">
+                  <span className="voyage-sim-metric__label">Εκτ. καύσιμο</span>
+                  <span className="voyage-sim-metric__value">{preview.fuelT !== null ? `${preview.fuelT.toFixed(0)} t` : "—"}</span>
+                  <span className="voyage-sim-metric__sub">με {previewSpeedKn.toFixed(1)} kn</span>
+                </div>
+                <div className="voyage-sim-metric">
+                  <span className="voyage-sim-metric__label">Εκτ. CO₂</span>
+                  <span className="voyage-sim-metric__value">{preview.co2T !== null ? `${preview.co2T.toFixed(0)} t` : "—"}</span>
+                  <span className="voyage-sim-metric__sub">× {CO2_FACTOR} t CO₂/t</span>
+                </div>
+                <div className="voyage-sim-metric">
+                  <span className="voyage-sim-metric__label">CII ταξιδιού</span>
+                  <div>{preview.cii ? <CiiBadge rating={preview.cii.rating} attained={preview.cii.attained} /> : "—"}</div>
+                  <span className="voyage-sim-metric__sub">μέθοδος IMO, {YEAR}</span>
+                </div>
+              </div>
+            ) : (
               <p className="voyage-form__preview">
-                {preview.distanceNm.toFixed(0)} nm θαλάσσια · ETA {preview.eta.toLocaleString("el-GR")}
+                Επιλέξτε πλοίο, αναχώρηση και προορισμό (από τις λίστες ή με κλικ στην υδρόγειο) για εκτίμηση απόστασης,
+                καυσίμου, CO₂ και CII.
               </p>
             )}
 
@@ -293,29 +346,37 @@ export function Voyages() {
               <th>Πλοίο</th>
               <th>Διαδρομή</th>
               <th>Ταχύτητα</th>
+              <th>Εκτ. CO₂</th>
               <th>Βαθμός CII</th>
-              <th>Αναχώρηση</th>
+              <th>Πρόσδεση</th>
               <th>ETA</th>
-              <th>Ώρα πρόσδεσης</th>
               <th>Ναυλοσύμφωνο</th>
               <th>Κατάσταση</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {voyages.map((v) => (
+            {voyages.map((v) => {
+              const vessel = vessels.find((x) => x.id === v.vesselId);
+              const co2T = vessel && v.routeNm ? passageFuelT(v.routeNm, v.speedKn, vessel) * CO2_FACTOR : null;
+              const berth = berthStatus(v);
+              return (
               <tr key={v.id}>
-                <td>{v.vesselName}</td>
+                <td className="voyage-table__vessel">{v.vesselName}</td>
                 <td>
                   {v.originPortName} → {v.destPortName}
                 </td>
                 <td>{v.speedKn.toFixed(1)} kn</td>
+                <td title="Όλο το ταξίδι με την τρέχουσα ταχύτητα">{co2T !== null ? `${co2T.toFixed(0)} t` : "—"}</td>
                 <td>
                   <CiiBadge rating={v.ciiRating} attained={v.ciiAttained} />
                 </td>
-                <td>{formatDate(v.departedAt)}</td>
+                <td>
+                  <span className={berth.className} title={v.berthTime ? `Ώρα πρόσδεσης ${formatDate(v.berthTime)}` : undefined}>
+                    {berth.label}
+                  </span>
+                </td>
                 <td>{formatDate(v.plannedEta)}</td>
-                <td>{v.berthTime ? formatDate(v.berthTime) : "—"}</td>
                 <td>
                   {ACTIVE_STATUSES.has(v.status) || v.charterParty ? (
                     <button
@@ -347,7 +408,8 @@ export function Voyages() {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         </div>

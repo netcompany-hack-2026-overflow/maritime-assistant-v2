@@ -15,6 +15,7 @@ import { bunkerOffersRouter, emailDraftsRouter } from "./routes/bunker-offers.js
 import { getSettings } from "./lib/settings.js";
 import { mailerStatus } from "./services/mailer.js";
 import { outboundEmailsRouter } from "./routes/outbound-emails.js";
+import { demoRouter } from "./routes/demo.js";
 import { aisTracker } from "./services/ais.js";
 import { lastWeatherError } from "./services/weather.js";
 
@@ -57,6 +58,7 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/bunker-offers", bunkerOffersRouter);
 app.use("/api/email-drafts", emailDraftsRouter);
 app.use("/api/outbound-emails", outboundEmailsRouter);
+app.use("/api/demo", demoRouter);
 app.get("/api/ais/status", (_req, res) => res.json(aisTracker.status()));
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {

@@ -1,7 +1,7 @@
 # Extraction Eval Results
 
-Provider under test: `openai` (model `gpt-5-mini`)
-Run at: 2026-11-18T08:47:28.748Z
+Provider under test: `openai` (model `gpt-6-luna`)
+Run at: 2026-11-19T10:39:44.683Z
 
 ## Summary
 

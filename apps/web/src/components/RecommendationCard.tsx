@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, FileText, RefreshCw } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Anchor, ChevronDown, ChevronUp, FileText, Navigation, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { bunkerVerdictReason, savingsVsBaseline, type BunkerCalc, type ScenarioId } from "@maritime/shared";
 import { api, type OutboundEmail, type RecommendationRecord, type RecordResponse } from "../lib/api.js";
@@ -20,13 +20,55 @@ interface RecommendationCardProps {
   alternatives?: number;
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  BERTH_DELAY: "καθυστέρηση πρόσδεσης",
-  CONGESTION: "συμφόρηση",
-  CLOSURE: "κλείσιμο λιμανιού",
-  BUNKER_OFFER: "προσφορά καυσίμου",
-  NONE: "συμβάν",
+/** What the recommendation is about, as a title. */
+const EVENT_TITLES: Record<string, string> = {
+  BERTH_DELAY: "Άφιξη just-in-time",
+  CONGESTION: "Προσαρμογή ταχύτητας λόγω συμφόρησης",
+  CLOSURE: "Κλείσιμο λιμανιού",
+  BUNKER_OFFER: "Αξιολόγηση προσφοράς καυσίμου",
+  NONE: "Βελτιστοποίηση ταξιδιού",
 };
+
+const EVENT_LABEL: Record<string, string> = {
+  BERTH_DELAY: "Καθυστέρηση πρόσδεσης",
+  CONGESTION: "Συμφόρηση λιμανιού",
+  CLOSURE: "Κλείσιμο λιμανιού",
+  BUNKER_OFFER: "Προσφορά καυσίμου",
+  NONE: "Κανένα συμβάν",
+};
+
+const when = (v: unknown) => (v ? new Date(String(v)).toLocaleString("el-GR") : "—");
+
+/** The record behind a fact, in words; the raw JSON stays one click away. */
+function humanFacts(table: string, data: Record<string, unknown>): Array<{ k: string; v: string }> {
+  if (table === "email") {
+    return [
+      { k: "Αποστολέας", v: String(data.fromAddr ?? "—") },
+      { k: "Θέμα", v: String(data.subject ?? "—") },
+      { k: "Παραλαβή", v: when(data.receivedAt) },
+    ];
+  }
+  if (table === "portEvent") {
+    const rows = [{ k: "Συμβάν", v: EVENT_LABEL[String(data.eventType)] ?? String(data.eventType ?? "—") }];
+    if (data.delayHours != null) rows.push({ k: "Καθυστέρηση", v: `+${data.delayHours} h` });
+    if (data.newBerthTime) rows.push({ k: "Νέα ώρα πρόσδεσης", v: when(data.newBerthTime) });
+    if (data.fuelGrade) rows.push({ k: "Καύσιμο", v: String(data.fuelGrade) });
+    if (data.priceUsdPerT != null) rows.push({ k: "Τιμή προσφοράς", v: `$${data.priceUsdPerT}/t` });
+    if (data.qtyMinT != null || data.qtyMaxT != null) rows.push({ k: "Ποσότητα", v: `${data.qtyMinT ?? "?"}–${data.qtyMaxT ?? "?"} t` });
+    return rows;
+  }
+  if (table === "voyage") {
+    return [
+      { k: "Κατάσταση", v: STATUS_LABEL[String(data.status)] ?? String(data.status ?? "—") },
+      { k: "Ταχύτητα", v: data.speedKn != null ? `${Number(data.speedKn).toFixed(1)} kn` : "—" },
+      { k: "ETA", v: when(data.plannedEta) },
+    ];
+  }
+  return Object.entries(data)
+    .filter(([k]) => !k.endsWith("Id") && k !== "id")
+    .slice(0, 5)
+    .map(([k, v]) => ({ k, v: String(v ?? "—") }));
+}
 
 const CALC_ROWS: Array<{ key: string; label: string; unit?: string; digits?: number }> = [
   { key: "distanceNm", label: "Υπόλοιπη απόσταση", unit: "nm" },
@@ -47,8 +89,9 @@ const CALC_ROWS: Array<{ key: string; label: string; unit?: string; digits?: num
   { key: "co2SavedT", label: "CO₂ που γλιτώνεται", unit: "t" },
 ];
 
-function FactRow({ table, id, label }: { table: string; id: string; label: string }) {
+function FactRow({ table, id, label, icon }: { table: string; id: string; label: string; icon: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
   const [record, setRecord] = useState<RecordResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -68,13 +111,31 @@ function FactRow({ table, id, label }: { table: string; id: string; label: strin
   return (
     <div className="fact-row">
       <button className="fact-row__toggle" onClick={toggle} aria-expanded={expanded}>
+        {icon}
+        <span>{label}</span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        {label}
       </button>
       {expanded && (
-        <pre className="fact-row__data">
-          {loading ? "Φόρτωση…" : JSON.stringify(record?.data, null, 2)}
-        </pre>
+        <div className="fact-card">
+          {loading || !record ? (
+            <span>Φόρτωση…</span>
+          ) : (
+            <>
+              <div className="fact-kv-list">
+                {humanFacts(table, record.data as Record<string, unknown>).map((item) => (
+                  <div key={item.k} className="fact-kv-row">
+                    <span className="fact-kv-key">{item.k}</span>
+                    <span className="fact-kv-val">{item.v}</span>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="fact-raw-toggle" onClick={() => setShowRaw((v) => !v)}>
+                {showRaw ? "Απόκρυψη JSON" : "Προβολή JSON"}
+              </button>
+              {showRaw && <pre className="fact-row__data">{JSON.stringify(record.data, null, 2)}</pre>}
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -150,17 +211,20 @@ export function RecommendationCard({
   const eventType = recommendation.portEvent?.eventType ?? "NONE";
   const delayHours = recommendation.portEvent?.delayHours;
 
-  const trigger =
-    port && delayHours != null
-      ? `${port.name} ${EVENT_LABELS[eventType] ?? eventType} +${delayHours}h`
-      : EVENT_LABELS[eventType] ?? eventType;
+  const title = EVENT_TITLES[eventType] ?? eventType;
+  const trigger = port ? `${title} · ${port.name}${delayHours != null ? ` (+${delayHours} h)` : ""}` : title;
 
   // Fuel offers: flag the ones that don't pay off, so they stand out before anyone approves.
   const bunker =
     recommendation.actionType === "BUNKER_DETOUR" ? (recommendation.calc as unknown as BunkerCalc) : null;
-  const notWorthIt = bunker?.verdict === "NOT_WORTH_IT";
+  const notWorthIt = bunker?.verdict === "NOT_WORTH_IT" || recommendation.costSavedEur < 0;
   const notWorthItBecause =
-    bunker && notWorthIt ? bunkerVerdictReason(bunker, recommendation.voyage?.destPort?.name ?? "προορισμό") : null;
+    bunker && bunker.verdict === "NOT_WORTH_IT"
+      ? bunkerVerdictReason(bunker, recommendation.voyage?.destPort?.name ?? "προορισμό")
+      : null;
+  const fuelDelta = recommendation.fuelSavedT;
+  const costDelta = recommendation.costSavedEur;
+  const co2Delta = recommendation.co2SavedT;
   const isPending = recommendation.status === "PENDING";
   const shown = isPending ? selected : recommendation.chosenScenario ?? selected;
   const scenario = set?.scenarios.find((s) => s.id === shown) ?? null;
@@ -218,17 +282,35 @@ export function RecommendationCard({
   };
 
   return (
-    <div className={notWorthIt ? "recommendation-card recommendation-card--not-worth-it" : "recommendation-card"}>
-      {bunker && (
-        <p className={notWorthIt ? "verdict verdict--no" : "verdict verdict--yes"}>
-          <strong>{notWorthIt ? "Δεν αξίζει" : "Αξίζει"}</strong>
-          {notWorthItBecause && <span>: {notWorthItBecause}.</span>}
-        </p>
-      )}
+    <div
+      className={
+        notWorthIt ? "recommendation-card recommendation-card--not-worth-it" : "recommendation-card recommendation-card--worth-it"
+      }
+    >
+      <div className={notWorthIt ? "verdict verdict--no" : "verdict verdict--yes"}>
+        <div>
+          <strong>{notWorthIt ? "Δεν αξίζει" : bunker ? "Αξίζει" : "Προτεινόμενη ενέργεια"}</strong>
+          {notWorthItBecause ? (
+            <span>: {notWorthItBecause}.</span>
+          ) : (
+            <span>
+              : {costDelta >= 0 ? "καθαρό όφελος" : "καθαρό κόστος"} {eur(Math.abs(costDelta))}.
+            </span>
+          )}
+        </div>
+        <span className={notWorthIt ? "verdict-pill verdict-pill--no" : "verdict-pill verdict-pill--yes"}>
+          {notWorthIt ? "Πρόταση: απόρριψη" : "Πρόταση: έγκριση"}
+        </span>
+      </div>
       <div className="recommendation-card__header">
         <div>
           <p className="label">{vessel?.name ?? "Πλοίο"}</p>
           <p className="recommendation-card__trigger">{trigger}</p>
+          {recommendation.voyage?.originPort && recommendation.voyage?.destPort && (
+            <p className="recommendation-card__route-sub">
+              Ταξίδι: {recommendation.voyage.originPort.name} → {recommendation.voyage.destPort.name}
+            </p>
+          )}
         </div>
         <div className="recommendation-card__speed">
           <span>{recommendation.currentSpeedKn.toFixed(1)} kn</span>
@@ -285,17 +367,20 @@ export function RecommendationCard({
       ) : (
       <div className="recommendation-card__kpis recommendation-card__kpis--three">
         <div className="kpi-tile">
-          <p className="label">Καύσιμο που γλιτώνεται</p>
-          <p className="kpi">{recommendation.fuelSavedT.toFixed(1)} t</p>
+          <p className="label">{fuelDelta >= 0 ? "Καύσιμο που γλιτώνεται" : "Επιπλέον καύσιμο"}</p>
+          <p className={`kpi ${fuelDelta >= 0 ? "kpi--positive" : "kpi--negative"}`}>{Math.abs(fuelDelta).toFixed(1)} t</p>
+          <p className="kpi-tile__assumption">
+            {fuelDelta >= 0 ? "κυβικός νόμος έλικας" : "για την παράκαμψη και την ταχύτητα"}
+          </p>
         </div>
         <div className="kpi-tile">
-          <p className="label">Εξοικονόμηση κόστους</p>
-          <p className="kpi">{eur(recommendation.costSavedEur)}</p>
+          <p className="label">{costDelta >= 0 ? "Καθαρή εξοικονόμηση" : "Καθαρό κόστος"}</p>
+          <p className={`kpi ${costDelta >= 0 ? "kpi--positive" : "kpi--negative"}`}>{eur(Math.abs(costDelta))}</p>
           <p className="kpi-tile__assumption">παραδοχή: €{fuelPriceEurPerT}/t καύσιμο</p>
         </div>
         <div className="kpi-tile">
-          <p className="label">CO₂ που γλιτώνεται</p>
-          <p className="kpi">{recommendation.co2SavedT.toFixed(1)} t</p>
+          <p className="label">{co2Delta >= 0 ? "CO₂ που γλιτώνεται" : "Επιπλέον CO₂"}</p>
+          <p className={`kpi ${co2Delta >= 0 ? "kpi--positive" : "kpi--negative"}`}>{Math.abs(co2Delta).toFixed(1)} t</p>
         </div>
       </div>
       )}
@@ -345,15 +430,17 @@ export function RecommendationCard({
 
       <div className="recommendation-card__facts">
         <p className="label">Στοιχεία που χρησιμοποιήθηκαν</p>
-        {recommendation.portEvent?.email && (
-          <FactRow table="email" id={recommendation.portEvent.email.id} label="Email προέλευσης" />
-        )}
-        {recommendation.portEvent && (
-          <FactRow table="portEvent" id={recommendation.portEvent.id} label="Συμβάν λιμανιού" />
-        )}
-        {recommendation.voyage && (
-          <FactRow table="voyage" id={recommendation.voyage.id} label="Ταξίδι" />
-        )}
+        <div className="facts-grid">
+          {recommendation.portEvent?.email && (
+            <FactRow table="email" id={recommendation.portEvent.email.id} label="Email προέλευσης" icon={<FileText size={14} />} />
+          )}
+          {recommendation.portEvent && (
+            <FactRow table="portEvent" id={recommendation.portEvent.id} label="Συμβάν λιμανιού" icon={<Anchor size={14} />} />
+          )}
+          {recommendation.voyage && (
+            <FactRow table="voyage" id={recommendation.voyage.id} label="Ταξίδι" icon={<Navigation size={14} />} />
+          )}
+        </div>
       </div>
 
       {error && <div className="error-state" role="alert">{error}</div>}
@@ -366,10 +453,10 @@ export function RecommendationCard({
       )}
       {recommendation.status === "PENDING" ? (
         <div className="recommendation-card__actions">
-          <button className="btn btn-primary" onClick={handleApprove} disabled={busy}>
+          <button className={notWorthIt ? "btn" : "btn btn-primary"} onClick={handleApprove} disabled={busy}>
             Έγκριση{selected ? ` σεναρίου ${selected}` : ""}
           </button>
-          <button className="btn" onClick={() => setShowRejectModal(true)} disabled={busy}>
+          <button className={notWorthIt ? "btn btn-primary" : "btn"} onClick={() => setShowRejectModal(true)} disabled={busy}>
             Απόρριψη
           </button>
           {set && (
@@ -419,7 +506,7 @@ export function RecommendationCard({
             <textarea
               aria-label="Αιτιολογία απόρριψης"
               autoFocus
-              placeholder="Αιτιολογία απόρριψης…"
+              placeholder="π.χ. η προσφορά λήγει πριν φτάσει το πλοίο…"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={3}

@@ -320,3 +320,12 @@ describe("only ships at sea get offers and replies", () => {
     expect(db.drafts).toEqual([]);
   });
 });
+
+describe("sameShipName", async () => {
+  const { sameShipName } = await import("../emailProcessing.js");
+  it("ignores the MV prefix and case, as real models vary", () => {
+    expect(sameShipName("MV Marathon Spirit", "Marathon Spirit")).toBe(true);
+    expect(sameShipName("MV Marathon Spirit", "M/V MARATHON SPIRIT")).toBe(true);
+    expect(sameShipName("MV Marathon Spirit", "MV Marathon Star")).toBe(false);
+  });
+});

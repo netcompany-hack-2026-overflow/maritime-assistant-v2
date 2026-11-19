@@ -30,6 +30,7 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "as a date instead. offerLines: one entry per fuel grade quoted (an email may quote VLSFO and LSMGO " +
   "together); the top-level fuelGrade/priceUsdPerT/qtyMinT/qtyMaxT are the first line. " +
   'portName is the plain port name only, e.g. "Rotterdam", never "Port of Rotterdam". ' +
+  'vesselNameMentioned is the ship\'s name as written, keeping its prefix, e.g. "MV Marathon Spirit" (not "Marathon Spirit"). ' +
   'newBerthTime is UTC in ISO 8601 ending in "Z", e.g. "2026-11-25T14:00:00.000Z"; ' +
   "treat times without a zone as UTC. " +
   "If the email mentions more than one event type, choose the one announced first " +
@@ -93,7 +94,7 @@ export function parseExtraction(raw: unknown): PortEventExtraction {
     portUnlocode: parsed.portUnlocode ? parsed.portUnlocode.replace(/\s+/g, "").toUpperCase() : null,
     newBerthTime: normalizeBerthTime(parsed.newBerthTime),
     // Offer fields only mean something on an offer; models sometimes echo prices elsewhere.
-    fuelGrade: bunker ? (parsed.fuelGrade?.trim().toUpperCase() || null) : null,
+    fuelGrade: bunker ? normalizeFuelGrade(parsed.fuelGrade) : null,
     priceUsdPerT: bunker ? (parsed.priceUsdPerT ?? null) : null,
     qtyMinT: bunker ? (parsed.qtyMinT ?? parsed.qtyMaxT ?? null) : null,
     qtyMaxT: bunker ? (parsed.qtyMaxT ?? parsed.qtyMinT ?? null) : null,
@@ -101,6 +102,15 @@ export function parseExtraction(raw: unknown): PortEventExtraction {
     supplier: bunker ? (parsed.supplier?.trim() || null) : null,
     ...(bunker ? normalizeTerms(parsed) : NO_TERMS),
   };
+}
+
+const GRADES = /\b(VLSFO|ULSFO|LSMGO|HSFO|LSFO|MGO|MDO|LNG|HFO)\b/i;
+
+/** "VLSFO 0.5%" / "vlsfo (RMG380)" -> "VLSFO": offers are compared by grade, so the spec text is dropped. */
+export function normalizeFuelGrade(value: string | null | undefined): string | null {
+  const v = value?.trim();
+  if (!v) return null;
+  return v.match(GRADES)?.[1].toUpperCase() ?? v.toUpperCase();
 }
 
 const NO_TERMS = {
@@ -121,7 +131,7 @@ const NO_TERMS = {
 function normalizeTerms(p: PortEventExtraction) {
   const nonNeg = (v: number | null | undefined) => (v === null || v === undefined || v < 0 ? null : v);
   const imo = p.vesselImo?.replace(/\D/g, "") ?? "";
-  const lines = (p.offerLines ?? []).map((l) => ({ ...l, fuelGrade: l.fuelGrade.trim().toUpperCase() }));
+  const lines = (p.offerLines ?? []).map((l) => ({ ...l, fuelGrade: normalizeFuelGrade(l.fuelGrade) ?? l.fuelGrade.trim().toUpperCase() }));
   return {
     vesselImo: imo.length === 7 ? imo : null,
     vesselEta: normalizeBerthTime(p.vesselEta ?? null),

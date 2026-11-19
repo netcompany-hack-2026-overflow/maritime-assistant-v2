@@ -531,6 +531,27 @@ export async function mockAnswerQuestion(question: string, rows: CitableRow[]): 
     }
   }
 
+  if (q.includes("cii")) {
+    const atSea = rows.filter((r) => r.table === "voyage" && r.data.status === "UNDERWAY" && typeof r.data.ciiRating === "string");
+    const poor = atSea.filter((r) => r.data.ciiRating === "D" || r.data.ciiRating === "E");
+    const fmt = (r: CitableRow) => `${r.data.vesselName} (${r.data.ciiRating}${typeof r.data.ciiAttained === "number" ? `, ${r.data.ciiAttained.toFixed(2)}` : ""})`;
+    if (poor.length > 0) {
+      return {
+        answer:
+          `Πλοία σε ταξίδι με βαθμό CII D ή E: ${poor.map(fmt).join(", ")}. ` +
+          "Η αργή πλεύση (σενάριο B) μειώνει την ένταση άνθρακα όταν υπάρχει περιθώριο ως την πρόσδεση.",
+        citations: poor.map((r) => ({ table: r.table, id: r.id })),
+      };
+    }
+    if (atSea.length > 0) {
+      const worst = [...atSea].sort((a, b) => String(b.data.ciiRating).localeCompare(String(a.data.ciiRating)))[0];
+      return {
+        answer: `Κανένα πλοίο σε ταξίδι δεν έχει βαθμό CII D ή E. Ο χαμηλότερος είναι του ${fmt(worst)}.`,
+        citations: [{ table: worst.table, id: worst.id }],
+      };
+    }
+  }
+
   if (has(q, ["affected", "επηρε"]) && has(q, ["delay", "port", "καθυστ", "λιμ"])) {
     const affectedVoyageIds = new Set(
       rows
