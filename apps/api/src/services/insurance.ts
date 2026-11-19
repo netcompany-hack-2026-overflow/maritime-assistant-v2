@@ -21,6 +21,7 @@ import { isAtSea, NOT_AT_SEA_MESSAGE } from "./atSea.js";
 import { MailerError, sendMail } from "./mailer.js";
 import { parseTerms } from "./scenarios.js";
 import { parseStoredRoute, routeBetweenPorts } from "./seaRoute.js";
+import { withKeyLock } from "../lib/keyedLock.js";
 
 /**
  * War-risk insurance of a voyage. The policy issued at departure is kept; the
@@ -244,10 +245,21 @@ async function save(voyageId: string, stored: StoredInsurance) {
 }
 
 /**
+ * Every read-modify-write of a voyage's insurance JSON runs one at a time, so a
+ * slow analysis can't save an old copy over a broker quote or an edited notice,
+ * and a notice can't be sent twice.
+ */
+const lockVoyage = <T>(voyageId: string, work: () => Promise<T>) => withKeyLock(`insurance:${voyageId}`, work);
+
+/**
  * The voyage's insurance as it stands now. Writes the AI analysis (and a fresh
  * notice draft) only when the facts behind them changed, or when asked to.
  */
-export async function getVoyageInsurance(voyageId: string, opts: { regenerate?: boolean; now?: Date } = {}): Promise<VoyageInsuranceDTO> {
+export function getVoyageInsurance(voyageId: string, opts: { regenerate?: boolean; now?: Date } = {}): Promise<VoyageInsuranceDTO> {
+  return lockVoyage(voyageId, () => currentInsurance(voyageId, opts));
+}
+
+async function currentInsurance(voyageId: string, opts: { regenerate?: boolean; now?: Date } = {}): Promise<VoyageInsuranceDTO> {
   const v = await loadVoyage(voyageId);
   const now = opts.now ?? new Date();
   const stored = readStoredInsurance(v.insurance);
@@ -378,61 +390,67 @@ function toDTO(
 }
 
 /** The broker's rate for one zone (% per 7 days), or null to go back to the market figure. */
-export async function setInsuranceQuote(voyageId: string, zoneId: string, pct: number | null): Promise<VoyageInsuranceDTO> {
-  const v = await loadVoyage(voyageId);
-  const stored = readStoredInsurance(v.insurance);
-  if (!stored.atDeparture) stored.atDeparture = assessAtDeparture(v);
-  const known = new Set(assessVoyage(v, {}).exposures.flatMap((e) => [e.rateZoneId, ...e.zones.map((z) => z.zoneId)]));
-  if (!known.has(zoneId)) throw new InsuranceError(400, "Η ζώνη δεν είναι στη διαδρομή αυτού του ταξιδιού.");
-  if (pct === null) delete stored.quotes[zoneId];
-  else stored.quotes[zoneId] = pct;
-  await save(v.id, stored);
-  await prisma.auditLog.create({
-    data: { entity: "voyage", entityId: v.id, action: "WAR_RISK_QUOTE_SET", payload: { zoneId, pct } },
+export function setInsuranceQuote(voyageId: string, zoneId: string, pct: number | null): Promise<VoyageInsuranceDTO> {
+  return lockVoyage(voyageId, async () => {
+    const v = await loadVoyage(voyageId);
+    const stored = readStoredInsurance(v.insurance);
+    if (!stored.atDeparture) stored.atDeparture = assessAtDeparture(v);
+    const known = new Set(assessVoyage(v, {}).exposures.flatMap((e) => [e.rateZoneId, ...e.zones.map((z) => z.zoneId)]));
+    if (!known.has(zoneId)) throw new InsuranceError(400, "Η ζώνη δεν είναι στη διαδρομή αυτού του ταξιδιού.");
+    if (pct === null) delete stored.quotes[zoneId];
+    else stored.quotes[zoneId] = pct;
+    await save(v.id, stored);
+    await prisma.auditLog.create({
+      data: { entity: "voyage", entityId: v.id, action: "WAR_RISK_QUOTE_SET", payload: { zoneId, pct } },
+    });
+    return currentInsurance(voyageId);
   });
-  return getVoyageInsurance(voyageId);
 }
 
 /** A person's edits to the notice; edited drafts are never rewritten by the agent. */
-export async function updateInsuranceNotice(
+export function updateInsuranceNotice(
   voyageId: string,
   edit: { to: string; subject: string; body: string }
 ): Promise<VoyageInsuranceDTO> {
-  const v = await loadVoyage(voyageId);
-  const stored = readStoredInsurance(v.insurance);
-  if (!stored.notice) throw new InsuranceError(404, "Δεν υπάρχει δήλωση προς τους ασφαλιστές για αυτό το ταξίδι.");
-  if (stored.notice.status === "SENT") throw new InsuranceError(409, "Η δήλωση έχει ήδη σταλεί.");
-  stored.notice = { ...stored.notice, ...edit, edited: true };
-  await save(v.id, stored);
-  return getVoyageInsurance(voyageId);
+  return lockVoyage(voyageId, async () => {
+    const v = await loadVoyage(voyageId);
+    const stored = readStoredInsurance(v.insurance);
+    if (!stored.notice) throw new InsuranceError(404, "Δεν υπάρχει δήλωση προς τους ασφαλιστές για αυτό το ταξίδι.");
+    if (stored.notice.status === "SENT") throw new InsuranceError(409, "Η δήλωση έχει ήδη σταλεί.");
+    stored.notice = { ...stored.notice, ...edit, edited: true };
+    await save(v.id, stored);
+    return currentInsurance(voyageId);
+  });
 }
 
 /** Send the notice to the war underwriters (only for a ship at sea, only on a person's click). */
-export async function sendInsuranceNotice(voyageId: string): Promise<VoyageInsuranceDTO> {
-  const v = await loadVoyage(voyageId);
-  if (!isAtSea(v)) throw new InsuranceError(409, NOT_AT_SEA_MESSAGE);
-  const stored = readStoredInsurance(v.insurance);
-  const n = stored.notice;
-  if (!n) throw new InsuranceError(404, "Δεν υπάρχει δήλωση προς τους ασφαλιστές για αυτό το ταξίδι.");
-  if (n.status === "SENT") throw new InsuranceError(409, "Η δήλωση έχει ήδη σταλεί.");
-  try {
-    const { messageId, deliveredTo } = await sendMail({ to: n.to, subject: n.subject, text: n.body });
-    const sentAt = new Date().toISOString();
-    stored.notice = { ...n, status: "SENT", sentAt, deliveredTo, messageId, lastError: null };
-    stored.sentNotices = [{ subject: n.subject, sentAt, deliveredTo }, ...stored.sentNotices];
-    await save(v.id, stored);
-    await prisma.auditLog.create({
-      data: { entity: "voyage", entityId: v.id, action: "WAR_RISK_NOTICE_SENT", payload: { to: n.to, deliveredTo, subject: n.subject } },
-    });
-  } catch (err) {
-    if (err instanceof MailerError) {
-      stored.notice = { ...n, lastError: err.message };
+export function sendInsuranceNotice(voyageId: string): Promise<VoyageInsuranceDTO> {
+  return lockVoyage(voyageId, async () => {
+    const v = await loadVoyage(voyageId);
+    if (!isAtSea(v)) throw new InsuranceError(409, NOT_AT_SEA_MESSAGE);
+    const stored = readStoredInsurance(v.insurance);
+    const n = stored.notice;
+    if (!n) throw new InsuranceError(404, "Δεν υπάρχει δήλωση προς τους ασφαλιστές για αυτό το ταξίδι.");
+    if (n.status === "SENT") throw new InsuranceError(409, "Η δήλωση έχει ήδη σταλεί.");
+    try {
+      const { messageId, deliveredTo } = await sendMail({ to: n.to, subject: n.subject, text: n.body });
+      const sentAt = new Date().toISOString();
+      stored.notice = { ...n, status: "SENT", sentAt, deliveredTo, messageId, lastError: null };
+      stored.sentNotices = [{ subject: n.subject, sentAt, deliveredTo }, ...stored.sentNotices];
       await save(v.id, stored);
-      throw new InsuranceError(err.status, err.message);
+      await prisma.auditLog.create({
+        data: { entity: "voyage", entityId: v.id, action: "WAR_RISK_NOTICE_SENT", payload: { to: n.to, deliveredTo, subject: n.subject } },
+      });
+    } catch (err) {
+      if (err instanceof MailerError) {
+        stored.notice = { ...n, lastError: err.message };
+        await save(v.id, stored);
+        throw new InsuranceError(err.status, err.message);
+      }
+      throw err;
     }
-    throw err;
-  }
-  return getVoyageInsurance(voyageId);
+    return currentInsurance(voyageId);
+  });
 }
 
 /** The line in the voyages table: computed live, no model call. */

@@ -97,7 +97,8 @@ class AisTracker {
     const vessels = await prisma.vessel.findMany({ where: { mmsi: { not: null } }, select: { id: true, mmsi: true } });
     this.mmsiToVessel = new Map(vessels.map((v) => [v.mmsi!, v.id]));
     this.close();
-    if (this.mmsiToVessel.size > 0) this.connect();
+    // Linking a vessel after stop() updates the list but doesn't reconnect.
+    if (!this.stopped && this.mmsiToVessel.size > 0) this.connect();
   }
 
   start(): void {
