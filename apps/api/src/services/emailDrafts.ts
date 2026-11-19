@@ -5,6 +5,7 @@ import { sendMail } from "./mailer.js";
 import { draftToDTO } from "./bunkerOffers.js";
 import { NOT_TAKEN_PREFIX, closeAlternatives, describeOption, openAlternatives } from "./alternatives.js";
 import { NOT_AT_SEA_MESSAGE, isAtSea } from "./atSea.js";
+import { withKeyLock } from "../lib/keyedLock.js";
 
 class HttpError extends Error {
   status: number;
@@ -22,6 +23,13 @@ export interface DraftEdit {
 
 /** Save a person's edits. Edited drafts are kept when prices change and drafts are rewritten. */
 export async function updateDraft(id: string, edit: DraftEdit) {
+  const head = await prisma.emailDraft.findUnique({ where: { id }, select: { recommendationId: true } });
+  if (!head) throw new HttpError(404, "Το πρόχειρο δεν βρέθηκε");
+  // Not while a reply for the same offer is being sent.
+  return withKeyLock(`recommendation:${head.recommendationId}`, () => updateDraftNow(id, edit));
+}
+
+async function updateDraftNow(id: string, edit: DraftEdit) {
   const draft = await prisma.emailDraft.findUnique({ where: { id } });
   if (!draft) throw new HttpError(404, "Το πρόχειρο δεν βρέθηκε");
   if (draft.status !== "DRAFT") throw new HttpError(409, `Αυτό το email έχει ήδη ${draft.status === "SENT" ? "σταλεί" : "κλείσει"}`);
@@ -35,8 +43,19 @@ export async function updateDraft(id: string, edit: DraftEdit) {
  * - DECLINE rejects it,
  * - COUNTER leaves it pending until the supplier answers.
  * The other replies for the offer are marked superseded. Only one reply per offer is ever sent.
+ *
+ * The reply has to match the decision already taken on the Actions page: no
+ * acceptance for an offer that was rejected, no decline or counter-offer for
+ * one that was approved. Sends for the same offer run one at a time, so a
+ * double click or a second tab can't send two replies.
  */
 export async function sendDraft(id: string) {
+  const head = await prisma.emailDraft.findUnique({ where: { id }, select: { recommendationId: true } });
+  if (!head) throw new HttpError(404, "Το πρόχειρο δεν βρέθηκε");
+  return withKeyLock(`recommendation:${head.recommendationId}`, () => sendDraftNow(id));
+}
+
+async function sendDraftNow(id: string) {
   const draft = await prisma.emailDraft.findUnique({
     where: { id },
     include: {
@@ -54,6 +73,15 @@ export async function sendDraft(id: string) {
       rec.rejectReason?.startsWith(NOT_TAKEN_PREFIX)
         ? `Η προσφορά έκλεισε (${rec.rejectReason}). Αναιρέστε εκείνη την έγκριση για να την αποδεχτείτε.`
         : "Έχει ήδη σταλεί άλλη απάντηση σε αυτή την προσφορά"
+    );
+  }
+  if (draft.kind === "ACCEPT" && rec.status === "REJECTED") {
+    throw new HttpError(409, "Η προσφορά έχει απορριφθεί, οπότε δεν στέλνεται αποδοχή.");
+  }
+  if (draft.kind !== "ACCEPT" && rec.status === "APPROVED") {
+    throw new HttpError(
+      409,
+      `Η προσφορά έχει εγκριθεί, οπότε δεν στέλνεται ${draft.kind === "DECLINE" ? "απόρριψη" : "αντιπρόταση"}. Αναιρέστε πρώτα την έγκριση.`
     );
   }
   // No email of any kind about a ship that is no longer at sea.
@@ -79,9 +107,20 @@ export async function sendDraft(id: string) {
     }),
   ];
 
+  const plan = rec.bunkerPlan as unknown as BunkerPlan | null;
+  const option = draft.kind === "ACCEPT" ? plan?.options.find((o) => o.key === draft.optionKey) : undefined;
+  // The figures of the option actually chosen, so "Saved to date" stays truthful.
+  const optionFields = option
+    ? {
+        recommendedSpeedKn: option.calc.speedBunkerKn,
+        fuelSavedT: -option.calc.extraFuelT,
+        costSavedEur: option.calc.netEur,
+        co2SavedT: -option.calc.extraCo2T,
+        calc: option.calc as unknown as Prisma.InputJsonValue,
+      }
+    : {};
+
   if (rec.status === "PENDING" && draft.kind === "ACCEPT") {
-    const plan = rec.bunkerPlan as unknown as BunkerPlan | null;
-    const option = plan?.options.find((o) => o.key === draft.optionKey);
     // Accepting this offer is the ship's decision: its other open options close.
     const alternatives = await openAlternatives(rec);
     ops.push(...closeAlternatives(alternatives, describeOption(rec), now));
@@ -109,17 +148,16 @@ export async function sendDraft(id: string) {
           status: "APPROVED",
           decidedAt: now,
           chosenOption: draft.optionKey,
-          // The figures of the option actually chosen, so "Saved to date" stays truthful.
-          ...(option
-            ? {
-                recommendedSpeedKn: option.calc.speedBunkerKn,
-                fuelSavedT: -option.calc.extraFuelT,
-                costSavedEur: option.calc.netEur,
-                co2SavedT: -option.calc.extraCo2T,
-                calc: option.calc as unknown as Prisma.InputJsonValue,
-              }
-            : {}),
+          ...optionFields,
         },
+      })
+    );
+  } else if (rec.status === "APPROVED" && draft.kind === "ACCEPT") {
+    // Approved on the page first; the acceptance tells the supplier which option, so record that one.
+    ops.push(
+      prisma.recommendation.update({
+        where: { id: rec.id },
+        data: { chosenOption: draft.optionKey, ...optionFields },
       })
     );
   } else if (rec.status === "PENDING" && draft.kind === "DECLINE") {

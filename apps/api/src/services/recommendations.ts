@@ -4,9 +4,10 @@ import { prisma } from "../lib/prisma.js";
 import { remainingDistanceNm, simHoursSince } from "../sim/positions.js";
 import { env } from "../lib/env.js";
 import { parseScenarioSet, recommendationFields } from "./scenarioFields.js";
-import { draftNoticeForApproval } from "./notices.js";
+import { draftCorrectionNotice, draftNoticeForApproval } from "./notices.js";
 import { calculateVoyageCII } from "./cii.js";
 import { NOT_AT_SEA_MESSAGE, isAtSea } from "./atSea.js";
+import { withKeyLock } from "../lib/keyedLock.js";
 import {
   NOT_TAKEN_PREFIX,
   closeAlternatives,
@@ -24,7 +25,22 @@ class HttpError extends Error {
   }
 }
 
-export async function approveRecommendation(id: string, scenarioId?: ScenarioId) {
+/** Decisions and replies on the same recommendation run one at a time. */
+const locked = <T>(id: string, work: () => Promise<T>) => withKeyLock(`recommendation:${id}`, work);
+
+export function approveRecommendation(id: string, scenarioId?: ScenarioId) {
+  return locked(id, () => approveNow(id, scenarioId));
+}
+
+export function undoApproval(id: string) {
+  return locked(id, () => undoNow(id));
+}
+
+export function rejectRecommendation(id: string, reason: string) {
+  return locked(id, () => rejectNow(id, reason));
+}
+
+async function approveNow(id: string, scenarioId?: ScenarioId) {
   const recommendation = await prisma.recommendation.findUnique({
     where: { id },
     include: { portEvent: { include: { port: true } } },
@@ -56,6 +72,12 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
     const now = new Date();
     await prisma.$transaction([
       prisma.recommendation.update({ where: { id }, data: { status: "APPROVED", decidedAt: now } }),
+      // Approved: its decline and counter-offer can't go out any more. The acceptances stay,
+      // to tell the supplier; undoing the approval reopens these.
+      prisma.emailDraft.updateMany({
+        where: { recommendationId: id, status: "DRAFT", kind: { in: ["DECLINE", "COUNTER"] } },
+        data: { status: "SUPERSEDED" },
+      }),
       ...closeAlternatives(alternatives, chosenLabel, now),
       prisma.auditLog.create({
         data: {
@@ -95,7 +117,7 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
 
   // Remaining distance on the real (non-accelerated) operational timeline.
   let remainingNm = remainingDistanceNm(voyage, now);
-  const reroute = chosenId === "C" && scenario?.coords && scenario.coords.length >= 2 && baseline;
+  const reroute = chosenId === "C" && scenario?.coords && scenario.coords.length >= 2 && baseline && baseline.distanceNm > 0;
   if (reroute) remainingNm *= scenario!.distanceNm / baseline!.distanceNm;
   // Time has passed since the scenarios were computed: re-solve the speed that
   // reaches the berth time from where the ship is now, within the scenario's
@@ -190,6 +212,7 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
         scenario,
         previousEta: voyage.plannedEta,
         previousSpeedKn: voyage.speedKn,
+        newSpeedKn,
         newEta: newPlannedEta,
       });
     } catch (err) {
@@ -204,7 +227,7 @@ export async function approveRecommendation(id: string, scenarioId?: ScenarioId)
  * Take back an approval made by mistake: restore the voyage's previous speed
  * (and berth time) and return the recommendation to PENDING.
  */
-export async function undoApproval(id: string) {
+async function undoNow(id: string) {
   const recommendation = await prisma.recommendation.findUnique({ where: { id } });
   if (!recommendation) throw new HttpError(404, "Η σύσταση δεν βρέθηκε");
   if (recommendation.status !== "APPROVED") {
@@ -215,14 +238,33 @@ export async function undoApproval(id: string) {
   const reopened = await closedByApproval(id);
 
   if (recommendation.actionType === "BUNKER_DETOUR") {
+    const voyage = await prisma.voyage.findUnique({ where: { id: recommendation.voyageId } });
+    if (!voyage || voyage.status !== "UNDERWAY") {
+      throw new HttpError(409, "Το ταξίδι δεν είναι πλέον σε εξέλιξη, οπότε η έγκριση δεν αναιρείται");
+    }
+    const sentReply = await prisma.emailDraft.findFirst({ where: { recommendationId: id, status: "SENT" } });
+    if (sentReply?.kind === "ACCEPT") {
+      throw new HttpError(
+        409,
+        `Έχει ήδη σταλεί αποδοχή στον προμηθευτή (${sentReply.toAddr}), οπότε η έγκριση δεν αναιρείται εδώ. Ακυρώστε πρώτα την παραγγελία με τον προμηθευτή.`
+      );
+    }
     const [updatedRecommendation] = await prisma.$transaction([
       prisma.recommendation.update({ where: { id }, data: { status: "PENDING", decidedAt: null, chosenOption: null } }),
+      // The decline and counter-offer the approval closed can go out again (unless a reply was sent).
+      ...(sentReply
+        ? []
+        : [
+            prisma.emailDraft.updateMany({
+              where: { recommendationId: id, status: "SUPERSEDED" },
+              data: { status: "DRAFT" },
+            }),
+          ]),
       ...reopenAlternatives(reopened),
       prisma.auditLog.create({
         data: { entity: "recommendation", entityId: id, action: "APPROVAL_UNDONE", payload: { actionType: "BUNKER_DETOUR" } },
       }),
     ]);
-    const voyage = await prisma.voyage.findUnique({ where: { id: recommendation.voyageId } });
     return { voyage, recommendation: updatedRecommendation };
   }
 
@@ -290,6 +332,12 @@ export async function undoApproval(id: string) {
     vesselType: voyage.vessel.type,
   });
 
+  // A notice already sent told charterers the new ETA; they need a correction.
+  const sentNotice = await prisma.outboundEmail.findFirst({
+    where: { recommendationId: id, status: "SENT" },
+    orderBy: { sentAt: "desc" },
+  });
+
   const [updatedVoyage, updatedRecommendation] = await prisma.$transaction([
     prisma.voyage.update({
       where: { id: voyage.id },
@@ -343,10 +391,27 @@ export async function undoApproval(id: string) {
     }),
   ]);
 
-  return { voyage: updatedVoyage, recommendation: updatedRecommendation };
+  let correction = null;
+  if (sentNotice) {
+    try {
+      correction = await draftCorrectionNotice({
+        recommendationId: id,
+        sent: sentNotice,
+        vesselName: voyage.vessel.name,
+        imo: voyage.vessel.imo,
+        destPortName: voyage.destPort.name,
+        restoredSpeedKn,
+        restoredEta,
+      });
+    } catch (err) {
+      console.error("Could not draft the correction notice:", err);
+    }
+  }
+
+  return { voyage: updatedVoyage, recommendation: updatedRecommendation, correction };
 }
 
-export async function rejectRecommendation(id: string, reason: string) {
+async function rejectNow(id: string, reason: string) {
   const recommendation = await prisma.recommendation.findUnique({ where: { id } });
   if (!recommendation) throw new HttpError(404, "Η σύσταση δεν βρέθηκε");
   if (recommendation.status !== "PENDING") {
@@ -358,6 +423,11 @@ export async function rejectRecommendation(id: string, reason: string) {
     prisma.recommendation.update({
       where: { id },
       data: { status: "REJECTED", rejectReason: reason, decidedAt: now },
+    }),
+    // Rejected: no acceptance or counter-offer may go out for it; a polite decline still can.
+    prisma.emailDraft.updateMany({
+      where: { recommendationId: id, status: "DRAFT", kind: { not: "DECLINE" } },
+      data: { status: "SUPERSEDED" },
     }),
     prisma.auditLog.create({
       data: {

@@ -25,6 +25,7 @@ vi.mock("../../lib/prisma.js", () => {
       },
     },
     portEvent: { findUnique: async () => ({ newBerthTime: null }) },
+    emailDraft: { updateMany: async () => ({ count: 0 }), findFirst: async () => null },
     auditLog: {
       create: async ({ data }: { data: { action: string } }) => db.audit.push(data),
       findFirst: async () => null,

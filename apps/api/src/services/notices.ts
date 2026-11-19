@@ -22,6 +22,8 @@ export async function draftNoticeForApproval(args: {
   scenario: Scenario;
   previousEta: Date;
   previousSpeedKn: number;
+  /** The speed actually set on approval (re-solved from where the ship is then). */
+  newSpeedKn: number;
   newEta: Date;
 }) {
   const rec = await prisma.recommendation.findUniqueOrThrow({
@@ -54,7 +56,7 @@ export async function draftNoticeForApproval(args: {
     berthTimeUtc: set.berthTime,
     scenarioLabel: `${scenario.id} (${scenario.label})`,
     scenarioDescription: scenario.description,
-    newSpeedKn: scenario.speedKn,
+    newSpeedKn: args.newSpeedKn,
     previousSpeedKn: args.previousSpeedKn,
     fuelSavedT: delta.fuelT,
     co2SavedT: delta.co2T,
@@ -99,6 +101,49 @@ export async function draftNoticeForApproval(args: {
       ccAddrs: cc,
       subject: draft.subject,
       body: draft.body,
+      status: "DRAFT",
+    },
+  });
+}
+
+const fmtUtc = (d: Date) => `${d.toISOString().slice(0, 10)} ${d.toISOString().slice(11, 16)} UTC`;
+
+/**
+ * An approval was undone after its notice had gone out: draft the correction,
+ * to the same people, so they are not left with an ETA that no longer holds.
+ * A DRAFT, like every notice; written from a template, no model call.
+ */
+export async function draftCorrectionNotice(args: {
+  recommendationId: string;
+  sent: { toAddrs: string; ccAddrs: string; subject: string; sentAt: Date | null };
+  vesselName: string;
+  imo: string;
+  destPortName: string;
+  restoredSpeedKn: number;
+  restoredEta: Date;
+}) {
+  const { sent } = args;
+  const sentOn = sent.sentAt ? ` of ${fmtUtc(sent.sentAt)}` : "";
+  const body = [
+    "Dear Charterers,",
+    "",
+    `Re: ${args.vesselName} (IMO ${args.imo}) — ${args.destPortName}`,
+    "",
+    `Please disregard our notice${sentOn} ("${sent.subject}"). The speed change it announced has been cancelled.`,
+    "",
+    `The vessel continues at ${args.restoredSpeedKn.toFixed(1)} kn. ETA ${args.destPortName}: ${fmtUtc(args.restoredEta)}.`,
+    "",
+    "We will advise if this changes.",
+    "",
+    "Operations",
+  ].join("\n");
+  return prisma.outboundEmail.create({
+    data: {
+      recommendationId: args.recommendationId,
+      toAddrs: sent.toAddrs,
+      ccAddrs: sent.ccAddrs,
+      subject: `Correction – ${sent.subject.replace(/^Correction – /, "")}`,
+      body,
       status: "DRAFT",
     },
   });

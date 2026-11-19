@@ -17,7 +17,7 @@ import { remainingDistanceNm, voyageGeometry } from "../sim/positions.js";
 import { routeWeather } from "./weather.js";
 import { findWeatherRoute } from "./weatherRoute.js";
 import { voyageProgressNow } from "./voyagePosition.js";
-import { recommendationFields } from "./scenarioFields.js";
+import { parseScenarioSet, recommendationFields } from "./scenarioFields.js";
 
 const H = 3_600_000;
 
@@ -160,8 +160,12 @@ export async function recomputeRecommendation(id: string, opts: { withRationale?
 
   const result = await computeScenarios(rec.voyage, berthTime);
   if (!result) return null;
+  // withRationale: false (live AIS updates) skips the model call only while the
+  // recommended scenario stays the same; a new best scenario needs a new explanation.
+  const before = parseScenarioSet(rec.scenarios);
+  const sameBest = before?.recommendedId === result.set.recommendedId;
   const rationale = await rationaleFor(rec.voyage, rec.portEvent, result.set, {
-    offline: opts.withRationale === false,
+    offline: opts.withRationale === false && sameBest,
   });
 
   return prisma.recommendation.update({

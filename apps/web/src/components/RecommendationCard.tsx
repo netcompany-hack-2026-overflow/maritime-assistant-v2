@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Anchor, ChevronDown, ChevronUp, FileText, Navigation, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { bunkerVerdictReason, savingsVsBaseline, type BunkerCalc, type ScenarioId } from "@maritime/shared";
@@ -200,6 +200,8 @@ export function RecommendationCard({
     recommendation.chosenScenario ?? set?.recommendedId ?? null
   );
   const [notices, setNotices] = useState<OutboundEmail[]>(recommendation.outboundEmails ?? []);
+  // After a reload (approve, undo) the server may have drafted a new notice or a correction.
+  useEffect(() => setNotices(recommendation.outboundEmails ?? []), [recommendation.outboundEmails]);
   const [showMath, setShowMath] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");

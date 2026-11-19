@@ -32,6 +32,7 @@ vi.mock("../../lib/prisma.js", () => {
     if (w.recommendationId?.in && !w.recommendationId.in.includes(d.recommendationId)) return false;
     if (w.status && d.status !== w.status) return false;
     if (w.kind?.not && d.kind === w.kind.not) return false;
+    if (w.kind?.in && !w.kind.in.includes(d.kind)) return false;
     if (w.recommendation && !matchRec(db.recs.find((r) => r.id === d.recommendationId), w.recommendation)) return false;
     return true;
   };
@@ -54,6 +55,7 @@ vi.mock("../../lib/prisma.js", () => {
         const d = db.drafts.find((x) => x.id === where.id);
         return d && include ? { ...d, recommendation: withRelations(db.recs.find((r) => r.id === d.recommendationId)) } : (d ?? null);
       },
+      findFirst: async ({ where }: { where: Where }) => db.drafts.find((d) => matchDraft(d, where)) ?? null,
       update: async ({ where, data }: { where: { id: string }; data: Row }) =>
         Object.assign(db.drafts.find((x) => x.id === where.id)!, data, { updatedAt: new Date() }),
       updateMany: async ({ where, data }: { where: Where; data: Row }) => {
@@ -183,14 +185,18 @@ describe("one decision per ship", () => {
     expect(rec("slowdown").status).toBe("PENDING");
   });
 
-  it("sending an acceptance email is the same decision: the others close, and undo reopens them", async () => {
+  it("sending an acceptance email is the same decision: the others close", async () => {
     await sendDraft("ceuta-ACCEPT");
     expect(rec("ceuta").status).toBe("APPROVED");
     expect(rec("algeciras").rejectReason).toBe("Δεν επιλέχθηκε: εγκρίθηκε ο ανεφοδιασμός στο Ceuta (Ceuta Oil Trading) για αυτό το πλοίο");
     expect(rec("slowdown").status).toBe("REJECTED");
-    await undoApproval("ceuta");
-    expect(rec("algeciras").status).toBe("PENDING");
-    expect(rec("slowdown").status).toBe("PENDING");
+  });
+
+  it("an approval whose acceptance has gone to the supplier can't be undone here", async () => {
+    await sendDraft("ceuta-ACCEPT");
+    await expect(undoApproval("ceuta")).rejects.toThrow(/Έχει ήδη σταλεί αποδοχή στον προμηθευτή \(ceuta@supplier.example\)/);
+    expect(rec("ceuta").status).toBe("APPROVED");
+    expect(rec("algeciras").status).toBe("REJECTED");
   });
 
   it("an option that arrives after the decision is a new decision, not blocked", async () => {
@@ -207,5 +213,59 @@ describe("trying to approve a closed option", () => {
     await expect(approveRecommendation("ceuta")).rejects.toThrow(
       "Δεν επιλέχθηκε: εγκρίθηκε ο ανεφοδιασμός στο Algeciras (Strait Bunkering Ltd) για αυτό το πλοίο. Αναιρέστε εκείνη την έγκριση για να επιλέξετε αυτή."
     );
+  });
+});
+
+describe("replies follow the decision taken on the page", () => {
+  it("after a rejection, the acceptance and counter-offer can't be sent; the decline can", async () => {
+    const { rejectRecommendation } = await import("../recommendations.js");
+    await rejectRecommendation("algeciras", "too far");
+    expect(draft("algeciras-ACCEPT").status).toBe("SUPERSEDED");
+    expect(draft("algeciras-COUNTER").status).toBe("SUPERSEDED");
+    expect(draft("algeciras-DECLINE").status).toBe("DRAFT");
+    await expect(sendDraft("algeciras-ACCEPT")).rejects.toThrow();
+    await sendDraft("algeciras-DECLINE");
+    expect(db.sent).toHaveLength(1);
+  });
+
+  it("an acceptance is refused for a rejected offer even if its draft is still open", async () => {
+    rec("algeciras").status = "REJECTED";
+    await expect(sendDraft("algeciras-ACCEPT")).rejects.toThrow(/έχει απορριφθεί/);
+    expect(db.sent).toHaveLength(0);
+  });
+
+  it("after approving on the page, the decline and counter-offer close; the acceptance can still go out", async () => {
+    await approveRecommendation("algeciras");
+    expect(draft("algeciras-DECLINE").status).toBe("SUPERSEDED");
+    expect(draft("algeciras-COUNTER").status).toBe("SUPERSEDED");
+    expect(draft("algeciras-ACCEPT").status).toBe("DRAFT");
+    await sendDraft("algeciras-ACCEPT");
+    expect(rec("algeciras")).toMatchObject({ status: "APPROVED", chosenOption: "ECO" });
+  });
+
+  it("a decline is refused for an approved offer even if its draft is still open", async () => {
+    await approveRecommendation("algeciras");
+    draft("algeciras-DECLINE").status = "DRAFT";
+    await expect(sendDraft("algeciras-DECLINE")).rejects.toThrow(/έχει εγκριθεί/);
+    expect(db.sent).toHaveLength(0);
+  });
+
+  it("undoing a page approval reopens its own decline and counter-offer", async () => {
+    await approveRecommendation("algeciras");
+    await undoApproval("algeciras");
+    expect(draft("algeciras-DECLINE").status).toBe("DRAFT");
+    expect(draft("algeciras-COUNTER").status).toBe("DRAFT");
+  });
+
+  it("no undo for a voyage that is no longer underway", async () => {
+    await approveRecommendation("algeciras");
+    db.voyages[0].status = "ARRIVED";
+    await expect(undoApproval("algeciras")).rejects.toThrow(/δεν είναι πλέον σε εξέλιξη/);
+  });
+
+  it("two clicks on Send deliver one acceptance", async () => {
+    const results = await Promise.allSettled([sendDraft("algeciras-ACCEPT"), sendDraft("algeciras-ACCEPT")]);
+    expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(db.sent).toHaveLength(1);
   });
 });
