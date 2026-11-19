@@ -34,6 +34,12 @@ Rules for agents:
   go-ahead in the conversation. Pushing a tested branch into `dev` is fine when the user
   asked for the work to be pushed.
 - Never force-push `dev` or `main`.
+- One branch per piece of work. Never merge one feature branch into another. If you need
+  someone else's work, wait until it is in `dev`, then bring it in with `git merge dev`.
+- Before anything goes to `main`, review the changes on `dev` for bugs, so `main` only
+  gets reviewed, tested code.
+- Once a branch is merged into `dev`, delete it locally and on GitHub
+  (`git branch -d <branch>` and `git push origin --delete <branch>`).
 - Don't commit local-only files: `.env`, `.claude/launch.json`, scratch scripts.
 
 ## Project in one paragraph
