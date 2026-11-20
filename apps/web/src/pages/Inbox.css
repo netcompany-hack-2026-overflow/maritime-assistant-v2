@@ -31,7 +31,13 @@
 
 .inbox-toolbar__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* The main action gets a row of its own, so it never runs past the narrow list column. */
+.inbox-toolbar__actions .btn-primary {
+  flex: 1 1 100%;
 }
 
 .custom-email-form {
@@ -239,9 +245,12 @@
 
 .email-list__item-container .email-list__item {
   flex: 1;
+  /* Let a long subject shrink (it ends in …) instead of pushing the delete button off screen. */
+  min-width: 0;
 }
 
 .email-list__delete {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: var(--muted);
@@ -253,8 +262,16 @@
   border-radius: var(--radius);
 }
 
-.email-list__item-container:hover .email-list__delete {
+.email-list__item-container:hover .email-list__delete,
+.email-list__delete:focus-visible {
   opacity: 1;
+}
+
+/* Touch screens have no hover: keep the delete button visible. */
+@media (hover: none) {
+  .email-list__delete {
+    opacity: 1;
+  }
 }
 
 .email-list__delete:hover {

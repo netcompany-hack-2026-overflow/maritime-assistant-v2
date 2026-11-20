@@ -105,11 +105,12 @@ When a fuel offer arrives, the agent:
          + delay risk (hours × charter rate × urgency 25/50/100%)
          + cost of credit (8%/yr vs 30 days) + supplier risk (0.3% per point below 10/10)
          + EU ETS on the extra CO₂ (same model as the scenarios: Settings EUA price ×
-           the year's phase-in × EU/non-EU voyage scope; can be switched off in the UI)
+           the year's phase-in × EU/non-EU voyage scope)
    ```
-   The sliders (charter rate, stem, urgency, ETS) re-run the same pure calculation in the
-   browser instantly, no tokens. The plain-English recommendation is built from the
-   numbers; "Ask the AI" makes **one** model call, only when asked.
+   The calculation runs in the browser on the voyage's own figures: the ship's charter rate,
+   the offer's quantity and the EUA price from Settings, listed under the recommendation. The
+   recommendation is built from the numbers, with no tokens. "Ask the AI" makes **one** model
+   call, only when asked.
 6. **Drafts the replies** (an acceptance per option, a counter-offer when the price doesn't
    work, a decline) from templates, so figures are exact and cost no tokens. You read,
    edit and send **one**: acceptance approves the offer with that option, decline rejects
@@ -313,7 +314,7 @@ the time check).
 | 0–10 s | **Actions** → "Simulate fuel quotes" | "Four suppliers, four emails in trader shorthand, like every day." |
 | 10–20 s | The table: Rock Marine at **$526/t** is cheapest… and ranks **#4** | "Cheapest per tonne is dearest overall: $4,500 barging on top, barge 12 hours after arrival, reliability 5/10." |
 | 20–30 s | The recommendation: "Strait Bunkering is $5.00/t dearer on paper… but ≈$33k cheaper overall" | "Making up 12 hours means sailing faster: ≈$27k of extra fuel no quote shows." |
-| 30–40 s | Ceuta's countdown (**firm 10 mins**, amber) · sliders: charter $40k, urgency High, ETS on/off | "The ranking re-computes instantly, no model call." |
+| 30–40 s | Ceuta's countdown (**firm 10 mins**, amber) · the cost lines side by side | "The ranking comes from the numbers, no model call." |
 | 40–50 s | Click the Strait Bunkering column → route sketch, ECO 12.5 kn vs 14 kn, times per waypoint | "It also planned the new route and the speed that arrives exactly at the berth." |
 | 50–60 s | "Accept · eco speed" → tweak the text → **Send** | "A person decides and sends. The model only reads; nobody makes the numbers up, and offers that don't fit the schedule are cut before we spend a token." |
 
