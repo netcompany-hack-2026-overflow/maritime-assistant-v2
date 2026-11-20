@@ -64,6 +64,10 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPick
     const controls = globe.controls();
     controls.autoRotate = !originPort && !destPort;
     controls.autoRotateSpeed = 0.6;
+    // Same zoom limits as the fleet globe: not into the surface, not out into empty space.
+    const radius = globe.getGlobeRadius();
+    controls.minDistance = radius * 1.15;
+    controls.maxDistance = radius * 3.6;
   }, [originPort, destPort]);
 
   const globeMaterial = useMemo(() => new THREE.MeshPhongMaterial({ color: "#f0f5fc" }), []);

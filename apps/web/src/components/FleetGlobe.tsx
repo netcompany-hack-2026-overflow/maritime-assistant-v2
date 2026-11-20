@@ -447,6 +447,15 @@ const WAKE = "#7dd3fc";
 const WARNING = "#b7791f";
 const PORT = "#1f8a5b";
 
+/** Closest and farthest camera, as altitude above the surface in globe radii. */
+const MIN_ALTITUDE = 0.15;
+const MAX_ALTITUDE = 2.6;
+/**
+ * The ships move a tiny step every 100 ms and the camera moves with them at once. A
+ * transition here would fight the mouse wheel: it would restore the zoom it started from.
+ */
+const FOLLOW_STEP_MS = 0;
+
 export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: FleetGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
@@ -456,6 +465,10 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
   const [fleetElapsedSec, setFleetElapsedSec] = useState(0);
   const hasInteractedRef = useRef(false);
   const lastZoomedVesselRef = useRef<string | null>(null);
+  /** The camera follows the selected ship from this moment on (Infinity = not following). */
+  const followFromRef = useRef(Infinity);
+  /** A person is dragging or zooming: the follow waits until they let go. */
+  const interactingRef = useRef(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -507,6 +520,37 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     controls.addEventListener("start", stopAutoRotate);
     return () => controls.removeEventListener("start", stopAutoRotate);
   }, [selectedVesselId]);
+
+  // Zoom limits, and noticing when a person moves the camera.
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const controls = globe.controls();
+    const radius = globe.getGlobeRadius();
+    controls.minDistance = radius * (1 + MIN_ALTITUDE);
+    controls.maxDistance = radius * (1 + MAX_ALTITUDE);
+    let startView: { lat: number; lng: number } | null = null;
+    const onStart = () => {
+      interactingRef.current = true;
+      const { lat, lng } = globe.pointOfView();
+      startView = { lat, lng };
+    };
+    const onEnd = () => {
+      interactingRef.current = false;
+      const { lat, lng } = globe.pointOfView();
+      // Dragging the globe away from the ship stops following it; zooming keeps following.
+      if (startView && (Math.abs(lat - startView.lat) > 0.5 || Math.abs(lng - startView.lng) > 0.5)) {
+        followFromRef.current = Infinity;
+      }
+      startView = null;
+    };
+    controls.addEventListener("start", onStart);
+    controls.addEventListener("end", onEnd);
+    return () => {
+      controls.removeEventListener("start", onStart);
+      controls.removeEventListener("end", onEnd);
+    };
+  }, []);
 
   const animatedShips = useMemo(() => {
     return ships.map((ship) => {
@@ -588,6 +632,7 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     if (!globe) return;
     if (!selectedVesselId) {
       lastZoomedVesselRef.current = null;
+      followFromRef.current = Infinity;
       setIsZoomedIn(false);
       return;
     }
@@ -600,12 +645,26 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     globe.controls().autoRotate = false;
     setIsZoomedIn(true);
     globe.pointOfView({ lat: ship.liveLat, lng: ship.liveLon, altitude: 0.34 }, 1100);
+    // Follow the ship once the fly-in has finished.
+    followFromRef.current = Date.now() + 1150;
+  }, [selectedVesselId, animatedShips]);
+
+  // Keep the selected ship in the centre as it sails: the camera moves with it, at the zoom the person chose.
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe || !selectedVesselId || interactingRef.current) return;
+    if (Date.now() < followFromRef.current) return;
+    const ship = animatedShips.find((s) => s.vesselId === selectedVesselId);
+    if (!ship) return;
+    const { altitude } = globe.pointOfView();
+    globe.pointOfView({ lat: ship.liveLat, lng: ship.liveLon, altitude }, FOLLOW_STEP_MS);
   }, [selectedVesselId, animatedShips]);
 
   const handleResetView = () => {
     const globe = globeRef.current;
     if (!globe) return;
     setIsZoomedIn(false);
+    followFromRef.current = Infinity;
     globe.pointOfView({ lat: 24, lng: 25, altitude: 1.8 }, 1000);
   };
 
