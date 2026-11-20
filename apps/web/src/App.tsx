@@ -8,7 +8,6 @@ import { Inbox } from "./pages/Inbox.js";
 import { Actions } from "./pages/Actions.js";
 import { Ask } from "./pages/Ask.js";
 import { Settings } from "./pages/Settings.js";
-import { Value } from "./pages/Value.js";
 import { api } from "./lib/api.js";
 
 const PENDING_POLL_MS = 5000;
@@ -19,7 +18,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/inbox": "Εισερχόμενα",
   "/actions": "Ενέργειες",
   "/ask": "Ερωτήσεις",
-  "/value": "Επιχειρηματική αξία",
   "/settings": "Ρυθμίσεις",
 };
 
@@ -84,7 +82,8 @@ export function App() {
         <Route path="/actions" element={<Actions />} />
         <Route path="/bunkering" element={<BunkeringRedirect />} />
         <Route path="/ask" element={<Ask />} />
-        <Route path="/value" element={<Value />} />
+        {/* The business-value page was removed; old links land on the fleet. */}
+        <Route path="/value" element={<Navigate to="/fleet" replace />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

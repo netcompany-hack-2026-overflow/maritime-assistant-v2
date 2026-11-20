@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Globe, { type GlobeMethods } from "react-globe.gl";
 import * as THREE from "three";
 import type { LatLon, PortDTO } from "@maritime/shared";
+import { globeHomeView, setupGlobeControls } from "../lib/globe.js";
 import "./PortPickerGlobe.css";
 
 interface PortPickerGlobeProps {
@@ -58,17 +59,15 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPick
   const originPort = useMemo(() => ports.find((p) => p.id === originPortId) ?? null, [ports, originPortId]);
   const destPort = useMemo(() => ports.find((p) => p.id === destPortId) ?? null, [ports, destPortId]);
 
+  // Same as the fleet globe: no auto-rotation, the same zoom limits and starting view.
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
-    const controls = globe.controls();
-    controls.autoRotate = !originPort && !destPort;
-    controls.autoRotateSpeed = 0.6;
-    // Same zoom limits as the fleet globe: not into the surface, not out into empty space.
-    const radius = globe.getGlobeRadius();
-    controls.minDistance = radius * 1.15;
-    controls.maxDistance = radius * 3.6;
-  }, [originPort, destPort]);
+    setupGlobeControls(globe, size.width, size.height);
+    if (!originPortId && !destPortId) globe.pointOfView(globeHomeView(globe, size.width, size.height), 0);
+    // Only on a new size; picking a port turns the globe in the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.width, size.height]);
 
   const globeMaterial = useMemo(() => new THREE.MeshPhongMaterial({ color: "#f0f5fc" }), []);
 
@@ -106,7 +105,6 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPick
 
     if (route && route.length >= 2) {
       const mid = route[Math.floor(route.length / 2)];
-      globe.controls().autoRotate = false;
       globe.pointOfView({ lat: mid.lat, lng: mid.lon, altitude: 1.95 }, 800);
       return;
     }
@@ -114,13 +112,11 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPick
     if (originPort && destPort) {
       const midLat = (originPort.lat + destPort.lat) / 2;
       const midLon = (originPort.lon + destPort.lon) / 2;
-      globe.controls().autoRotate = false;
       globe.pointOfView({ lat: midLat, lng: midLon, altitude: 2.0 }, 800);
       return;
     }
 
     if (originPort) {
-      globe.controls().autoRotate = false;
       globe.pointOfView({ lat: originPort.lat, lng: originPort.lon, altitude: 1.7 }, 700);
     }
   }, [route, originPort, destPort]);
@@ -204,8 +200,9 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPick
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          flexWrap: "wrap",
           alignItems: "center",
+          gap: "4px 14px",
           fontSize: 11,
           color: "#64748b",
           padding: "0 2px",
@@ -219,7 +216,7 @@ export function PortPickerGlobe({ ports, originPortId, destPortId, route, onPick
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: WARNING }} />
           {destPort ? destPort.unlocode : "Προορισμός"}
         </span>
-        <span style={{ fontStyle: "italic" }}>Κάντε κλικ σε λιμάνια στην υδρόγειο</span>
+        <span style={{ flexBasis: "100%", fontStyle: "italic" }}>Κάντε κλικ σε λιμάνια στην υδρόγειο</span>
       </div>
     </div>
   );

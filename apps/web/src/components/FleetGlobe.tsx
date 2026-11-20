@@ -3,24 +3,8 @@ import Globe, { type GlobeMethods } from "react-globe.gl";
 import * as THREE from "three";
 import { Compass, Anchor, AlertTriangle, RotateCcw, Navigation, Eye, Waves } from "lucide-react";
 import type { PortDTO, VesselPositionDTO } from "@maritime/shared";
-
-interface GlobePoint {
-  kind: "port" | "ship";
-  id: string;
-  lat: number;
-  lng: number;
-  label: string;
-  pending?: boolean;
-  selected?: boolean;
-}
-
-interface GlobeArc {
-  startLat: number;
-  startLng: number;
-  endLat: number;
-  endLng: number;
-  color: string;
-}
+import { globeHomeView, setupGlobeControls } from "../lib/globe.js";
+import "./FleetGlobe.css";
 
 interface GlobePath {
   id: string;
@@ -28,15 +12,6 @@ interface GlobePath {
   color: string;
   selected: boolean;
   isWake?: boolean;
-}
-
-interface GlobeRing {
-  lat: number;
-  lng: number;
-  maxR: number;
-  propagationSpeed: number;
-  repeatPeriod: number;
-  isWarning: boolean;
 }
 
 function headingEndpoint(lat: number, lon: number, headingDeg: number, deltaDeg = 0.85) {
@@ -447,14 +422,113 @@ const WAKE = "#7dd3fc";
 const WARNING = "#b7791f";
 const PORT = "#1f8a5b";
 
-/** Closest and farthest camera, as altitude above the surface in globe radii. */
-const MIN_ALTITUDE = 0.15;
-const MAX_ALTITUDE = 2.6;
+/** Height of the ship and port icons above the surface, in globe radii. */
+const SHIP_ALT = 0.012;
+const PORT_ALT = 0.008;
+/** Camera altitude when flying to a selected ship (inside the limits in lib/globe.ts). */
+const SHIP_VIEW_ALTITUDE = 0.8;
+/** Show the sea-cam panel only when the globe is wide enough for it beside the ship panel and the drawer. */
+const SEA_CAM_MIN_WIDTH = 1024;
 /**
  * The ships move a tiny step every 100 ms and the camera moves with them at once. A
  * transition here would fight the mouse wheel: it would restore the zoom it started from.
  */
 const FOLLOW_STEP_MS = 0;
+
+/** Ship seen from above, bow up: pointed bow, rounded stern, bridge aft. Rotated to its course. */
+const SHIP_SVG = `<svg viewBox="0 0 16 40" aria-hidden="true" focusable="false">
+<path class="ship-marker__body" d="M8 1.5C11.6 6 13.6 11.5 13.8 17.5V35C13.8 37.2 12.4 38.5 10.4 38.5H5.6C3.6 38.5 2.2 37.2 2.2 35V17.5C2.4 11.5 4.4 6 8 1.5Z"/>
+<path class="ship-marker__deck" d="M8 9V25"/>
+<rect class="ship-marker__bridge" x="4.4" y="28.5" width="7.2" height="5.5" rx="1.2"/>
+</svg>`;
+
+/** Port: an anchor on a white disc. */
+const ANCHOR_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+<circle class="port-marker__disc" cx="12" cy="12" r="11"/>
+<g class="port-marker__anchor">
+<circle cx="12" cy="6.2" r="1.9"/>
+<path d="M12 8.1V19.5M8.6 11.2H15.4M5.8 13.6A6.2 6.2 0 0 0 18.2 13.6"/>
+</g>
+</svg>`;
+
+/** Port icon size and the room its name takes to the right of it, in px (for hiding overlapping names). */
+const PORT_ICON_PX = 16;
+const PORT_NAME_CHAR_PX = 6.4;
+
+interface ShipMarker {
+  kind: "ship";
+  id: string;
+  lat: number;
+  lng: number;
+  el: HTMLButtonElement;
+  hull: HTMLSpanElement;
+}
+
+interface PortMarker {
+  kind: "port";
+  id: string;
+  lat: number;
+  lng: number;
+  el: HTMLSpanElement;
+  name: HTMLSpanElement;
+  /** Width of icon + name, in px. */
+  labelWidth: number;
+}
+
+type GlobeMarker = ShipMarker | PortMarker;
+
+/**
+ * Fixed accessors. A new function on each render would make the globe throw away and rebuild
+ * every icon; with these it only moves the existing ones.
+ */
+const markerElement = (d: object) => (d as GlobeMarker).el;
+const markerAltitude = (d: object) => ((d as GlobeMarker).kind === "ship" ? SHIP_ALT : PORT_ALT);
+
+function createShipMarker(id: string, onSelect: (id: string) => void): ShipMarker {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "ship-marker";
+  const hull = document.createElement("span");
+  hull.className = "ship-marker__hull";
+  hull.innerHTML = SHIP_SVG;
+  el.appendChild(hull);
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onSelect(id);
+  });
+  return { kind: "ship", id, lat: 0, lng: 0, el, hull };
+}
+
+function createPortMarker(port: PortDTO): PortMarker {
+  const el = document.createElement("span");
+  el.className = "port-marker";
+  el.title = `${port.name} (${port.unlocode})`;
+  el.innerHTML = ANCHOR_SVG;
+  const name = document.createElement("span");
+  name.className = "port-marker__name";
+  name.textContent = port.name;
+  el.appendChild(name);
+  return {
+    kind: "port",
+    id: port.id,
+    lat: port.lat,
+    lng: port.lon,
+    el,
+    name,
+    labelWidth: PORT_ICON_PX + 4 + port.name.length * PORT_NAME_CHAR_PX,
+  };
+}
+
+/** The ship's course as an angle on screen (0 = up), so the bow points the right way from any camera angle. */
+function screenBearing(globe: GlobeMethods, lat: number, lng: number, heading: number): number {
+  const ahead = headingEndpoint(lat, lng, heading, 0.3);
+  const a = globe.getScreenCoords(lat, lng, SHIP_ALT);
+  const b = globe.getScreenCoords(ahead.lat, ahead.lon, SHIP_ALT);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) < 0.05) return heading;
+  return (Math.atan2(dx, -dy) * 180) / Math.PI;
+}
 
 export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: FleetGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -463,12 +537,20 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
   const [countries, setCountries] = useState<Array<Record<string, unknown>>>([]);
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [fleetElapsedSec, setFleetElapsedSec] = useState(0);
-  const hasInteractedRef = useRef(false);
   const lastZoomedVesselRef = useRef<string | null>(null);
   /** The camera follows the selected ship from this moment on (Infinity = not following). */
   const followFromRef = useRef(Infinity);
   /** A person is dragging or zooming: the follow waits until they let go. */
   const interactingRef = useRef(false);
+  /** The person has moved the camera at least once. */
+  const movedRef = useRef(false);
+  const onSelectRef = useRef(onSelectShip);
+  const shipMarkersRef = useRef(new Map<string, ShipMarker>());
+  const portMarkersRef = useRef(new Map<string, PortMarker>());
+
+  useEffect(() => {
+    onSelectRef.current = onSelectShip;
+  });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -505,33 +587,26 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     return () => clearInterval(timer);
   }, []);
 
+  // No auto-rotation and zoom limits, which depend on the size of the view. Until the person moves
+  // the globe or picks a ship, the starting view is refitted too (the real size arrives just after mount).
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
-    const controls = globe.controls();
-    controls.autoRotate = !selectedVesselId;
-    controls.autoRotateSpeed = 0.4;
-    const stopAutoRotate = () => {
-      if (!hasInteractedRef.current) {
-        hasInteractedRef.current = true;
-        controls.autoRotate = false;
-      }
-    };
-    controls.addEventListener("start", stopAutoRotate);
-    return () => controls.removeEventListener("start", stopAutoRotate);
-  }, [selectedVesselId]);
+    setupGlobeControls(globe, size.width, size.height);
+    if (!movedRef.current && !lastZoomedVesselRef.current) {
+      globe.pointOfView(globeHomeView(globe, size.width, size.height), 0);
+    }
+  }, [size.width, size.height]);
 
-  // Zoom limits, and noticing when a person moves the camera.
+  // Noticing when a person moves the camera.
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
     const controls = globe.controls();
-    const radius = globe.getGlobeRadius();
-    controls.minDistance = radius * (1 + MIN_ALTITUDE);
-    controls.maxDistance = radius * (1 + MAX_ALTITUDE);
     let startView: { lat: number; lng: number } | null = null;
     const onStart = () => {
       interactingRef.current = true;
+      movedRef.current = true;
       const { lat, lng } = globe.pointOfView();
       startView = { lat, lng };
     };
@@ -642,9 +717,8 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     if (!ship) return;
 
     lastZoomedVesselRef.current = selectedVesselId;
-    globe.controls().autoRotate = false;
     setIsZoomedIn(true);
-    globe.pointOfView({ lat: ship.liveLat, lng: ship.liveLon, altitude: 0.34 }, 1100);
+    globe.pointOfView({ lat: ship.liveLat, lng: ship.liveLon, altitude: SHIP_VIEW_ALTITUDE }, 1100);
     // Follow the ship once the fly-in has finished.
     followFromRef.current = Date.now() + 1150;
   }, [selectedVesselId, animatedShips]);
@@ -665,7 +739,7 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     if (!globe) return;
     setIsZoomedIn(false);
     followFromRef.current = Infinity;
-    globe.pointOfView({ lat: 24, lng: 25, altitude: 1.8 }, 1000);
+    globe.pointOfView(globeHomeView(globe, size.width, size.height), 1000);
   };
 
   const selectedSurroundings = useMemo(() => {
@@ -701,37 +775,75 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     return { ship, nearbyPorts, nearbyChokepoint, nearbyVessels };
   }, [selectedVesselId, animatedShips, ports]);
 
-  const points: GlobePoint[] = useMemo(() => {
-    const portPoints: GlobePoint[] = ports.map((p) => ({
-      kind: "port",
-      id: p.id,
-      lat: p.lat,
-      lng: p.lon,
-      label: `${p.name} (${p.unlocode})`,
-    }));
-    const shipPoints: GlobePoint[] = animatedShips.map((s) => ({
-      kind: "ship",
-      id: s.vesselId,
-      lat: s.liveLat,
-      lng: s.liveLon,
-      label: `${s.name} - ${s.speedKn.toFixed(1)} kn`,
-      pending: s.hasPendingAction,
-      selected: s.vesselId === selectedVesselId,
-    }));
-    return [...portPoints, ...shipPoints];
-  }, [ports, animatedShips, selectedVesselId]);
+  // Port and ship icons. The marker objects are kept between ticks so the globe moves the same
+  // HTML elements instead of building new ones every 100 ms.
+  const portMarkers = useMemo(() => {
+    const prev = portMarkersRef.current;
+    const next = new Map<string, PortMarker>();
+    for (const p of ports) {
+      const marker = prev.get(p.id) ?? createPortMarker(p);
+      marker.lat = p.lat;
+      marker.lng = p.lon;
+      next.set(p.id, marker);
+    }
+    portMarkersRef.current = next;
+    return [...next.values()];
+  }, [ports]);
 
-  const rings: GlobeRing[] = useMemo(() => {
-    return animatedShips
-      .filter((s) => s.vesselId === selectedVesselId || s.hasPendingAction)
-      .map((s) => ({
-        lat: s.liveLat,
-        lng: s.liveLon,
-        maxR: s.vesselId === selectedVesselId ? 2.2 : 1.5,
-        propagationSpeed: 1.8,
-        repeatPeriod: 1100,
-        isWarning: Boolean(s.hasPendingAction),
-      }));
+  const shipMarkers = useMemo(() => {
+    const prev = shipMarkersRef.current;
+    const next = new Map<string, ShipMarker>();
+    for (const s of animatedShips) {
+      const marker = prev.get(s.vesselId) ?? createShipMarker(s.vesselId, (id) => onSelectRef.current(id));
+      marker.lat = s.liveLat;
+      marker.lng = s.liveLon;
+      next.set(s.vesselId, marker);
+    }
+    shipMarkersRef.current = next;
+    return [...next.values()];
+  }, [animatedShips]);
+
+  // Ships after ports, so a ship is drawn over a port it is passing.
+  const markers: GlobeMarker[] = useMemo(() => [...portMarkers, ...shipMarkers], [portMarkers, shipMarkers]);
+
+  // Each tick: colour and size of every ship, its bow along the course, and which port names fit.
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    for (const s of animatedShips) {
+      const marker = shipMarkersRef.current.get(s.vesselId);
+      if (!marker) continue;
+      const selected = s.vesselId === selectedVesselId;
+      const className = [
+        "ship-marker",
+        s.hasPendingAction ? "ship-marker--pending" : "",
+        selected ? "ship-marker--selected" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      if (marker.el.className !== className) marker.el.className = className;
+      const label = `${s.name} · ${s.speedKn.toFixed(1)} kn${s.hasPendingAction ? " · ενέργεια σε αναμονή" : ""}`;
+      if (marker.el.title !== label) {
+        marker.el.title = label;
+        marker.el.setAttribute("aria-label", label);
+      }
+      marker.hull.style.transform = `rotate(${screenBearing(globe, s.liveLat, s.liveLon, s.liveHeading).toFixed(1)}deg)`;
+    }
+
+    // A port name is shown unless it would cover a name already shown (e.g. Algeciras, Gibraltar, Ceuta).
+    const placed: Array<[number, number, number, number]> = [];
+    for (const marker of portMarkersRef.current.values()) {
+      if (marker.el.style.display === "none") continue; // on the far side of the globe
+      const { x, y } = globe.getScreenCoords(marker.lat, marker.lng, PORT_ALT);
+      const half = PORT_ICON_PX / 2;
+      const box: [number, number, number, number] = [x - half, y - half, x - half + marker.labelWidth, y + half];
+      const free =
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        placed.every((b) => box[0] > b[2] || box[2] < b[0] || box[1] > b[3] || box[3] < b[1]);
+      if (marker.name.hidden === free) marker.name.hidden = !free;
+      if (free) placed.push(box);
+    }
   }, [animatedShips, selectedVesselId]);
 
   const paths: GlobePath[] = useMemo(() => {
@@ -760,127 +872,51 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
     return list;
   }, [animatedShips, selectedVesselId]);
 
-  const arcs: GlobeArc[] = useMemo(
-    () =>
-      animatedShips.map((ship) => {
-        const tick = headingEndpoint(ship.liveLat, ship.liveLon, ship.liveHeading, 0.85);
-        return {
-          startLat: ship.liveLat,
-          startLng: ship.liveLon,
-          endLat: tick.lat,
-          endLng: tick.lon,
-          color: ship.hasPendingAction ? WARNING : NAVY,
-        };
-      }),
-    [animatedShips]
-  );
-
   const globeMaterial = useMemo(
     () => new THREE.MeshPhongMaterial({ color: "#f0f5fc", transparent: false }),
     []
   );
 
   return (
-    <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%" }}>
-      <Globe
-        ref={globeRef}
-        width={size.width}
-        height={size.height}
-        backgroundColor="rgba(0,0,0,0)"
-        globeMaterial={globeMaterial}
-        showAtmosphere={false}
-        hexPolygonsData={countries}
-        hexPolygonResolution={4}
-        hexPolygonMargin={0.3}
-        hexPolygonUseDots={true}
-        hexPolygonColor={() => "#0a2a66"}
-        pointsData={points}
-        pointLat="lat"
-        pointLng="lng"
-        pointAltitude={(d: object) => ((d as GlobePoint).selected ? 0.01 : 0.008)}
-        pointRadius={(d: object) => {
-          const p = d as GlobePoint;
-          if (p.kind === "port") return isZoomedIn ? 0.2 : 0.3;
-          return p.selected ? 0.32 : 0.36;
-        }}
-        pointColor={(d: object) => {
-          const p = d as GlobePoint;
-          if (p.kind === "port") return PORT;
-          return p.pending ? WARNING : BLUE;
-        }}
-        pointLabel={(d: object) => (d as GlobePoint).label}
-        onPointClick={(d: object) => {
-          const p = d as GlobePoint;
-          if (p.kind === "ship") onSelectShip(p.id);
-        }}
-        ringsData={rings}
-        ringLat="lat"
-        ringLng="lng"
-        ringMaxRadius="maxR"
-        ringPropagationSpeed="propagationSpeed"
-        ringRepeatPeriod="repeatPeriod"
-        ringColor={(d: object) =>
-          (d as GlobeRing).isWarning ? "rgba(183, 121, 31, 0.65)" : "rgba(30, 94, 255, 0.65)"
-        }
-        arcsData={arcs}
-        arcStartLat="startLat"
-        arcStartLng="startLng"
-        arcEndLat="endLat"
-        arcEndLng="endLng"
-        arcColor={(d: object) => (d as GlobeArc).color}
-        arcStroke={0.22}
-        arcAltitude={0.004}
-        pathsData={paths}
-        pathPoints="coords"
-        pathPointLat={(c: [number, number]) => c[0]}
-        pathPointLng={(c: [number, number]) => c[1]}
-        pathPointAlt={0.004}
-        pathColor={(d: object) => (d as GlobePath).color}
-        pathStroke={(d: object) => {
-          const p = d as GlobePath;
-          if (p.isWake) return p.selected ? 2.4 : 0.8;
-          return p.selected ? 1.5 : 0.7;
-        }}
-        pathDashLength={(d: object) => ((d as GlobePath).isWake ? 1 : 0.02)}
-        pathDashGap={(d: object) => ((d as GlobePath).isWake ? 0 : 0.008)}
-        pathDashAnimateTime={(d: object) => ((d as GlobePath).isWake ? 0 : 8000)}
-        pathTransitionDuration={0}
-        labelsData={ports}
-        labelLat="lat"
-        labelLng="lon"
-        labelText="name"
-        labelSize={isZoomedIn ? 0.36 : 0.55}
-        labelDotRadius={0}
-        labelAltitude={0.01}
-        labelColor={() => PORT}
-        labelResolution={2}
-      />
-
-      {isZoomedIn && (
-        <button
-          onClick={handleResetView}
-          style={{
-            position: "absolute",
-            top: 158,
-            left: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "7px 12px",
-            background: "rgba(255, 255, 255, 0.95)",
-            border: "1px solid #cbd5e1",
-            borderRadius: 8,
-            color: NAVY,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(10,42,102,0.1)",
+    // `isolation` keeps the icons' z-index (set by globe.gl) inside the globe, so the savings tile
+    // and the vessel drawer stay on top; the globe's own layer keeps them under the panels below.
+    <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%", isolation: "isolate" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        <Globe
+          ref={globeRef}
+          width={size.width}
+          height={size.height}
+          backgroundColor="rgba(0,0,0,0)"
+          globeMaterial={globeMaterial}
+          showAtmosphere={false}
+          hexPolygonsData={countries}
+          hexPolygonResolution={4}
+          hexPolygonMargin={0.3}
+          hexPolygonUseDots={true}
+          hexPolygonColor={() => "#0a2a66"}
+          htmlElementsData={markers}
+          htmlLat="lat"
+          htmlLng="lng"
+          htmlAltitude={markerAltitude}
+          htmlElement={markerElement}
+          htmlTransitionDuration={0}
+          pathsData={paths}
+          pathPoints="coords"
+          pathPointLat={(c: [number, number]) => c[0]}
+          pathPointLng={(c: [number, number]) => c[1]}
+          pathPointAlt={0.004}
+          pathColor={(d: object) => (d as GlobePath).color}
+          pathStroke={(d: object) => {
+            const p = d as GlobePath;
+            if (p.isWake) return p.selected ? 2.4 : 0.8;
+            return p.selected ? 1.5 : 0.7;
           }}
-        >
-          <RotateCcw size={14} />
-          Όλος ο στόλος
-        </button>
-      )}
+          pathDashLength={(d: object) => ((d as GlobePath).isWake ? 1 : 0.02)}
+          pathDashGap={(d: object) => ((d as GlobePath).isWake ? 0 : 0.008)}
+          pathDashAnimateTime={(d: object) => ((d as GlobePath).isWake ? 0 : 8000)}
+          pathTransitionDuration={0}
+        />
+      </div>
 
       {selectedSurroundings && (
         <>
@@ -890,6 +926,7 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
               bottom: 16,
               left: 16,
               width: 285,
+              maxWidth: "calc(100% - 32px)",
               background: "rgba(255, 255, 255, 0.95)",
               backdropFilter: "blur(8px)",
               border: "1px solid #dbe4f0",
@@ -900,19 +937,30 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
               color: "#1e293b",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "4px 8px",
+                marginBottom: 8,
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, color: NAVY, fontSize: 13 }}>
-                <Navigation size={14} color={BLUE} />
+                <Navigation size={14} color={BLUE} style={{ flexShrink: 0 }} />
                 <span>{selectedSurroundings.ship.name}</span>
               </div>
               <span
                 style={{
+                  flexShrink: 0,
                   background: "#eff6ff",
                   color: BLUE,
                   padding: "2px 7px",
                   borderRadius: 6,
                   fontWeight: 600,
                   fontSize: 11,
+                  whiteSpace: "nowrap",
                 }}
               >
                 {`${selectedSurroundings.ship.speedKn.toFixed(1)} kn | πορεία ${Math.round(selectedSurroundings.ship.liveHeading)}°`}
@@ -977,16 +1025,27 @@ export function FleetGlobe({ ports, ships, selectedVesselId, onSelectShip }: Fle
                 {selectedSurroundings.nearbyVessels.map((v) => `${v.name} (${v.distNm} nm)`).join(", ")}
               </div>
             )}
+
+            {isZoomedIn && (
+              <div style={{ borderTop: "1px solid #e2e8f0", marginTop: 8, paddingTop: 8 }}>
+                <button type="button" className="btn btn-sm" onClick={handleResetView}>
+                  <RotateCcw size={13} aria-hidden="true" />
+                  Όλος ο στόλος
+                </button>
+              </div>
+            )}
           </div>
 
-          <LiveVesselSeaCam
-            shipName={selectedSurroundings.ship.name}
-            shipType={(selectedSurroundings.ship as { type?: string }).type}
-            speedKn={selectedSurroundings.ship.speedKn}
-            heading={selectedSurroundings.ship.liveHeading}
-            hasPendingAction={selectedSurroundings.ship.hasPendingAction}
-            nearbyChokepoint={selectedSurroundings.nearbyChokepoint}
-          />
+          {size.width >= SEA_CAM_MIN_WIDTH && (
+            <LiveVesselSeaCam
+              shipName={selectedSurroundings.ship.name}
+              shipType={(selectedSurroundings.ship as { type?: string }).type}
+              speedKn={selectedSurroundings.ship.speedKn}
+              heading={selectedSurroundings.ship.liveHeading}
+              hasPendingAction={selectedSurroundings.ship.hasPendingAction}
+              nearbyChokepoint={selectedSurroundings.nearbyChokepoint}
+            />
+          )}
         </>
       )}
     </div>

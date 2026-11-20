@@ -114,6 +114,7 @@
 
 .voyage-status {
   display: inline-block;
+  white-space: nowrap;
   font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
@@ -190,8 +191,6 @@
 }
 
 .voyage-cp {
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-xs);
   white-space: nowrap;
 }
 

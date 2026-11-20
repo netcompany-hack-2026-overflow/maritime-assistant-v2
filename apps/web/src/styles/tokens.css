@@ -21,6 +21,11 @@
 
   --radius: 8px;
 
+  /* Button and input heights, so controls in one row line up. */
+  --control-h: 36px;
+  --control-h-sm: 28px;
+  --control-h-touch: 44px;
+
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
   --focus: #1e5eff;

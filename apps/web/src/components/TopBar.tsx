@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { to: "/inbox", label: "Εισερχόμενα", end: false },
   { to: "/actions", label: "Ενέργειες", end: false },
   { to: "/ask", label: "Ερωτήσεις", end: false },
-  { to: "/value", label: "Αξία", end: false },
   { to: "/settings", label: "Ρυθμίσεις", end: false },
 ];
 

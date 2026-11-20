@@ -164,14 +164,12 @@
 
 .ins-quote input {
   width: 110px;
-}
-
-.btn.ins-small {
-  padding: 4px 10px;
-  font-size: var(--text-xs);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 .ins-pill {
@@ -249,10 +247,22 @@
 
 .ins-field input,
 .ins-field textarea {
+  font-family: inherit;
   font-size: var(--text-sm);
   color: var(--text);
   width: 100%;
   box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.ins-field input {
+  min-height: var(--control-h);
+  padding: 0 var(--space-3);
+}
+
+.ins-field textarea {
+  padding: var(--space-2) var(--space-3);
 }
 
 .ins-field textarea {
@@ -263,6 +273,7 @@
 
 .ins-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   justify-content: flex-end;
 }
