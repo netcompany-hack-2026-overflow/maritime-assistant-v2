@@ -14,7 +14,6 @@ import {
   type TcoBreakdown,
   type TcoOffer,
   type TcoRow,
-  type Urgency,
 } from "@maritime/shared";
 import { api, type MetaResponse } from "../lib/api.js";
 import { NOT_TAKEN_PREFIX } from "../lib/labels.js";
@@ -66,7 +65,6 @@ const WAYPOINT_LABEL: Record<BunkerWaypoint["kind"], (port: string, dest: string
   DESTINATION: (_, dest) => `Άφιξη ${dest}`,
 };
 
-const URGENCY_LABEL: Record<Urgency, string> = { LOW: "Χαμηλό", NORMAL: "Κανονικό", HIGH: "Υψηλό" };
 
 const OPTION_TITLE: Record<BunkerOption["key"], string> = {
   ECO: "Ανεφοδιασμός και μετά μείωση ταχύτητας για άφιξη ακριβώς στην ώρα",
@@ -150,14 +148,8 @@ export function BunkerOffersPanel({
   useEffect(() => {
     if (focusOfferId) setSelectedId(focusOfferId);
   }, [focusOfferId]);
-  // What-if inputs; null = the voyage's own default.
-  const [charter, setCharter] = useState<number | null>(null);
-  const [stemQty, setStemQty] = useState<number | null>(null);
-  const [urgency, setUrgency] = useState<Urgency>(DEFAULT_TCO.urgency);
-  const [etsEnabled, setEtsEnabled] = useState(DEFAULT_TCO.etsEnabled);
-  // null = the EUA price from Settings (the one the speed scenarios use too).
-  const [etsPriceOverride, setEtsPrice] = useState<number | null>(null);
-  const etsPrice = etsPriceOverride ?? meta?.euaPriceEurPerT ?? DEFAULT_TCO.etsPriceEurPerT;
+  // The EUA price from Settings (the one the speed scenarios use too).
+  const etsPrice = meta?.euaPriceEurPerT ?? DEFAULT_TCO.etsPriceEurPerT;
   const [ai, setAi] = useState<{ text: string; busy: boolean; error: string | null }>({ text: "", busy: false, error: null });
   const [busy, setBusy] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
@@ -169,12 +161,11 @@ export function BunkerOffersPanel({
   const openOffers = offers.filter((o) => o.status === "PENDING").length;
   const defaultStem = offers.find((o) => o.plan)?.plan?.input.stemQtyT ?? 800;
 
+  // The voyage's own figures: the ship's charter rate, the quantity the offers were analysed for, EUA from Settings.
   const assumptions: TcoAssumptions = {
     ...DEFAULT_TCO,
-    stemQtyT: stemQty ?? defaultStem,
-    charterUsdPerDay: charter ?? voyage.charterRateUsdPerDay ?? 15_000,
-    urgency,
-    etsEnabled,
+    stemQtyT: defaultStem,
+    charterUsdPerDay: voyage.charterRateUsdPerDay ?? 15_000,
     etsPriceEurPerT: etsPrice,
   };
 
@@ -182,7 +173,7 @@ export function BunkerOffersPanel({
   const rows = useMemo(
     () => compareOffers(tcoOffers, assumptions),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tcoOffers, assumptions.stemQtyT, assumptions.charterUsdPerDay, urgency, etsEnabled, etsPrice]
+    [tcoOffers, assumptions.stemQtyT, assumptions.charterUsdPerDay, etsPrice]
   );
   const explanation = useMemo(() => explainComparison(rows), [rows]);
   const byId = new Map(offers.map((o) => [o.recommendationId, o]));
@@ -193,7 +184,7 @@ export function BunkerOffersPanel({
   // The AI text describes the numbers it was given; drop it when they change.
   useEffect(
     () => setAi({ text: "", busy: false, error: null }),
-    [voyage.id, assumptions.stemQtyT, assumptions.charterUsdPerDay, urgency, etsEnabled, etsPrice]
+    [voyage.id, assumptions.stemQtyT, assumptions.charterUsdPerDay, etsPrice]
   );
   // A half-written rejection belongs to the offer it was started on.
   useEffect(() => {
@@ -254,47 +245,6 @@ export function BunkerOffersPanel({
       )}
 
       <div className="bunkering-grid">
-        <section className="whatif" aria-label="Τι θα γινόταν αν">
-          <p className="label">Τι θα γινόταν αν</p>
-          <label className="whatif__field">
-            <span>Ναύλος (charter rate) <strong>{usd(assumptions.charterUsdPerDay)}/ημέρα</strong></span>
-            <input type="range" min={5000} max={60000} step={500} value={assumptions.charterUsdPerDay} onChange={(e) => setCharter(Number(e.target.value))} />
-          </label>
-          <label className="whatif__field">
-            <span>Ποσότητα <strong>{assumptions.stemQtyT.toLocaleString("en-US")} t</strong></span>
-            <input type="range" min={300} max={1500} step={50} value={assumptions.stemQtyT} onChange={(e) => setStemQty(Number(e.target.value))} />
-          </label>
-          <fieldset className="whatif__field whatif__urgency">
-            <legend>Επείγον (πόσο κοστίζει μια ώρα καθυστέρησης)</legend>
-            {(["LOW", "NORMAL", "HIGH"] as Urgency[]).map((u) => (
-              <label key={u} className={urgency === u ? "seg seg--active" : "seg"}>
-                <input type="radio" name={`urgency-${voyage.id}`} value={u} checked={urgency === u} onChange={() => setUrgency(u)} />
-                {URGENCY_LABEL[u]}
-              </label>
-            ))}
-          </fieldset>
-          <label className="whatif__check">
-            <input type="checkbox" checked={etsEnabled} onChange={(e) => setEtsEnabled(e.target.checked)} />
-            EU ETS στο επιπλέον CO₂ της παράκαμψης
-          </label>
-          {etsEnabled && (
-            <label className="whatif__field">
-              <span>Τιμή EUA <strong>€{etsPrice}/t CO₂</strong></span>
-              <input type="range" min={20} max={150} step={1} value={etsPrice} onChange={(e) => setEtsPrice(Number(e.target.value))} />
-            </label>
-          )}
-          <button
-            className="btn whatif__reset"
-            onClick={() => { setCharter(null); setStemQty(null); setUrgency(DEFAULT_TCO.urgency); setEtsEnabled(DEFAULT_TCO.etsEnabled); setEtsPrice(null); }}
-          >
-            Επαναφορά
-          </button>
-          <p className="whatif__help">
-            Η πίστωση αποτιμάται με {DEFAULT_TCO.financeRatePct}% τον χρόνο έναντι {DEFAULT_TCO.standardPaymentDays} ημερών· κάθε
-            μονάδα αξιοπιστίας κάτω από το 10 προσθέτει {DEFAULT_TCO.reliabilityPctPerPoint}% του λογαριασμού καυσίμου.
-          </p>
-        </section>
-
         <section className="advice" aria-label="Σύσταση">
           <p className="label">Σύσταση</p>
           <p className="advice__headline">{explanation.headline}</p>
@@ -307,6 +257,12 @@ export function BunkerOffersPanel({
           {legacy.length > 0 && (
             <p className="advice__warning">{legacy.length} παλαιότερες προσφορές επεξεργάστηκαν πριν υπάρξει η σύγκριση και δεν περιλαμβάνονται.</p>
           )}
+          <p className="muted advice__assumptions">
+            Με ναύλο {usd(assumptions.charterUsdPerDay)}/ημέρα, {assumptions.stemQtyT.toLocaleString("en-US")} t
+            {assumptions.etsEnabled ? ` και EUA €${etsPrice}/t CO₂ στο επιπλέον CO₂ της παράκαμψης` : ""}. Η πίστωση αποτιμάται
+            με {DEFAULT_TCO.financeRatePct}% τον χρόνο έναντι {DEFAULT_TCO.standardPaymentDays} ημερών· κάθε μονάδα αξιοπιστίας
+            κάτω από το 10 προσθέτει {DEFAULT_TCO.reliabilityPctPerPoint}% του λογαριασμού καυσίμου.
+          </p>
           <div className="advice__ai">
             <button className="btn" onClick={handleAskAi} disabled={ai.busy || rows.length === 0}>
               <Sparkles size={14} aria-hidden="true" />
@@ -361,7 +317,7 @@ export function BunkerOffersPanel({
                 <tr><th scope="row">Barge</th>{rows.map((r) => <td key={r.offer.id}>{r.screen.delayHours > 0 ? `${r.screen.delayHours} h μετά την άφιξη` : "με την άφιξη"}</td>)}</tr>
                 <tr><th scope="row">Ποσότητα</th>{rows.map((r) => <td key={r.offer.id}>{r.qtyT.toLocaleString("en-US")} t</td>)}</tr>
                 {breakdownKeys.map((k) => (
-                  (k !== "etsUsd" || etsEnabled) && (
+                  (k !== "etsUsd" || assumptions.etsEnabled) && (
                     <tr key={k} className="compare__cost"><th scope="row">{TCO_LABELS[k]}</th>{rows.map((r) => <td key={r.offer.id}>{cell(r, k)}</td>)}</tr>
                   )
                 ))}
@@ -438,9 +394,6 @@ export function BunkerOffersPanel({
                 <OptionCard key={o.key} option={o} offer={selected} chosen={selected.chosenOption === o.key} />
               ))}
             </div>
-          )}
-          {assumptions.stemQtyT !== defaultStem && (
-            <p className="muted">Οι επιλογές και οι απαντήσεις παρακάτω είναι για τους {defaultStem.toLocaleString("en-US")} t με τους οποίους αναλύθηκε η προσφορά· ο πίνακας πάνω χρησιμοποιεί την ποσότητα του «τι θα γινόταν αν».</p>
           )}
 
           <div className="offer-decision">
