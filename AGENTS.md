@@ -8,7 +8,14 @@ this repository. Read this first.
 `main` is what we demo and ship. `dev` is where finished work is collected and checked
 before it reaches `main`.
 
-1. **Start every new piece of work from `dev`:**
+**Small or big?**
+- **Small** (a text fix, a colour, a one-file bug fix that stands on its own): commit it
+  directly on `dev`, after running the checks in "Before you push", and push `dev`.
+- **Big** (a new page or feature, a new calculation, a schema change, anything across
+  several files, anything you may want to drop): use its own branch, steps 1–3 below.
+- Not sure? Treat it as big.
+
+1. **Start every big piece of work from `dev`:**
    ```bash
    git checkout dev && git pull
    git checkout -b <type>/<short-name>      # e.g. feature/bunker-offers, fix/inbox-link, chore/docs
@@ -29,7 +36,8 @@ before it reaches `main`.
    ```
 
 Rules for agents:
-- Never commit directly to `dev` or `main`; always use a branch made from `dev`.
+- Never commit directly to `main`. Commit directly to `dev` only for small changes (see
+  "Small or big?" above); everything else goes on a branch made from `dev`.
 - Never push to `main`, and never merge `dev` into `main`, without the user's explicit
   go-ahead in the conversation. Pushing a tested branch into `dev` is fine when the user
   asked for the work to be pushed.
