@@ -20,6 +20,57 @@ about fuel, and decide whether to slow the ship down. This tool does the reading
 matching, and the arithmetic — and then stops and asks a human to approve or reject
 the recommendation. **Nothing is executed automatically.**
 
+## Quick start
+
+```bash
+git clone <repo-url>
+cd maritime-assistant-v2
+docker compose up --build
+```
+
+Open **http://localhost:8080**. No `.env` file or API key is needed: without a key the app
+uses an offline extractor (mock) and the whole demo works. To use a real LLM, see
+[Setup](#setup-docker--recommended).
+
+## Contents
+
+- [What Challenge #2 asked for, and where to find it](#what-challenge-2-asked-for-and-where-to-find-it)
+- [The idea in one scenario](#the-idea-in-one-scenario)
+- [The 90-second demo path](#the-90-second-demo-path)
+- [What sets it apart](#what-sets-it-apart-scenarios-with-contractual-consequences)
+- [Business value](#business-value)
+- [Pages](#pages)
+- [Architecture](#architecture) · [How GenAI is used](#how-genai-is-used) · [Why these choices](#why-these-choices)
+- [Data model](#data-model)
+- [Setup](#setup-docker--recommended) · [Local dev](#local-dev-without-docker)
+- [Testing & accuracy evidence](#testing--accuracy-evidence)
+- [REST API](#rest-api) · [Assumptions](#assumptions) · [Known limitations](#known-limitations)
+- [Hackathon rules we follow](#hackathon-rules-we-follow)
+
+## What Challenge #2 asked for, and where to find it
+
+Challenge #2 (Smart Maritime Operations Assistant) asks for a GenAI assistant over
+structured operational data. Each requirement and where it is covered:
+
+| Requirement | What Tidewise does | Where |
+|---|---|---|
+| Structured model of vessels and operations | Postgres with vessels, voyages, ports, port events, recommendations, charter parties, suppliers, audit log | [Data model](#data-model), [schema.prisma](apps/api/prisma/schema.prisma) |
+| Emails and documents → structured records | Agent email → `PortEvent` (port, delay, new berth time). Fuel quote → grade, price, quantity, port, expiry. Charter party PDF → laytime, demurrage, clauses. Every field has its source text highlighted | Inbox, Voyages → Charter party |
+| Plain-language questions, showing the facts behind each answer | Ask page: the LLM answers only from database records and cites table+id. Citations that don't exist are dropped on the server | Ask, [ask.ts](apps/api/src/services/ask.ts) |
+| Recommended actions for a person to approve | Slow down (JIT), weather reroute, accept/decline a fuel offer. Approve, or reject with a reason, logged to the audit log | Actions |
+| Working prototype | Runs with one `docker compose up --build` | [Quick start](#quick-start) |
+| End-to-end live demo | Email → structured event → recommendation with numbers → approval → email to the charterer → the ship slows down on the globe | [The 90-second demo path](#the-90-second-demo-path) |
+| How we tested accuracy | 18 synthetic emails with expected fields, 18/18 in CI. Unit tests for every calculation | [Testing & accuracy evidence](#testing--accuracy-evidence) |
+| Architecture, use of GenAI, rationale | Diagram, the LLM's role, the reason for each choice | [Architecture](#architecture), [GenAI](#how-genai-is-used), [Why](#why-these-choices) |
+
+Challenge directions we cover (the challenge says combining several is better):
+
+- **Port calls:** berth delay → just-in-time arrival, less waiting at anchor, laytime and demurrage from the charter party.
+- **Fuel and emissions:** where refuelling is worth it, consumption, CO₂, EU ETS cost and CII rating (A–E).
+- **Routes:** real sea routes, a weather reroute from wave and current forecasts, live position from AIS.
+- **Supply chain:** fuel supplier quotes → comparison on total cost → acceptance email (the "order"), counter-offer or decline.
+- **Also:** war-risk insurance for high-risk areas, issued with each voyage.
+
 ## The idea in one scenario
 
 MV Aegean Star is sailing Piraeus → Rotterdam at 14.0 kn. A port-agent email arrives:
@@ -384,6 +435,43 @@ Vessel movement runs on two deliberately decoupled clocks: a **visual** clock
 every JIT calculation). This keeps the business math sound regardless of how fast the
 globe is spinning or how long the demo machine has been running.
 
+## How GenAI is used
+
+The rule: **the LLM reads and writes, the code calculates, a person decides.** No number
+that drives a decision (speed, fuel, €, CO₂, offer ranking) comes from the model.
+
+| Where | What the LLM does | How we check it |
+|---|---|---|
+| Agent and supplier emails (and PDFs) | Extracts structured JSON: event type, port, vessel, delay, new berth time, fuel offer terms. Works in English, Greek, mixed, and trader slang | zod schema validation, a JSON repair loop (up to 2 tries), source text highlighted for every field, 18-email eval |
+| Charter party (PDF or text) | Extracts laytime, NOR, WIBON, demurrage/despatch, the JIT clause and the war clause | Each term shows its exact source text; the user can correct it |
+| Actions | Explains the recommendation in plain language, from the numbers the code produced | The calculation's numbers are shown next to it ("show the math") |
+| Fuel offer comparison | "Ask the AI": **one** call, only when you ask | Ranking and recommendation are made without the LLM; offers that don't fit the schedule are dropped before any call |
+| Ask | Answers only from database records, citing table+id | The server drops citations that don't match a real record |
+| Charterer notice, war-risk insurance | Writes the email and the analysis from given facts | Draft only; only a person sends |
+
+Providers: OpenAI, Anthropic or the offline `mock` (regex), behind one interface
+([apps/api/src/llm/types.ts](apps/api/src/llm/types.ts)). Replies to suppliers are written
+from templates, so prices are always exact and cost no tokens.
+
+## Why these choices
+
+- **Calculations in pure functions, not in the LLM.** A model can get arithmetic wrong. The
+  functions in `packages/shared` have unit tests, and the operator sees every intermediate
+  number before approving.
+- **A person approves every decision.** A speed change or an accepted offer costs money and
+  has contractual effects. Nothing is sent or changed without Approve/Send, and every decision
+  is logged.
+- **Mock provider, no key needed.** The app, CI and the eval run without an account or cost,
+  and give the same result every time. Put a key in `.env` to switch to a real model.
+- **Source text highlighted.** The operator sees where each value came from and catches a
+  wrong extraction before it becomes a recommendation.
+- **Few LLM calls.** The model is called only from user actions, never from page polling,
+  with a timeout and a token limit. That keeps cost and response time low.
+- **Two clocks.** The globe runs fast for the demo; calculations stay on real time, so the
+  numbers are right.
+- **Postgres and a TypeScript monorepo.** The same types and schemas in api and web, and
+  relational data that fits vessel → voyage → event → recommendation.
+
 ## Data model
 
 ```mermaid
@@ -395,6 +483,9 @@ erDiagram
     VOYAGE ||--o{ RECOMMENDATION : "subject of"
     EMAIL ||--o{ PORT_EVENT : "extracted from"
     PORT_EVENT ||--o{ RECOMMENDATION : "triggers"
+    VOYAGE ||--o| CHARTER_PARTY : "governed by"
+    RECOMMENDATION ||--o{ OUTBOUND_EMAIL : "notice to charterer/agent"
+    RECOMMENDATION ||--o{ EMAIL_DRAFT : "reply to supplier"
 
     PORT {
         string unlocode
@@ -415,6 +506,8 @@ erDiagram
         datetime rebasedAt
         datetime plannedEta
         datetime berthTime
+        json routeCoords
+        float routeNm
         enum status
     }
     EMAIL {
@@ -427,19 +520,57 @@ erDiagram
         enum eventType
         float delayHours
         datetime newBerthTime
+        string fuelGrade
+        float priceUsdPerT
+        float qtyMinT
+        float qtyMaxT
+        datetime validUntil
+        string supplier
         json sourceSpans
     }
     RECOMMENDATION {
+        enum actionType
         float currentSpeedKn
         float recommendedSpeedKn
         float fuelSavedT
+        float costSavedEur
+        float co2SavedT
         json calc
+        json scenarios
+        json bunkerPlan
         enum status
+    }
+    CHARTER_PARTY {
+        string sourceName
+        json terms
+        float expectedOpsHours
+    }
+    OUTBOUND_EMAIL {
+        string toAddrs
+        string subject
+        enum status
+    }
+    EMAIL_DRAFT {
+        enum kind
+        string toAddr
+        string subject
+        enum status
+    }
+    SUPPLIER {
+        string name
+        string emailDomain
+        float reliabilityScore
     }
     AUDIT_LOG {
         string entity
         string action
         json payload
+    }
+    SETTINGS {
+        float fuelPriceEurPerT
+        float euaPriceEurPerT
+        float co2Factor
+        float usdEurRate
     }
 ```
 
@@ -631,7 +762,7 @@ Full per-field, per-email results are written to
 - Offer comparison (TCO): a charter rate per vessel (e.g. $18,000/day for MV Aegean
   Star), cost of money 8%/yr against 30 days' credit, supplier risk 0.3% of the bill per
   reliability point below 10 (history in the `Supplier` table; unknown = 6/10), EUA
-  €75/t. Barging not stated is treated as included and flagged. The first grade in each
+  price from Settings (default €90/t). Barging not stated is treated as included and flagged. The first grade in each
   email (e.g. VLSFO) is compared; other grades are shown separately. The detour is measured as a straight line out to
   the port and back from the closest point on the ship's remaining route whose line to
   the port doesn't cross land (Natural Earth 110m coastlines). The sea-route network is
@@ -669,8 +800,21 @@ Full per-field, per-email results are written to
 - PDF upload reads the text layer only; scanned (image-only) PDFs are rejected with a
   clear message rather than OCR'd.
 
-## Hard rules followed throughout
+## Hackathon rules we follow
 
-Synthetic data only. No secrets committed (`.env` is gitignored; `.env.example` ships
-with empty API key placeholders). No hardcoded API keys. Every phase of the build
-ended with a working `docker compose up --build` from a clean state before moving on.
+- **Docker on Linux, one command:** `git clone` and `docker compose up --build` build and
+  start everything (Postgres, API, web). Images are Linux-based (`node:20-slim`,
+  `nginx:alpine`). CI runs a full `docker compose up --build` with smoke tests on every push.
+- **Database from an official image:** `postgres:16`.
+- **External data only from official public APIs:** Open-Meteo Marine (weather),
+  aisstream.io (AIS, optional), OpenAI/Anthropic (optional). Everything else is mock data we
+  made.
+- **No real personal data:** vessels, IMO numbers, emails, suppliers and addresses are
+  synthetic.
+- **API keys handled safely:** no key in the repo. Keys go only in `.env` (gitignored),
+  `.env.example` has empty placeholders, and no key reaches the browser.
+- **Cross-platform:** runs wherever Docker runs (Linux, macOS, Windows). The UI works on
+  desktop, tablet and phone.
+
+Every phase of the build ended with a working `docker compose up --build` from a clean
+state before moving on.
