@@ -57,6 +57,7 @@
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   font-size: var(--text-sm);
+  white-space: nowrap;
 }
 
 .hero__links a:hover {
@@ -485,35 +486,5 @@
   .how__steps {
     grid-template-columns: repeat(5, 1fr);
     gap: var(--space-5);
-  }
-}
-
-.value-teaser {
-  background: var(--surface);
-}
-
-.value-teaser__grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-6);
-}
-
-.value-teaser__grid > div {
-  border-top: 1px solid var(--text);
-  padding-top: var(--space-4);
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.value-teaser__q {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: var(--space-2);
-}
-
-@media (max-width: 900px) {
-  .value-teaser__grid {
-    grid-template-columns: 1fr;
   }
 }

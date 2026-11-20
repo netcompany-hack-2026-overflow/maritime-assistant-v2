@@ -4,7 +4,7 @@
 
 > **The app's interface is in Greek.** This English README calls pages and buttons by their
 > English meaning. Pages: Fleet = Στόλος, Voyages = Ταξίδια, Inbox = Εισερχόμενα, Actions = Ενέργειες,
-> Ask = Ερωτήσεις, Value = Αξία, Settings = Ρυθμίσεις. Common buttons:
+> Ask = Ερωτήσεις, Settings = Ρυθμίσεις. Common buttons:
 > Approve = Έγκριση, Reject = Απόρριψη, Undo approval = Αναίρεση έγκρισης, Send = Αποστολή,
 > "Simulate incoming email" = «Προσομοίωση εισερχόμενου email», "Simulate fuel quotes" =
 > «Προσομοίωση προσφορών καυσίμου». Emails to suppliers and charterers stay in English.
@@ -170,12 +170,10 @@ The four demo emails are in [apps/api/prisma/mock_demo_data.json](apps/api/prism
    - the K&R advice
    - the AI analysis
    - the notice to the underwriters, ready to send
-8. **Value** — the business-value section: the customer, a per-ship and per-fleet savings
-   calculator (fuel, ETS, demurrage, CII) and "why now", with sources.
-9. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
+8. **Ask** — ask "Why didn't we take the Genoa offer?" or "How much fuel have we saved
    from approved recommendations?" and get an answer with a citation back to the
    recommendation record.
-10. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
+9. **Documents** (optional) — in Inbox, "Upload PDF" with the sample
    `apps/web/public/samples/algeciras-berth-notice.pdf`. The PDF's text runs through the
    same pipeline and produces a recommendation for MV Ionian Trader.
 
@@ -277,7 +275,7 @@ A plain JIT calculator says "slow down, save fuel". Tidewise also answers charte
 **Customer.** Dry bulk and tanker owner-operators (10–60 ships) on voyage charters, starting
 with Greek fleets; used by operations, chartering and technical/ESG.
 
-**Savings** (calculator on the **Value** page, same engine). Supramax 58,000 dwt, 13.5 kn,
+**Savings** (same engine that prices the scenarios in **Actions**). Supramax 58,000 dwt, 13.5 kn,
 29 t/day, 24 h berth delay notified 1,200 nm out: ~43 t fuel and ~135 t CO₂ less, ~€26k fuel
 + ~€7k EU ETS (60% average ETS scope, EUA €90) ≈ **€33k per notice**; at 10 notices a year
 **~€330k per ship**, ~€6.7M for a 20-ship fleet, ~6% lower attained CII per ship. Demurrage
@@ -322,13 +320,15 @@ the time check).
 
 - **Landing** (`/`) — hero page explaining the product, with a live "fuel saved so far"
   figure and a link into the console. The console pages live under `/fleet`, `/voyages`,
-  `/inbox`, `/actions`, `/ask`, `/value`, `/settings`.
+  `/inbox`, `/actions`, `/ask`, `/settings`.
 - **Fleet** — 3D globe (dotted-land style) with every vessel's live position, heading,
-  and remaining sea route, plus labelled ports; a side list of ships; click a ship for a detail drawer. Ships with a
+  and remaining sea route. Each ship is a ship icon (SVG) with its bow along its course, and
+  each port a green anchor with its name. The globe does not spin by itself and zoom is
+  limited (not too close, not too far). A side list of ships; click a ship for a detail drawer. Ships with a
   pending recommendation are highlighted. A "Saved to date" tile totals fuel, € and
   CO₂ saved by every approved recommendation.
 - **Voyages** — a table of every voyage with a "New voyage" form: pick a vessel and two
-  ports (via dropdowns or by clicking a small rotating globe), see the sea route and a
+  ports (via dropdowns or by clicking a small globe), see the sea route and a
   live distance/ETA preview, and create or cancel voyages.
 - **Inbox** — queued and processed port-agent emails. "Simulate incoming email"
   releases the next queued one; "Paste email" lets you type a custom one; "Upload PDF"

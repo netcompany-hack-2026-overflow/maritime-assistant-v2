@@ -30,9 +30,17 @@
   color: var(--text);
 }
 
+/* The links never push the bar off screen: the gap shrinks first, then the row scrolls sideways. */
 .top-bar__nav {
   display: flex;
-  gap: var(--space-6);
+  gap: clamp(var(--space-3), 2vw, var(--space-6));
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.top-bar__nav::-webkit-scrollbar {
+  display: none;
 }
 
 .top-bar__link {

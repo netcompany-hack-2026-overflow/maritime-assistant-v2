@@ -73,9 +73,10 @@
 
 .cp-dialog__ops input {
   width: 80px;
+  min-height: var(--control-h);
   font-family: inherit;
   font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-2);
+  padding: 0 var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }

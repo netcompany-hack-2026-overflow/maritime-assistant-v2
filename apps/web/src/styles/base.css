@@ -67,13 +67,13 @@ button {
   font-size: var(--text-sm);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
-  /* Never wider than the space it sits in: long labels wrap inside the button instead of spilling out. */
+  min-height: var(--control-h);
+  /* Never wider than the space it sits in, and never narrower than its longest word: a row of
+     buttons wraps to the next line instead of squeezing the labels. */
   max-width: 100%;
-  min-width: 0;
   justify-content: center;
   text-align: center;
   white-space: normal;
-  overflow-wrap: break-word;
   line-height: 1.3;
 }
 
@@ -98,6 +98,32 @@ button {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Small button, for tables and compact rows. */
+.btn-sm {
+  min-height: var(--control-h-sm);
+  padding: var(--space-1) var(--space-3);
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 85%, #000000);
+  border-color: var(--danger);
+}
+
+/* Touch screens: every button is big enough for a finger. */
+@media (pointer: coarse) {
+  .btn {
+    min-height: var(--control-h-touch);
+  }
 }
 
 .empty-state {

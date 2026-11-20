@@ -451,7 +451,7 @@ export function Voyages() {
                 <td>
                   {ACTIVE_STATUSES.has(v.status) || v.charterParty ? (
                     <button
-                      className={v.charterParty ? "btn voyage-cp voyage-cp--on" : "btn voyage-cp"}
+                      className={v.charterParty ? "btn btn-sm voyage-cp voyage-cp--on" : "btn btn-sm voyage-cp"}
                       onClick={() => setCpVoyage(v)}
                       aria-label={`${v.charterParty ? "Προβολή" : "Προσθήκη"} ναυλοσυμφώνου για ${v.vesselName}`}
                     >
@@ -478,7 +478,7 @@ export function Voyages() {
                 <td>
                   {ACTIVE_STATUSES.has(v.status) && (
                     <button
-                      className="btn"
+                      className="btn btn-sm"
                       onClick={() => handleCancel(v.id)}
                       aria-label={`Ακύρωση ταξιδιού του ${v.vesselName}`}
                       disabled={cancellingId === v.id}

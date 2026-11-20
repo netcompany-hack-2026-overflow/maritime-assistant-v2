@@ -51,9 +51,10 @@
   background: var(--surface);
 }
 
+/* An inset line instead of a border, so the text of the active row does not shift. */
 .ship-list__item--active {
   background: var(--surface);
-  border-left: 2px solid var(--blue);
+  box-shadow: inset 2px 0 0 var(--blue);
 }
 
 .ship-list__name {

@@ -125,7 +125,6 @@ export function Landing() {
           </Link>
           <nav aria-label="Κύριο μενού" className="hero__links">
             <a href="#how">Πώς δουλεύει</a>
-            <a href="#value">Επιχειρηματική αξία</a>
             <Link to="/ask">Ρωτήστε για τον στόλο</Link>
             <Link to="/fleet" className="hero__nav-cta">
               Άνοιγμα κονσόλας
@@ -200,40 +199,6 @@ export function Landing() {
           </ol>
           <Link to="/fleet" className="how__cta">
             Άνοιγμα κονσόλας <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-      </section>
-
-      <section id="value" className="how value-teaser" aria-labelledby="value-title">
-        <div className="how__inner">
-          <h2 id="value-title" className="how__title">
-            Επιχειρηματική <em>αξία.</em>
-          </h2>
-          <div className="value-teaser__grid">
-            <div>
-              <p className="value-teaser__q">Ποιος είναι ο πελάτης;</p>
-              <p>
-                Πλοιοκτήτριες-διαχειρίστριες εταιρείες ξηρού φορτίου και δεξαμενόπλοιων σε ναυλώσεις ταξιδιού, ξεκινώντας
-                από ελληνικούς στόλους. Το χρησιμοποιούν καθημερινά το operations, το chartering και η τεχνική/ESG ομάδα.
-              </p>
-            </div>
-            <div>
-              <p className="value-teaser__q">Τι εξοικονομεί;</p>
-              <p>
-                Μία καθυστέρηση πρόσδεσης 24 h σε Supramax 1.200 nm πριν το λιμάνι: περίπου 43 t καυσίμου και 135 t CO₂, περίπου €33k
-                σε καύσιμο και δικαιώματα EU ETS, και το demurrage μιας μέρας στην άγκυρα. Με δέκα ειδοποιήσεις τον χρόνο, περίπου €330k ανά πλοίο.
-              </p>
-            </div>
-            <div>
-              <p className="value-teaser__q">Γιατί τώρα;</p>
-              <p>
-                Το EU ETS καλύπτει το 100% των εκπομπών της ναυτιλίας από το 2026 με EUA κοντά στα €90/t, το CII σφίγγει κάθε
-                χρόνο ως το 2030, το VLSFO είναι πάνω από $700/t και ο IMO προωθεί την άφιξη just-in-time.
-              </p>
-            </div>
-          </div>
-          <Link to="/value" className="how__cta">
-            Υπολογίστε τα νούμερα για τον στόλο σας <ArrowRight size={16} aria-hidden="true" />
           </Link>
           <p className="how__credit">Φωτογραφία: Austin Neill / Unsplash</p>
         </div>

@@ -163,7 +163,7 @@ export function InsuranceDialog({ voyageId, title, onClose }: Props) {
                   {data.analysis.source === "llm" ? `AI (${data.analysis.provider})` : "πρότυπο χωρίς AI"} · {utc(data.analysis.generatedAt)}
                 </span>
                 <button
-                  className="btn ins-small"
+                  className="btn btn-sm"
                   disabled={busy !== null}
                   onClick={() => run("analysis", () => api.regenerateInsuranceAnalysis(voyageId), "Η ανάλυση ξαναγράφτηκε.")}
                 >
@@ -272,7 +272,7 @@ export function InsuranceDialog({ voyageId, title, onClose }: Props) {
                             />
                           </label>
                           <button
-                            className="btn ins-small"
+                            className="btn btn-sm"
                             disabled={busy !== null || !(Number(draft) > 0)}
                             onClick={() =>
                               run("quote", () => api.setInsuranceQuote(voyageId, e.rateZoneId, Number(draft)), "Το επασφάλιστρο ξαναϋπολογίστηκε με την προσφορά.")
@@ -282,7 +282,7 @@ export function InsuranceDialog({ voyageId, title, onClose }: Props) {
                           </button>
                           {e.quoted && (
                             <button
-                              className="btn ins-small"
+                              className="btn btn-sm"
                               disabled={busy !== null}
                               onClick={() => run("quote", () => api.setInsuranceQuote(voyageId, e.rateZoneId, null))}
                             >
